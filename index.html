@@ -22,10 +22,7 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://note.directory/" />
-    <meta
-      property="og:image"
-      content="https://note.directory/img/logo.png"
-    />
+    <meta property="og:image" content="https://note.directory/img/logo.png" />
     <link rel="canonical" href="https://note.directory/" />
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#1e1e2e" />
@@ -2001,10 +1998,18 @@
           >
             edit
           </button>
-          <button class="md-tab" id="mdTabView" onclick="switchMdTab('view', true)">
+          <button
+            class="md-tab"
+            id="mdTabView"
+            onclick="switchMdTab('view', true)"
+          >
             view
           </button>
-          <button class="md-tab" id="mdTabZen" onclick="switchMdTab('zen', true)">
+          <button
+            class="md-tab"
+            id="mdTabZen"
+            onclick="switchMdTab('zen', true)"
+          >
             zen
           </button>
         </div>
@@ -2016,7 +2021,11 @@
               id="highlightLayer"
               aria-hidden="true"
             ></pre>
-            <div class="occurrence-overlay" id="occurrenceOverlay" aria-hidden="true"></div>
+            <div
+              class="occurrence-overlay"
+              id="occurrenceOverlay"
+              aria-hidden="true"
+            ></div>
             <textarea
               class="editor"
               id="editor"
@@ -2030,16 +2039,18 @@
           <div class="md-preview" id="mdPreview"></div>
           <div class="zen-bar" id="zenBar" style="display: none">
             <div class="zen-bar-left">
-              <img class="zen-bar-logo" src="img/favicon-32x32.png" alt="note" />
+              <img
+                class="zen-bar-logo"
+                src="img/favicon-32x32.png"
+                alt="note"
+              />
               <span class="zen-bar-filename" id="zenBarFilename"></span>
             </div>
             <div class="zen-bar-right">
-              <span class="zen-copied" id="zenCopied"
-                >copied to clipboard</span
-              >
-              <button class="zen-menu-btn" onclick="toggleZenMenu()"
-                >===</button
-              >
+              <span class="zen-copied" id="zenCopied">copied to clipboard</span>
+              <button class="zen-menu-btn" onclick="toggleZenMenu()">
+                ===
+              </button>
               <div class="zen-menu" id="zenMenu">
                 <button onclick="exitZenMode()">
                   edit
@@ -3061,7 +3072,10 @@
         if (!h.past.length) return;
         const oldContent = editor.value;
         // Skip past entries identical to current state (snapshot duplicates)
-        while (h.past.length && h.past[h.past.length - 1].content === oldContent) {
+        while (
+          h.past.length &&
+          h.past[h.past.length - 1].content === oldContent
+        ) {
           h.past.pop();
         }
         if (!h.past.length) return;
@@ -3561,14 +3575,18 @@
       let occurrenceTimeout = null;
 
       function syncOccurrenceScroll() {
-        occurrenceOverlay.style.transform = "translate(" + (-editor.scrollLeft) + "px," + (-editor.scrollTop) + "px)";
+        occurrenceOverlay.style.transform =
+          "translate(" + -editor.scrollLeft + "px," + -editor.scrollTop + "px)";
       }
       let lastOccurrenceQuery = "";
 
       // Build a flat text-node map of the highlight layer for Range-based positioning
       function buildTextNodeMap() {
         const nodes = [];
-        const walker = document.createTreeWalker(highlightLayer, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(
+          highlightLayer,
+          NodeFilter.SHOW_TEXT,
+        );
         let charOffset = 0;
         let node;
         while ((node = walker.nextNode())) {
@@ -3580,7 +3598,8 @@
       }
 
       function findNodeAtOffset(nodeMap, offset) {
-        let lo = 0, hi = nodeMap.length - 1;
+        let lo = 0,
+          hi = nodeMap.length - 1;
         while (lo < hi) {
           const mid = (lo + hi) >>> 1;
           if (nodeMap[mid].end <= offset) lo = mid + 1;
@@ -3641,10 +3660,12 @@
         }
 
         function lineOf(pos) {
-          let lo = 0, hi = lineStarts.length - 1;
+          let lo = 0,
+            hi = lineStarts.length - 1;
           while (lo < hi) {
             const mid = (lo + hi + 1) >> 1;
-            if (lineStarts[mid] <= pos) lo = mid; else hi = mid - 1;
+            if (lineStarts[mid] <= pos) lo = mid;
+            else hi = mid - 1;
           }
           return lo;
         }
@@ -3663,7 +3684,8 @@
         for (let i = 0; i < positions.length; i++) {
           const line = lineOf(positions[i]);
           const top = Math.round((line / totalLines) * trackHeight);
-          trackHtml += '<div class="occurrence-marker" style="top:' + top + 'px"></div>';
+          trackHtml +=
+            '<div class="occurrence-marker" style="top:' + top + 'px"></div>';
 
           if (positions[i] !== start) {
             const startInfo = findNodeAtOffset(nodeMap, positions[i]);
@@ -3676,7 +3698,16 @@
                 const rect = rects[r];
                 const x = rect.left - layerRect.left + scrollLeft;
                 const y = rect.top - layerRect.top + scrollTop;
-                overlayHtml += '<div class="occurrence-highlight" style="top:' + y + 'px;left:' + x + 'px;width:' + rect.width + 'px;height:' + (rect.height + 1) + 'px"></div>';
+                overlayHtml +=
+                  '<div class="occurrence-highlight" style="top:' +
+                  y +
+                  "px;left:" +
+                  x +
+                  "px;width:" +
+                  rect.width +
+                  "px;height:" +
+                  (rect.height + 1) +
+                  'px"></div>';
               }
             }
           }
@@ -4093,7 +4124,10 @@
             const depth = Math.floor(tm[1].length / 2);
             const indent = "  ".repeat(depth);
             const check = tm[2];
-            out.push({ type: "list", text: indent + "- [" + check + "] " + tm[3].trimEnd() });
+            out.push({
+              type: "list",
+              text: indent + "- [" + check + "] " + tm[3].trimEnd(),
+            });
             continue;
           }
 
@@ -4111,7 +4145,10 @@
           if (om) {
             const depth = Math.floor(om[1].length / 2);
             const indent = "  ".repeat(depth);
-            out.push({ type: "list", text: indent + om[2] + " " + om[3].trimEnd() });
+            out.push({
+              type: "list",
+              text: indent + om[2] + " " + om[3].trimEnd(),
+            });
             continue;
           }
 
@@ -4143,7 +4180,11 @@
           if (out[i].type !== "table" && out[i].type !== "table-sep") continue;
           // Find table block
           const start = i;
-          while (i < out.length && (out[i].type === "table" || out[i].type === "table-sep")) i++;
+          while (
+            i < out.length &&
+            (out[i].type === "table" || out[i].type === "table-sep")
+          )
+            i++;
           const end = i;
           i--;
 
@@ -4151,7 +4192,10 @@
           const rows = [];
           let sepIdx = -1;
           for (let r = start; r < end; r++) {
-            const cells = out[r].text.split("|").slice(1, -1).map((c) => c.trim());
+            const cells = out[r].text
+              .split("|")
+              .slice(1, -1)
+              .map((c) => c.trim());
             rows.push(cells);
             if (out[r].type === "table-sep") sepIdx = r - start;
           }
@@ -4177,27 +4221,36 @@
           const widths = new Array(colCount).fill(3);
           for (const row of rows) {
             for (let c = 0; c < row.length; c++) {
-              if (row[c] !== undefined) widths[c] = Math.max(widths[c], row[c].length);
+              if (row[c] !== undefined)
+                widths[c] = Math.max(widths[c], row[c].length);
             }
           }
 
           // Rebuild rows
           for (let r = 0; r < rows.length; r++) {
-            const isSep = (start + r === start + sepIdx);
+            const isSep = start + r === start + sepIdx;
             let line = "|";
             for (let c = 0; c < colCount; c++) {
               if (isSep) {
                 const dashes = "-".repeat(widths[c]);
-                if (aligns[c] === "center") line += " :" + dashes.slice(2) + ": |";
-                else if (aligns[c] === "right") line += " " + dashes.slice(1) + ": |";
+                if (aligns[c] === "center")
+                  line += " :" + dashes.slice(2) + ": |";
+                else if (aligns[c] === "right")
+                  line += " " + dashes.slice(1) + ": |";
                 else line += " " + dashes + " |";
               } else {
                 const cell = rows[r][c] || "";
-                if (aligns[c] === "right") line += " " + cell.padStart(widths[c]) + " |";
+                if (aligns[c] === "right")
+                  line += " " + cell.padStart(widths[c]) + " |";
                 else if (aligns[c] === "center") {
                   const pad = widths[c] - cell.length;
                   const left = Math.floor(pad / 2);
-                  line += " " + " ".repeat(left) + cell + " ".repeat(pad - left) + " |";
+                  line +=
+                    " " +
+                    " ".repeat(left) +
+                    cell +
+                    " ".repeat(pad - left) +
+                    " |";
                 } else line += " " + cell.padEnd(widths[c]) + " |";
               }
             }
@@ -4212,16 +4265,25 @@
         for (let i = 0; i < out.length; i++) {
           const cur = out[i];
           const prev = out[i - 1];
-          const isTableStart = (cur.type === "table" || cur.type === "table-sep") &&
+          const isTableStart =
+            (cur.type === "table" || cur.type === "table-sep") &&
             (!prev || (prev.type !== "table" && prev.type !== "table-sep"));
-          const isListStart = cur.type === "list" &&
-            (!prev || prev.type !== "list");
-          const isCodeStart = cur.type === "code" &&
-            (!prev || prev.type !== "code");
-          const needsBlankBefore = blockTypes.has(cur.type) || isTableStart || isListStart || isCodeStart;
+          const isListStart =
+            cur.type === "list" && (!prev || prev.type !== "list");
+          const isCodeStart =
+            cur.type === "code" && (!prev || prev.type !== "code");
+          const needsBlankBefore =
+            blockTypes.has(cur.type) ||
+            isTableStart ||
+            isListStart ||
+            isCodeStart;
 
           // Blank line before block elements (if not already blank or first line)
-          if (needsBlankBefore && result.length > 0 && result[result.length - 1] !== "") {
+          if (
+            needsBlankBefore &&
+            result.length > 0 &&
+            result[result.length - 1] !== ""
+          ) {
             result.push("");
           }
 
@@ -4230,13 +4292,15 @@
 
           // Check if we need blank line after
           const next = out[i + 1];
-          const isTableEnd = (cur.type === "table" || cur.type === "table-sep") &&
+          const isTableEnd =
+            (cur.type === "table" || cur.type === "table-sep") &&
             (!next || (next.type !== "table" && next.type !== "table-sep"));
-          const isListEnd = cur.type === "list" &&
-            (!next || next.type !== "list");
-          const isCodeEnd = cur.type === "code" &&
-            (!next || next.type !== "code");
-          const needsBlankAfter = blockTypes.has(cur.type) || isTableEnd || isListEnd || isCodeEnd;
+          const isListEnd =
+            cur.type === "list" && (!next || next.type !== "list");
+          const isCodeEnd =
+            cur.type === "code" && (!next || next.type !== "code");
+          const needsBlankAfter =
+            blockTypes.has(cur.type) || isTableEnd || isListEnd || isCodeEnd;
 
           if (needsBlankAfter && next && next.type !== "blank") {
             result.push("");
@@ -4246,7 +4310,11 @@
         // Collapse multiple blank lines
         const final = [];
         for (let i = 0; i < result.length; i++) {
-          if (result[i] === "" && final.length > 0 && final[final.length - 1] === "") {
+          if (
+            result[i] === "" &&
+            final.length > 0 &&
+            final[final.length - 1] === ""
+          ) {
             continue; // skip consecutive blanks
           }
           final.push(result[i]);
@@ -4333,7 +4401,12 @@
               hLines.push(cur);
             }
             const wrapped = hLines
-              .map((l) => '<span class="code-line"><span class="code-ct">' + (l || " ") + "</span></span>")
+              .map(
+                (l) =>
+                  '<span class="code-line"><span class="code-ct">' +
+                  (l || " ") +
+                  "</span></span>",
+              )
               .join("");
             codeBlocks.push(
               '<pre><button class="code-copy-btn">copy</button><code>' +
@@ -4564,7 +4637,9 @@
               .split("\n")
               .map((row) => {
                 const tds = splitRow(row)
-                  .map((c, i) => "<td" + alignAttr(i) + ">" + c.trim() + "</td>")
+                  .map(
+                    (c, i) => "<td" + alignAttr(i) + ">" + c.trim() + "</td>",
+                  )
                   .join("");
                 return "<tr>" + tds + "</tr>";
               })
@@ -5047,9 +5122,7 @@
             switchMdTab("zen");
             if (anchor) {
               requestAnimationFrame(() => {
-                const el = mdPreview.querySelector(
-                  "#" + CSS.escape(anchor),
-                );
+                const el = mdPreview.querySelector("#" + CSS.escape(anchor));
                 if (el) el.scrollIntoView({ behavior: "smooth" });
               });
             }
@@ -5060,9 +5133,7 @@
             switchMdTab("view");
             if (anchor) {
               requestAnimationFrame(() => {
-                const el = mdPreview.querySelector(
-                  "#" + CSS.escape(anchor),
-                );
+                const el = mdPreview.querySelector("#" + CSS.escape(anchor));
                 if (el) el.scrollIntoView({ behavior: "smooth" });
               });
             }
@@ -5219,9 +5290,7 @@
             const anchor = hashMap.get("anchor");
             if (anchor) {
               requestAnimationFrame(() => {
-                const el = mdPreview.querySelector(
-                  "#" + CSS.escape(anchor),
-                );
+                const el = mdPreview.querySelector("#" + CSS.escape(anchor));
                 if (el) el.scrollIntoView({ behavior: "smooth" });
               });
             }
@@ -5233,8 +5302,9 @@
           if (name) {
             const note = state.notes.find((n) => n.name === name);
             if (note) {
-              const viewParam =
-                new URLSearchParams(location.search).get("view");
+              const viewParam = new URLSearchParams(location.search).get(
+                "view",
+              );
               const tab =
                 viewParam === "zen"
                   ? "zen"
@@ -5246,9 +5316,7 @@
               const anchor = hashMap.get("anchor");
               if (anchor) {
                 requestAnimationFrame(() => {
-                  const el = mdPreview.querySelector(
-                    "#" + CSS.escape(anchor),
-                  );
+                  const el = mdPreview.querySelector("#" + CSS.escape(anchor));
                   if (el) el.scrollIntoView({ behavior: "smooth" });
                 });
               }
@@ -5934,7 +6002,7 @@
         const scrollbarW = editor.offsetWidth - editor.clientWidth;
         if (scrollbarW !== _lastScrollbarW) {
           _lastScrollbarW = scrollbarW;
-          highlightLayer.style.paddingRight = (16 + scrollbarW) + "px";
+          highlightLayer.style.paddingRight = 16 + scrollbarW + "px";
         }
       }
 
@@ -5998,7 +6066,8 @@
 
         const val = editor.value || "";
         // Use saved pre-click position so mouse clicks don't move block cursor
-        const pos = _vimPreClickPos !== null ? _vimPreClickPos : editor.selectionStart;
+        const pos =
+          _vimPreClickPos !== null ? _vimPreClickPos : editor.selectionStart;
         const before = val.substring(0, pos);
         const lines = before.split("\n");
         const lineIdx = lines.length - 1;
@@ -6573,7 +6642,7 @@
         const isOperatorPending =
           pending === "d" || pending === "c" || pending === "y";
         if (
-          ((key >= "1" && key <= "9") && (!pending || isOperatorPending)) ||
+          (key >= "1" && key <= "9" && (!pending || isOperatorPending)) ||
           (key >= "0" && key <= "9" && vimState.count)
         ) {
           vimState.count += key;
@@ -7363,8 +7432,7 @@
           const motionKey = key === "G" ? "G" : key;
           // Position cursor at head so vimMotion calculates from the right spot
           editor.selectionStart = editor.selectionEnd = head;
-          const motionCount =
-            key === "G" ? (hasExplicitCount ? cnt : 0) : cnt;
+          const motionCount = key === "G" ? (hasExplicitCount ? cnt : 0) : cnt;
           let newHead = vimMotion(motionKey, motionCount);
           if (vimState.visualLine) {
             // In visual line mode, track head line directly
@@ -7659,7 +7727,10 @@
             editor.value = formatMarkdown(editor.value);
             vimState.bufferDirty = true;
             saveSwap(note.id, editor.value);
-            editor.selectionStart = editor.selectionEnd = Math.min(pos, editor.value.length);
+            editor.selectionStart = editor.selectionEnd = Math.min(
+              pos,
+              editor.value.length,
+            );
             updateLineNumbers();
             updateHighlight();
             updateCursorPos();
@@ -8540,7 +8611,16 @@
       editor.addEventListener("select", updateCursorPos);
       editor.addEventListener("mouseup", scheduleOccurrenceUpdate);
       editor.addEventListener("keydown", (e) => {
-        if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Home" || e.key === "End" || e.key === "PageUp" || e.key === "PageDown") {
+        if (
+          e.key === "ArrowLeft" ||
+          e.key === "ArrowRight" ||
+          e.key === "ArrowUp" ||
+          e.key === "ArrowDown" ||
+          e.key === "Home" ||
+          e.key === "End" ||
+          e.key === "PageUp" ||
+          e.key === "PageDown"
+        ) {
           clearOccurrenceHighlights();
         }
       });
@@ -8774,7 +8854,10 @@
               editor.value = formatMarkdown(editor.value);
               note.content = editor.value;
               note.updatedAt = Date.now();
-              editor.selectionStart = editor.selectionEnd = Math.min(pos, editor.value.length);
+              editor.selectionStart = editor.selectionEnd = Math.min(
+                pos,
+                editor.value.length,
+              );
               updateLineNumbers();
               updateHighlight();
               updateCursorPos();
@@ -8818,7 +8901,10 @@
             note.updatedAt = Date.now();
             scheduleSave();
           }
-          editor.selectionStart = editor.selectionEnd = Math.min(pos, editor.value.length);
+          editor.selectionStart = editor.selectionEnd = Math.min(
+            pos,
+            editor.value.length,
+          );
           updateLineNumbers();
           updateHighlight();
           updateCursorPos();
@@ -9231,7 +9317,11 @@
 
           // Settings: local settings are authoritative (per-device)
           // Remote settings only apply on first connect (no local settings yet)
-          if (remoteSettings && !localStorage.getItem(VIM_KEY) && !localStorage.getItem(WRAP_KEY)) {
+          if (
+            remoteSettings &&
+            !localStorage.getItem(VIM_KEY) &&
+            !localStorage.getItem(WRAP_KEY)
+          ) {
             applyDriveSettings(remoteSettings);
           }
 
@@ -9542,7 +9632,7 @@
         "",
         "One autumn morning, Elara found a lantern half-buried in mud. It was dented, cracked, and missing its glass — but inside, a faint glow pulsed like a heartbeat.",
         "",
-        "> \"Things that still glow,\" her grandmother always said, \"are never truly broken.\"",
+        '> "Things that still glow," her grandmother always said, "are never truly broken."',
         "",
         "She decided to fix it. Her supplies were simple:",
         "",
@@ -9587,9 +9677,9 @@
         'const lantern = { glow: true, owner: "Elara" };',
         "",
         "function enterForest(brave: boolean): string {",
-        "  if (!brave) return \"Maybe tomorrow.\";",
+        '  if (!brave) return "Maybe tomorrow.";',
         "",
-        "  const creatures = [\"Moss Fox\", \"Thorn Owl\", \"Root Troll\"];",
+        '  const creatures = ["Moss Fox", "Thorn Owl", "Root Troll"];',
         "  for (const c of creatures) {",
         "    console.log(`Elara befriended the ${c}.`);",
         "  }",
@@ -9616,11 +9706,13 @@
         "",
         "---",
         "",
-        "*Written in [note](https://jaggli.github.io/note/) — where all good tales begin.*",
+        "*Written in [note](https://note.directory/) — where all good tales begin.*",
       ].join("\n");
 
       async function openMdDemo() {
-        const existing = state.notes.find((n) => n.name === "markdown-features.md");
+        const existing = state.notes.find(
+          (n) => n.name === "markdown-features.md",
+        );
         if (existing) {
           existing.content = MD_DEMO;
           existing.updatedAt = Date.now();
