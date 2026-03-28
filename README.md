@@ -151,6 +151,10 @@ prompt for a filename via a styled dialog.
   Services (lazy-loaded). Drive API calls use plain
   `fetch` — no `gapi` client library needed
 
+## License
+
+MIT — see [LICENSE](LICENSE).
+
 ## Acknowledgements
 
 Thanks to [Rune Bjørnerås](https://github.com/rubjo) for
