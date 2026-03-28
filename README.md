@@ -6,14 +6,14 @@ on any server. No signup, no backend, no dependencies.
 Just open the page and start typing.
 
 Built as a single `index.html` file with vanilla JS and
-CSS (~9600 lines). Your notes are stored in `localStorage`
+CSS (~9900 lines). Your notes are stored in `localStorage`
 by default. Optionally, sign in with Google to sync notes
 across devices via Google Drive.
 
 ## How it works
 
 - **Single file**: The entire app is one self-contained
-  HTML file (~9600 lines). No build step, no bundler,
+  HTML file (~9900 lines). No build step, no bundler,
   no framework.
 - **Local storage**: Notes are persisted in your
   browser's `localStorage` (5MB limit). A storage meter
@@ -49,7 +49,7 @@ across devices via Google Drive.
 - Export all notes as a ZIP (includes metadata for re-import)
 - Import notes by dropping ZIP or text files onto the editor
 - Google Drive sync with per-file conflict resolution
-- Vim mode (toggle in toolbar, desktop only)
+- Vim mode (toggle in status bar, desktop only)
 - Word wrap toggle with wrap-aware line numbers
 - Current line highlighting
 - Markdown preview with edit/view/zen tabs for `.md` files
@@ -69,7 +69,7 @@ across devices via Google Drive.
   parent/child toggling
 - Markdown formatter (`:fmt` or Ctrl+Shift+F) for
   consistent heading, list, table, and whitespace style
-- Zen mode for distraction-free reading/writing
+- Zen mode for distraction-free reading
 - Cursor position memory (persisted per note across
   sessions and mode switches)
 - Cursor position (line/column) and vim mode indicator in status bar
