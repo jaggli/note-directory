@@ -141,8 +141,8 @@ prompt for a filename via a styled dialog.
 ## Tech
 
 - **Theme**: [Catppuccin Mocha](https://catppuccin.com)
-- **Font**: [Victor Mono](https://rubjo.github.io/victor-mono/)
-  (served locally)
+- **Font**: [Victor Mono](https://github.com/rubjo/victor-mono)
+  by Rune Bjørnerås (served locally)
 - **Compression**: deflate-raw via `CompressionStream` /
   `DecompressionStream` APIs for URL sharing
 - **Zip**: Custom minimal zip builder (no library)
@@ -150,3 +150,9 @@ prompt for a filename via a styled dialog.
 - **Google Drive**: OAuth 2.0 via Google Identity
   Services (lazy-loaded). Drive API calls use plain
   `fetch` — no `gapi` client library needed
+
+## Acknowledgements
+
+Thanks to [Rune Bjørnerås](https://github.com/rubjo) for
+creating [Victor Mono](https://github.com/rubjo/victor-mono),
+the fantastic font used throughout the editor.
