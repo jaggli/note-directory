@@ -1,7 +1,8 @@
 # note — minimal text editor
 
-A single-file, local-first text editor that runs entirely
-in your browser. No signup, no backend, no dependencies.
+A private, local-first text editor that runs entirely in
+your browser. No data is collected, transmitted, or stored
+on any server. No signup, no backend, no dependencies.
 Just open the page and start typing.
 
 Built as a single `index.html` file with vanilla JS and
