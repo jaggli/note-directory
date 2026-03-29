@@ -1,5 +1,7 @@
 # note — minimal text editor
 
+[https://note.directory](https://note.directory)
+
 A private, local-first text editor that runs entirely in
 your browser. No data is collected, transmitted, or stored
 on any server. No signup, no backend, no dependencies.
