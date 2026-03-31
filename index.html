@@ -9090,8 +9090,9 @@
           try {
             await silentTokenRefresh();
           } catch {
+            // Don't log out — tab is likely backgrounded and timers are
+            // throttled. onTabResume will re-auth when the user returns.
             clearToken();
-            showSyncFailed();
           }
         }, refreshIn);
       }
@@ -9885,16 +9886,14 @@
         document.querySelector(".sync-dot")?.classList.remove("syncing");
 
         if (!gdriveToken || Date.now() >= gdriveTokenExpiry) {
-          // Token expired — try silent refresh, fall back to interactive auth
+          // Token expired — try silent refresh; don't attempt interactive
+          // auth here (no user gesture, so browsers block the popup).
+          // The next user-initiated sync/save will re-auth via gdriveFetch.
           try {
             await silentTokenRefresh();
           } catch {
-            try {
-              await gdriveAuth();
-            } catch {
-              showSyncFailed();
-              return;
-            }
+            showSyncFailed();
+            return;
           }
           showSyncConnected();
           driveSyncQuiet();
