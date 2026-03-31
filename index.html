@@ -761,7 +761,7 @@
         flex-shrink: 0;
       }
 
-      .zen-menu-btn {
+      .zen-close-btn {
         padding: 4px 10px;
         border: none;
         border-radius: 4px;
@@ -769,47 +769,34 @@
         color: var(--text);
         cursor: pointer;
         font-family: var(--font);
-        font-size: 15px;
+        font-size: 18px;
+        line-height: 1;
         opacity: 0.4;
         transition: opacity 0.2s;
       }
-      .zen-menu-btn:hover {
+      .zen-close-btn:hover {
         opacity: 1;
       }
 
-      .zen-menu {
-        display: none;
-        position: absolute;
-        top: 100%;
-        right: 0;
-        margin-top: 10px;
+      .zen-share-btn {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 1000;
         background: var(--sidebar);
         border: 1px solid var(--border);
         border-radius: 4px;
-        overflow: hidden;
-        min-width: 120px;
-      }
-      .zen-menu.visible {
-        display: flex;
-        flex-direction: column;
-      }
-      .zen-menu button {
-        background: none;
-        border: none;
         color: var(--subtext);
         font-family: var(--font);
         font-size: 13px;
         padding: 6px 14px;
         cursor: pointer;
-        text-align: left;
+        opacity: 0.6;
+        transition: opacity 0.2s;
       }
-      .zen-menu button:hover {
-        background: var(--overlay);
+      .zen-share-btn:hover {
+        opacity: 1;
         color: var(--text);
-      }
-      .zen-menu-hint {
-        color: var(--subtext);
-        font-size: 12px;
       }
 
       .zen-copied {
@@ -818,8 +805,10 @@
         color: var(--subtext);
         opacity: 0;
         transition: opacity 0.2s;
-        position: absolute;
-        right: 40px;
+        position: fixed;
+        bottom: 56px;
+        right: 24px;
+        z-index: 1000;
         white-space: nowrap;
         pointer-events: none;
       }
@@ -1497,14 +1486,6 @@
           height: 24px;
         }
 
-        .zen-menu button {
-          font-size: 16px;
-          padding: 10px 18px;
-        }
-
-        .zen-menu-hint {
-          display: none;
-        }
 
       }
 
@@ -2096,17 +2077,13 @@
             </div>
             <div class="zen-bar-right">
               <span class="zen-copied" id="zenCopied">copied to clipboard</span>
-              <button class="zen-menu-btn" onclick="toggleZenMenu()">
-                ===
+              <button class="zen-close-btn" onclick="exitZenMode()" title="Close zen mode [Esc]">
+                &times;
               </button>
-              <div class="zen-menu" id="zenMenu">
-                <button onclick="exitZenMode()">
-                  edit
-                  <span class="zen-menu-hint">[Esc]</span>
-                </button>
-                <button onclick="zenShare()">share</button>
-              </div>
             </div>
+            <button class="zen-share-btn" id="zenShareBtn" onclick="zenShare()" style="display:none">
+              share
+            </button>
           </div>
           <div class="md-toast" id="mdToast"></div>
           <div class="empty-state" id="emptyState">
@@ -4966,6 +4943,7 @@
           zenEl.querySelector(".zen-bar-filename-start").textContent = zenName.slice(0, zenSplit);
           zenEl.querySelector(".zen-bar-filename-end").textContent = zenName.slice(zenSplit);
           zenBar.style.display = "";
+          document.getElementById("zenShareBtn").style.display = "";
         } else if (tab === "view") {
           const note = getActiveNote();
           if (note) {
@@ -4990,6 +4968,7 @@
           btnVim.style.display = "none";
           appEl.classList.remove("zen-mode");
           zenBar.style.display = "none";
+          document.getElementById("zenShareBtn").style.display = "none";
           // Scroll preview so cursor area is centered
           requestAnimationFrame(() => {
             const scrollMax = mdPreview.scrollHeight - mdPreview.clientHeight;
@@ -5019,6 +4998,7 @@
           btnVim.style.display = "";
           appEl.classList.remove("zen-mode");
           zenBar.style.display = "none";
+          document.getElementById("zenShareBtn").style.display = "none";
           // Sync editor with in-memory content (e.g. after checkbox toggle)
           const activeNote = getActiveNote();
           if (activeNote) editor.value = activeNote.content;
@@ -5107,29 +5087,14 @@
       }
 
       function exitZenMode() {
-        closeZenMenu();
         persistZenNote();
         switchMdTab("edit", true);
         render();
         updateUrl();
       }
 
-      function toggleZenMenu() {
-        document.getElementById("zenMenu").classList.toggle("visible");
-      }
-
-      function closeZenMenu() {
-        document.getElementById("zenMenu").classList.remove("visible");
-      }
-
-      document.addEventListener("click", (e) => {
-        if (zenModeActive && !e.target.closest(".zen-bar-right")) {
-          closeZenMenu();
-        }
-      });
 
       async function zenShare() {
-        closeZenMenu();
         try {
           const hashMap = parseHashParams(location.hash);
           hashMap.delete("anchor");
