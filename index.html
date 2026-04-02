@@ -5438,8 +5438,7 @@
 
       function switchNote(id) {
         if (vimState.enabled && vimState.bufferDirty) {
-          vimShowError("No write since last change (add ! to override)");
-          return;
+          vimWriteBuffer();
         }
         // Push current state for browser back/forward navigation
         if (state.activeId && state.activeId !== id) {
