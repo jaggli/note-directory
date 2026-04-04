@@ -84,7 +84,7 @@
         --red: #f38ba8;
         --yellow: #f9e2af;
         --border: #313244;
-        --gutter: #585b70;
+        --gutter: #7f849c;
         --font:
           "Victor Mono", "SF Mono", "Fira Code", "Cascadia Code", Consolas,
           "Courier New", monospace;
@@ -1115,6 +1115,17 @@
         opacity: 0.5;
       }
 
+      /* Focus visible */
+      :focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 1px;
+      }
+
+      .editor:focus-visible,
+      .editor:focus {
+        outline: none;
+      }
+
       /* Syntax highlighting tokens */
       .hl-kw {
         color: #cba6f7;
@@ -1262,7 +1273,12 @@
       }
 
       .status-hint {
+        background: none;
+        border: none;
         color: var(--subtext);
+        font-family: var(--font);
+        font-size: 14px;
+        cursor: pointer;
         padding: 2px 8px;
         border-radius: 3px;
       }
@@ -1970,8 +1986,8 @@
   </head>
   <body>
     <div class="app">
-      <div class="sidebar">
-        <div class="sidebar-resize" id="sidebarResize"></div>
+      <div class="sidebar" role="complementary" aria-label="Note list">
+        <div class="sidebar-resize" id="sidebarResize" aria-hidden="true"></div>
         <div class="sidebar-header">
           <span>note</span>
           <span style="margin-left: auto; display: flex; gap: 8px">
@@ -1979,50 +1995,57 @@
               class="btn-new"
               onclick="createNote(undefined, undefined, true)"
               title="New note"
+              aria-label="New note"
             >
               +
             </button>
             <button
               class="sidebar-close"
               onclick="toggleSidebar()"
-              title="Close"
+              title="Close sidebar"
+              aria-label="Close sidebar"
             >
               &times;
             </button>
           </span>
         </div>
-        <div class="note-list" id="noteList"></div>
+        <div class="note-list" id="noteList" role="list" aria-label="Notes"></div>
       </div>
-      <div class="editor-container">
-        <div class="find-replace-bar" id="findReplaceBar">
+      <div class="editor-container" role="main">
+        <div class="find-replace-bar" id="findReplaceBar" role="search" aria-label="Find and replace">
           <input
             type="text"
             id="findInput"
             placeholder="find..."
+            aria-label="Find text"
             spellcheck="false"
           />
           <input
             type="text"
             id="replaceInput"
             placeholder="replace..."
+            aria-label="Replace text"
             spellcheck="false"
           />
           <button onclick="findNext()">next</button>
           <button onclick="findPrev()">prev</button>
           <button onclick="replaceCurrent()">replace</button>
           <button onclick="replaceAll()">all</button>
-          <span class="find-replace-count" id="findReplaceCount"></span>
+          <span class="find-replace-count" id="findReplaceCount" aria-live="polite"></span>
           <button
             onclick="closeFindReplace()"
             style="margin-left: auto; border: none"
+            aria-label="Close find and replace"
           >
             &times;
           </button>
         </div>
-        <div class="md-tab-bar" id="mdTabBar">
+        <div class="md-tab-bar" id="mdTabBar" role="tablist" aria-label="Editor mode">
           <button
             class="md-tab active"
             id="mdTabEdit"
+            role="tab"
+            aria-selected="true"
             onclick="switchMdTab('edit', true)"
           >
             edit
@@ -2030,6 +2053,8 @@
           <button
             class="md-tab"
             id="mdTabView"
+            role="tab"
+            aria-selected="false"
             onclick="switchMdTab('view', true)"
           >
             view
@@ -2037,13 +2062,15 @@
           <button
             class="md-tab"
             id="mdTabZen"
+            role="tab"
+            aria-selected="false"
             onclick="switchMdTab('zen', true)"
           >
             zen
           </button>
         </div>
         <div class="editor-wrap">
-          <div class="gutter" id="gutter"></div>
+          <div class="gutter" id="gutter" aria-hidden="true"></div>
           <div class="editor-area" id="editorArea">
             <pre
               class="highlight-layer"
@@ -2059,12 +2086,13 @@
               class="editor"
               id="editor"
               name="editor"
+              aria-label="Text editor"
               placeholder="Start typing..."
               spellcheck="false"
             ></textarea>
-            <div class="vim-cursor" id="vimCursor"></div>
+            <div class="vim-cursor" id="vimCursor" aria-hidden="true"></div>
           </div>
-          <div class="occurrence-track" id="occurrenceTrack"></div>
+          <div class="occurrence-track" id="occurrenceTrack" aria-hidden="true"></div>
           <div class="md-preview" id="mdPreview"></div>
           <div class="zen-bar" id="zenBar" style="display: none">
             <div class="zen-bar-left">
@@ -2077,11 +2105,11 @@
             </div>
             <div class="zen-bar-right">
               <span class="zen-copied" id="zenCopied">copied to clipboard</span>
-              <button class="zen-close-btn" onclick="exitZenMode()" title="Close zen mode [Esc]">
+              <button class="zen-close-btn" onclick="exitZenMode()" title="Close zen mode [Esc]" aria-label="Close zen mode">
                 &times;
               </button>
             </div>
-            <button class="zen-share-btn" id="zenShareBtn" onclick="zenShare()" style="display:none">
+            <button class="zen-share-btn" id="zenShareBtn" onclick="zenShare()" style="display:none" aria-label="Share note">
               share
             </button>
           </div>
@@ -2099,31 +2127,27 @@
           <button class="btn-files" id="btnFiles" onclick="toggleSidebar()">
             note
           </button>
-          <span
+          <button
             class="status-hint"
             onclick="createNote()"
-            style="cursor: pointer"
-            >new <kbd>ctrl+n</kbd></span
+            >new <kbd>ctrl+n</kbd></button
           >
-          <span
+          <button
             class="status-hint"
             onclick="openSearch()"
-            style="cursor: pointer"
-            >search <kbd>ctrl+p</kbd></span
+            >search <kbd>ctrl+p</kbd></button
           >
-          <span
+          <button
             class="status-hint"
             id="btnReplace"
             onclick="openFindReplace()"
-            style="cursor: pointer"
-            >replace <kbd>ctrl+h</kbd></span
+            >replace <kbd>ctrl+h</kbd></button
           >
-          <span
+          <button
             class="status-hint"
             id="btnVim"
             onclick="toggleVim()"
-            style="cursor: pointer"
-            >vim <kbd>ctrl+shift+m</kbd></span
+            >vim <kbd>ctrl+shift+m</kbd></button
           >
           <div class="status-right">
             <span class="status-info">
@@ -2144,9 +2168,10 @@
             </button>
             <div class="file-menu-container" id="fileMenuContainer">
               <button class="btn-share" onclick="toggleFileMenu()">file</button>
-              <div class="file-menu" id="fileMenu">
+              <div class="file-menu" id="fileMenu" role="menu" aria-label="File menu">
                 <button
                   class="file-menu-item"
+                  role="menuitem"
                   onclick="
                     openHelp();
                     closeFileMenu();
@@ -2157,6 +2182,7 @@
                 <hr class="file-menu-separator" />
                 <button
                   class="file-menu-item mobile-only"
+                  role="menuitem"
                   onclick="
                     createNote();
                     closeFileMenu();
@@ -2166,6 +2192,7 @@
                 </button>
                 <button
                   class="file-menu-item mobile-only"
+                  role="menuitem"
                   onclick="
                     openFindReplace();
                     closeFileMenu();
@@ -2175,6 +2202,7 @@
                 </button>
                 <button
                   class="file-menu-item"
+                  role="menuitem"
                   id="btnShare"
                   onclick="shareNote()"
                 >
@@ -2182,6 +2210,7 @@
                 </button>
                 <button
                   class="file-menu-item"
+                  role="menuitem"
                   onclick="
                     downloadNote();
                     closeFileMenu();
@@ -2192,6 +2221,7 @@
                 <hr class="file-menu-separator mobile-only" />
                 <button
                   class="file-menu-item mobile-only"
+                  role="menuitem"
                   onclick="
                     openSearch();
                     closeFileMenu();
@@ -2201,6 +2231,7 @@
                 </button>
                 <button
                   class="file-menu-item"
+                  role="menuitem"
                   onclick="
                     downloadAll();
                     closeFileMenu();
@@ -2211,6 +2242,7 @@
                 <hr class="file-menu-separator" />
                 <button
                   class="file-menu-item"
+                  role="menuitem"
                   id="btnDriveSync"
                   onclick="driveSync()"
                 >
@@ -2218,6 +2250,7 @@
                 </button>
                 <a
                   class="file-menu-item file-menu-link"
+                  role="menuitem"
                   href="legal/privacy-policy.html"
                   target="_blank"
                 >
@@ -2234,23 +2267,23 @@
                 <span id="syncLabel">sync</span>
                 <span class="sync-dot">&#9679;</span>
               </button>
-              <div class="file-menu" id="syncMenu">
+              <div class="file-menu" id="syncMenu" role="menu" aria-label="Sync menu">
                 <div id="syncMenuConnected">
-                  <button class="file-menu-item" onclick="driveSync()">
+                  <button class="file-menu-item" role="menuitem" onclick="driveSync()">
                     sync now
                   </button>
                   <hr class="file-menu-separator" />
-                  <button class="file-menu-item" onclick="driveSignOut()">
+                  <button class="file-menu-item" role="menuitem" onclick="driveSignOut()">
                     disconnect
                   </button>
                 </div>
                 <div id="syncMenuFailed" style="display: none">
-                  <button class="file-menu-item" onclick="driveSync()">
+                  <button class="file-menu-item" role="menuitem" onclick="driveSync()">
                     reconnect
                   </button>
                 </div>
                 <div id="syncMenuDisconnected" style="display: none">
-                  <button class="file-menu-item" onclick="driveSync()">
+                  <button class="file-menu-item" role="menuitem" onclick="driveSync()">
                     connect
                   </button>
                 </div>
@@ -2260,18 +2293,19 @@
         </div>
         <div class="vim-command-bar" id="vimCommandBar">
           <span class="vim-command-prefix">:</span>
-          <input id="vimCommandInput" type="text" spellcheck="false" />
+          <input id="vimCommandInput" type="text" aria-label="Vim command" spellcheck="false" />
         </div>
       </div>
     </div>
 
-    <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalText">
       <div class="modal">
         <div class="modal-text" id="modalText"></div>
         <input
           class="modal-input"
           id="modalInput"
           type="text"
+          aria-label="Input"
           spellcheck="false"
         />
         <div class="modal-actions">
@@ -2284,7 +2318,7 @@
     </div>
 
     <div class="search-backdrop" id="searchBackdrop"></div>
-    <div class="search-results" id="searchResults">
+    <div class="search-results" id="searchResults" role="dialog" aria-modal="true" aria-label="Search notes">
       <div class="search-results-header">
         <input
           class="search-input"
@@ -2292,17 +2326,18 @@
           name="search"
           type="text"
           placeholder="search..."
+          aria-label="Search notes"
           spellcheck="false"
         />
-        <span class="search-results-count" id="searchCount"></span>
-        <button class="btn-search-close" onclick="closeSearch()" title="Close">
+        <span class="search-results-count" id="searchCount" aria-live="polite"></span>
+        <button class="btn-search-close" onclick="closeSearch()" title="Close" aria-label="Close search">
           &times;
         </button>
       </div>
       <div class="search-results-list" id="searchResultsList"></div>
     </div>
 
-    <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
       <div class="drop-label">drop files to import</div>
     </div>
 
@@ -2875,8 +2910,40 @@
       //  Modal
       // ═══════════════════════════════════════════════════
 
+      // Focus trap: keeps Tab cycling within a container
+      function trapFocus(container, onKey) {
+        function handler(e) {
+          if (e.key === "Tab") {
+            const focusable = container.querySelectorAll(
+              'button:not([style*="display: none"]):not([style*="display:none"]), [href], input:not([style*="display: none"]):not([style*="display:none"]), select, textarea, [tabindex]:not([tabindex="-1"])',
+            );
+            const visible = Array.from(focusable).filter(
+              (el) => el.offsetParent !== null,
+            );
+            if (!visible.length) return;
+            const first = visible[0];
+            const last = visible[visible.length - 1];
+            if (e.shiftKey) {
+              if (document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+              }
+            } else {
+              if (document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+              }
+            }
+          }
+          if (onKey) onKey(e);
+        }
+        container.addEventListener("keydown", handler);
+        return () => container.removeEventListener("keydown", handler);
+      }
+
       function showModal(text, confirmLabel, cancelLabel, danger) {
         return new Promise((resolve) => {
+          const previousFocus = document.activeElement;
           modalText.textContent = text;
           modalInput.style.display = "none";
           modalConfirm.textContent = confirmLabel;
@@ -2887,12 +2954,14 @@
             : "modal-btn";
           modalOverlay.classList.add("visible");
 
+          let removeTrap;
           function cleanup() {
+            if (removeTrap) removeTrap();
             modalOverlay.classList.remove("visible");
             modalConfirm.removeEventListener("click", onConfirm);
             modalCancel.removeEventListener("click", onCancel);
             modalOverlay.removeEventListener("click", onOverlay);
-            document.removeEventListener("keydown", onKey);
+            if (previousFocus && previousFocus.focus) previousFocus.focus();
           }
           function onConfirm() {
             cleanup();
@@ -2919,15 +2988,22 @@
             }
           }
 
+          removeTrap = trapFocus(modalOverlay, onKey);
           modalConfirm.addEventListener("click", onConfirm);
           modalCancel.addEventListener("click", onCancel);
           modalOverlay.addEventListener("click", onOverlay);
-          document.addEventListener("keydown", onKey);
+          // Focus the appropriate button
+          if (cancelLabel) {
+            modalCancel.focus();
+          } else {
+            modalConfirm.focus();
+          }
         });
       }
 
       function showPromptModal(text, defaultValue, confirmLabel) {
         return new Promise((resolve) => {
+          const previousFocus = document.activeElement;
           modalText.textContent = text;
           modalInput.style.display = "block";
           modalInput.value = defaultValue || "";
@@ -2944,13 +3020,15 @@
             modalInput.select();
           }
 
+          let removeTrap;
           function cleanup() {
+            if (removeTrap) removeTrap();
             modalOverlay.classList.remove("visible");
             modalInput.style.display = "none";
             modalConfirm.removeEventListener("click", onConfirm);
             modalCancel.removeEventListener("click", onCancel);
             modalOverlay.removeEventListener("click", onOverlay);
-            document.removeEventListener("keydown", onKey);
+            if (previousFocus && previousFocus.focus) previousFocus.focus();
           }
           function onConfirm() {
             const val = modalInput.value.trim();
@@ -2978,15 +3056,16 @@
             }
           }
 
+          removeTrap = trapFocus(modalOverlay, onKey);
           modalConfirm.addEventListener("click", onConfirm);
           modalCancel.addEventListener("click", onCancel);
           modalOverlay.addEventListener("click", onOverlay);
-          document.addEventListener("keydown", onKey);
         });
       }
 
       function showImportModal(filename) {
         return new Promise((resolve) => {
+          const previousFocus = document.activeElement;
           modalText.textContent = '"' + filename + '" already exists.';
           modalInput.style.display = "none";
           const actionsDiv = modalOverlay.querySelector(".modal-actions");
@@ -3004,11 +3083,13 @@
           actionsDiv.append(btnSkip, btnKeep, btnOver);
           modalOverlay.classList.add("visible");
 
+          let removeTrap;
           function cleanup() {
+            if (removeTrap) removeTrap();
             modalOverlay.classList.remove("visible");
             actionsDiv.innerHTML = saved;
             modalOverlay.removeEventListener("click", onOverlay);
-            document.removeEventListener("keydown", onKey);
+            if (previousFocus && previousFocus.focus) previousFocus.focus();
           }
           function onOverlay(e) {
             if (e.target === modalOverlay) {
@@ -3023,6 +3104,7 @@
               resolve("skip");
             }
           }
+          removeTrap = trapFocus(modalOverlay, onKey);
           btnSkip.addEventListener("click", () => {
             cleanup();
             resolve("skip");
@@ -3036,7 +3118,7 @@
             resolve("override");
           });
           modalOverlay.addEventListener("click", onOverlay);
-          document.addEventListener("keydown", onKey);
+          btnSkip.focus();
         });
       }
 
@@ -3875,6 +3957,7 @@
           const div = document.createElement("div");
           div.className =
             "note-item" + (note.id === state.activeId ? " active" : "");
+          div.setAttribute("role", "listitem");
           div.draggable = true;
           div.dataset.idx = ni;
           div.dataset.id = note.id;
@@ -3999,6 +4082,7 @@
           const pinBtn = document.createElement("button");
           pinBtn.className = "btn-pin" + (note.pinned ? " pinned" : "");
           pinBtn.title = note.pinned ? "Unpin" : "Pin";
+          pinBtn.setAttribute("aria-label", (note.pinned ? "Unpin " : "Pin ") + note.name);
           pinBtn.innerHTML =
             '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01z"/></svg>';
           pinBtn.addEventListener("click", (e) => {
@@ -4013,6 +4097,7 @@
           const renameBtn = document.createElement("button");
           renameBtn.className = "btn-rename";
           renameBtn.title = "Rename";
+          renameBtn.setAttribute("aria-label", "Rename " + note.name);
           renameBtn.innerHTML = "&#9998;";
           renameBtn.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -4023,6 +4108,7 @@
           const btn = document.createElement("button");
           btn.className = "btn-delete";
           btn.title = "Delete";
+          btn.setAttribute("aria-label", "Delete " + note.name);
           btn.innerHTML = "&times;";
           btn.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -4773,13 +4859,17 @@
 
         // Step 4: selectively re-enable <details> and <summary> ONLY
         // These were escaped in step 1. We match the escaped forms exactly.
+        // Safety: [^&]{0,200} cannot span past entity boundaries (&gt;, &lt;,
+        // &amp;, &quot;) because step 1 escaped ALL & < > " characters.
+        // The replacement always emits a bare tag — attributes are stripped
+        // unconditionally. The {0,200} length cap prevents ReDoS on
+        // pathological input.
         text = text.replace(/&lt;details&gt;/gi, "<details>");
         text = text.replace(/&lt;\/details&gt;/gi, "</details>");
         text = text.replace(/&lt;summary&gt;/gi, "<summary>");
         text = text.replace(/&lt;\/summary&gt;/gi, "</summary>");
-        // Also handle details with attributes (but strip all attributes for safety)
-        text = text.replace(/&lt;details\s[^&]*&gt;/gi, "<details>");
-        text = text.replace(/&lt;summary\s[^&]*&gt;/gi, "<summary>");
+        text = text.replace(/&lt;details\s[^&]{0,200}&gt;/gi, "<details>");
+        text = text.replace(/&lt;summary\s[^&]{0,200}&gt;/gi, "<summary>");
 
         return text;
       }
@@ -4815,6 +4905,9 @@
         document
           .getElementById("mdTabZen")
           .classList.toggle("active", tab === "zen");
+        mdTabEdit.setAttribute("aria-selected", tab === "edit");
+        mdTabView.setAttribute("aria-selected", tab === "view");
+        document.getElementById("mdTabZen").setAttribute("aria-selected", tab === "zen");
 
         const appEl = document.querySelector(".app");
         const zenBar = document.getElementById("zenBar");
@@ -5522,20 +5615,28 @@
       const MAX_RESULTS = 20;
       let searchSelectedIdx = -1;
       let searchDebounce = null;
+      let searchPreviousFocus = null;
+      let searchRemoveTrap = null;
 
       function openSearch() {
+        searchPreviousFocus = document.activeElement;
         searchResults.classList.add("visible");
         searchBackdrop.classList.add("visible");
         searchInput.value = "";
         searchCount.textContent = "";
         searchResultsList.innerHTML = "";
         searchInput.focus();
+        if (searchRemoveTrap) searchRemoveTrap();
+        searchRemoveTrap = trapFocus(searchResults);
       }
 
       function closeSearch() {
+        if (searchRemoveTrap) { searchRemoveTrap(); searchRemoveTrap = null; }
         searchResults.classList.remove("visible");
         searchBackdrop.classList.remove("visible");
         searchSelectedIdx = -1;
+        if (searchPreviousFocus && searchPreviousFocus.focus) searchPreviousFocus.focus();
+        searchPreviousFocus = null;
       }
 
       function fuzzyMatch(text, query) {
@@ -8552,6 +8653,12 @@
 
       // Flush pending saves when the leader tab is closed
       window.addEventListener("beforeunload", () => {
+        // Flush unsaved vim buffer before closing (leader only — non-leader
+        // tabs can't persist via saveState, so vimWriteBuffer would delete
+        // the swap file without actually saving the content)
+        if (isTabLeader && vimState.enabled && vimState.bufferDirty) {
+          vimWriteBuffer();
+        }
         if (isTabLeader && saveTimeout) {
           clearTimeout(saveTimeout);
           saveState();
