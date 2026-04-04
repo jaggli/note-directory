@@ -5474,10 +5474,13 @@
           highlightLayer.scrollLeft = editor.scrollLeft;
           syncOccurrenceScroll();
         });
-        // Reset vim state
+        // Reset vim state — always do a full reset (not conditional on mode)
+        // to clear any stale pending/count/visualLine state, which can
+        // accumulate after a backgrounded tab resumes.
         if (vimState.enabled) {
           if (vimCommandBar.classList.contains("visible")) vimCloseCommandBar();
-          if (vimState.mode !== "normal") vimSetMode("normal");
+          _vimPreClickPos = null;
+          vimSetMode("normal");
           editor.readOnly = false;
           editor.focus();
           editor.readOnly = true;
