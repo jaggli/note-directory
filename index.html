@@ -6204,64 +6204,55 @@
         let absTop, absLeft;
 
         if (editorArea.classList.contains("wrap")) {
-          // Use the measurement div for accurate wrapped positioning
+          // Locate the cursor by placing the ENTIRE editor value in a mirror
+          // div and querying a Range at the cursor position. Measuring text
+          // prefixes (the previous approach) is unreliable near wrap
+          // boundaries because `overflow-wrap: break-word` may break a word
+          // mid-way in a prefix while the full line wraps cleanly at the
+          // word boundary, making the binary search land several characters
+          // off from the real wrap position.
           const cs = window.getComputedStyle(editor);
+          const padLeftPx = parseFloat(cs.paddingLeft);
           const contentWidth =
-            editor.clientWidth -
-            parseFloat(cs.paddingLeft) -
-            parseFloat(cs.paddingRight);
+            editor.clientWidth - padLeftPx - parseFloat(cs.paddingRight);
           _wrapMeasure.style.font = cs.font;
           _wrapMeasure.style.letterSpacing = cs.letterSpacing;
           _wrapMeasure.style.tabSize = cs.tabSize;
           _wrapMeasure.style.lineHeight = cs.lineHeight;
           _wrapMeasure.style.width = contentWidth + "px";
+          _wrapMeasure.style.whiteSpace = "pre-wrap";
+          _wrapMeasure.style.overflowWrap = "break-word";
+          _wrapMeasure.textContent = val || " ";
           document.body.appendChild(_wrapMeasure);
 
-          // Height of all lines before the cursor line
-          const allLines = val.split("\n");
-          let yOffset = 0;
-          for (let i = 0; i < lineIdx; i++) {
-            _wrapMeasure.textContent = allLines[i] || " ";
-            yOffset += _wrapMeasure.offsetHeight;
-          }
-
-          // Height of text on cursor line up to cursor column
-          const curLine = allLines[lineIdx];
-          const textBefore = curLine.substring(0, col);
-          _wrapMeasure.textContent = textBefore || " ";
-          const hBefore = _wrapMeasure.offsetHeight;
-          yOffset += hBefore - lineHeight;
-
-          // Find where the last visual row starts by binary search
-          let rowStart = 0;
-          if (hBefore > lineHeight) {
-            let lo = 0,
-              hi = col;
-            while (lo < hi) {
-              const mid = (lo + hi) >>> 1;
-              _wrapMeasure.textContent =
-                textBefore.substring(0, mid + 1) || " ";
-              if (_wrapMeasure.offsetHeight >= hBefore) {
-                hi = mid;
-              } else {
-                lo = mid + 1;
+          let rectTop = 0;
+          let rectLeft = 0;
+          const textNode = _wrapMeasure.firstChild;
+          if (textNode) {
+            const range = document.createRange();
+            const safePos = Math.min(
+              pos,
+              (textNode.nodeValue || "").length,
+            );
+            try {
+              range.setStart(textNode, safePos);
+              range.setEnd(textNode, safePos);
+              const rects = range.getClientRects();
+              const rect = rects.length ? rects[rects.length - 1] : null;
+              if (rect) {
+                const mr = _wrapMeasure.getBoundingClientRect();
+                rectTop = rect.top - mr.top;
+                rectLeft = rect.left - mr.left;
               }
-            }
-            rowStart = lo;
+            } catch (e) {}
           }
-          // Measure the width of text from rowStart to col
-          const rowText = curLine.substring(rowStart, col);
-          _wrapMeasure.style.width = "max-content";
-          _wrapMeasure.style.whiteSpace = "pre";
-          _wrapMeasure.textContent = rowText;
-          const xOffset = _wrapMeasure.offsetWidth;
-          _wrapMeasure.style.width = contentWidth + "px";
-          _wrapMeasure.style.whiteSpace = "pre-wrap";
-
           document.body.removeChild(_wrapMeasure);
 
-          absTop = padTop + yOffset;
-          absLeft = parseFloat(cs.paddingLeft) + xOffset;
+          // Snap top to the lineHeight grid: rect.top sits on the glyph,
+          // not the line box, so it is typically a few pixels off.
+          const rowIdx = Math.max(0, Math.round(rectTop / lineHeight));
+          absTop = padTop + rowIdx * lineHeight;
+          absLeft = padLeftPx + rectLeft;
         } else {
           absTop = padTop + lineIdx * lineHeight;
           absLeft = padLeft + col * cw;
