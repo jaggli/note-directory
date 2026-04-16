@@ -530,7 +530,7 @@
       .gutter {
         background: var(--surface);
         color: var(--gutter);
-        padding: 10px 0;
+        padding: 10px 0 50vh;
         text-align: right;
         font-size: 14px;
         line-height: 1.5;
@@ -562,7 +562,7 @@
         font-family: var(--font);
         font-size: 14px;
         line-height: 1.5;
-        padding: 10px 16px;
+        padding: 10px 16px 50vh;
         tab-size: 2;
         white-space: pre;
         border: none;
@@ -1900,13 +1900,13 @@
 
         .editor-area > *:not(.vim-cursor) {
           font-size: 16px;
-          padding: 12px 14px;
+          padding: 12px 14px 50vh;
         }
 
         .gutter {
           font-size: 16px;
           min-width: 44px;
-          padding: 12px 0;
+          padding: 12px 0 50vh;
         }
 
         .gutter-line {
@@ -3874,6 +3874,7 @@
         }
         updateGutterActive();
         if (typeof vimUpdateBlockCursor === "function") vimUpdateBlockCursor();
+        if (typeof ensureCursorScrolloff === "function") ensureCursorScrolloff();
         scheduleOccurrenceUpdate();
       }
 
@@ -6175,6 +6176,68 @@
           () => cur.classList.remove("moving"),
           150,
         );
+      }
+
+      // Keep the cursor a few lines away from the top/bottom of the visible
+      // editor area, so typing at the end of a file doesn't park the caret on
+      // the bottom edge. Vim non-insert mode runs its own scrolloff inside
+      // vimUpdateBlockCursor, so this only fires when the native textarea
+      // caret is the active one.
+      function ensureCursorScrolloff() {
+        if (vimState.enabled && vimState.mode !== "insert") return;
+        const val = editor.value || "";
+        const pos = editor.selectionStart;
+        const lineHeight = parseFloat(_editorCS.lineHeight) || 21;
+        const padTop = parseFloat(_editorCS.paddingTop) || 10;
+        let absTop;
+
+        if (editorArea.classList.contains("wrap")) {
+          const padLeftPx = parseFloat(_editorCS.paddingLeft);
+          const contentWidth =
+            editor.clientWidth - padLeftPx - parseFloat(_editorCS.paddingRight);
+          _wrapMeasure.style.font = _editorCS.font;
+          _wrapMeasure.style.letterSpacing = _editorCS.letterSpacing;
+          _wrapMeasure.style.tabSize = _editorCS.tabSize;
+          _wrapMeasure.style.lineHeight = _editorCS.lineHeight;
+          _wrapMeasure.style.width = contentWidth + "px";
+          _wrapMeasure.style.whiteSpace = "pre-wrap";
+          _wrapMeasure.style.overflowWrap = "break-word";
+          const safePos = Math.min(pos, val.length);
+          _wrapMeasure.textContent = "";
+          if (safePos > 0) {
+            _wrapMeasure.appendChild(
+              document.createTextNode(val.substring(0, safePos)),
+            );
+          }
+          const marker = document.createElement("span");
+          marker.textContent = "\u200b";
+          _wrapMeasure.appendChild(marker);
+          if (safePos < val.length) {
+            _wrapMeasure.appendChild(
+              document.createTextNode(val.substring(safePos)),
+            );
+          }
+          document.body.appendChild(_wrapMeasure);
+          const markerRect = marker.getBoundingClientRect();
+          const mr = _wrapMeasure.getBoundingClientRect();
+          const rectTop = markerRect.top - mr.top;
+          _wrapMeasure.textContent = "";
+          document.body.removeChild(_wrapMeasure);
+          const rowIdx = Math.max(0, Math.round(rectTop / lineHeight));
+          absTop = padTop + rowIdx * lineHeight;
+        } else {
+          const lineIdx = (val.substring(0, pos).match(/\n/g) || []).length;
+          absTop = padTop + lineIdx * lineHeight;
+        }
+
+        const scrolloff = 5 * lineHeight;
+        const viewH = editor.clientHeight;
+        if (absTop - scrolloff < editor.scrollTop) {
+          editor.scrollTop = Math.max(0, absTop - scrolloff);
+        }
+        if (absTop + lineHeight + scrolloff > editor.scrollTop + viewH) {
+          editor.scrollTop = absTop + lineHeight + scrolloff - viewH;
+        }
       }
 
       function vimUpdateBlockCursor() {
