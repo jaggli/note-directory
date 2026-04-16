@@ -150,6 +150,7 @@ See [skills/README.md](skills/README.md) for usage and install instructions.
 
 ## Who's Using It
 
+- [serge.ai](https://www.serge.ai/) by [superstellar.io](https://www.superstellar.io/)
 - [snyps.io](https://snyps.io/) by [veanu.ch](https://www.veanu.ch/)
 
 ## Tech
