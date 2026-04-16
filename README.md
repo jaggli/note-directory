@@ -148,6 +148,10 @@ Two companion Claude Code skills let you decode and create `note.directory` link
 
 See [skills/README.md](skills/README.md) for usage and install instructions.
 
+## Who's Using It
+
+- [snyps.io](https://snyps.io/) by [veanu.ch](https://www.veanu.ch/)
+
 ## Tech
 
 - **Theme**: [Catppuccin Mocha](https://catppuccin.com)
