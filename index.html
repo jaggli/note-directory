@@ -2880,10 +2880,12 @@
           const hashMap = parseHashParams(location.hash);
           hashMap.set("name", note.name);
           hashMap.set("note", compressed);
+          hashMap.set("ts", String(note.updatedAt));
           const full = location.pathname + query + buildHash(hashMap);
           if (full.length > URL_MAX_LENGTH) {
             // Too long — drop note content from URL, hide share
             hashMap.delete("note");
+            hashMap.delete("ts");
             history.replaceState(
               { noteId: note.id, tab: currentTab() },
               "",
@@ -8154,6 +8156,7 @@
           const hashMap = new Map();
           hashMap.set("name", note.name);
           hashMap.set("note", compressed);
+          hashMap.set("ts", String(note.updatedAt));
 
           const url =
             location.origin + location.pathname + query + buildHash(hashMap);
@@ -8204,12 +8207,21 @@
             return true;
           }
 
+          const urlTs = Number(hashMap.get("ts")) || 0;
           const existing = state.notes.find((n) => n.name === name);
           if (existing) {
             if (existing.content === content) {
               state.activeId = existing.id;
               saveState();
               if (fromOldFormat) await updateUrl();
+              return true;
+            }
+            // URL is stale (older than local) — prefer local state silently.
+            // Why: updateUrl() is async and may not complete before the tab
+            // closes, so on reopen the URL can contain a pre-save snapshot.
+            if (urlTs && existing.updatedAt >= urlTs) {
+              state.activeId = existing.id;
+              saveState();
               return true;
             }
             render();
