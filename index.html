@@ -6224,30 +6224,33 @@
           _wrapMeasure.style.width = contentWidth + "px";
           _wrapMeasure.style.whiteSpace = "pre-wrap";
           _wrapMeasure.style.overflowWrap = "break-word";
-          _wrapMeasure.textContent = val || " ";
+          // Insert a marker span at the cursor position. Measuring via
+          // a Range on a plain text node returns no client rects on empty
+          // lines in some browsers (Firefox, Safari), so the cursor would
+          // snap to (0,0). A zero-width span always has a measurable box.
+          const safePos = Math.min(pos, val.length);
+          _wrapMeasure.textContent = "";
+          if (safePos > 0) {
+            _wrapMeasure.appendChild(
+              document.createTextNode(val.substring(0, safePos)),
+            );
+          }
+          const marker = document.createElement("span");
+          marker.textContent = "\u200b";
+          _wrapMeasure.appendChild(marker);
+          if (safePos < val.length) {
+            _wrapMeasure.appendChild(
+              document.createTextNode(val.substring(safePos)),
+            );
+          }
           document.body.appendChild(_wrapMeasure);
 
-          let rectTop = 0;
-          let rectLeft = 0;
-          const textNode = _wrapMeasure.firstChild;
-          if (textNode) {
-            const range = document.createRange();
-            const safePos = Math.min(
-              pos,
-              (textNode.nodeValue || "").length,
-            );
-            try {
-              range.setStart(textNode, safePos);
-              range.setEnd(textNode, safePos);
-              const rects = range.getClientRects();
-              const rect = rects.length ? rects[rects.length - 1] : null;
-              if (rect) {
-                const mr = _wrapMeasure.getBoundingClientRect();
-                rectTop = rect.top - mr.top;
-                rectLeft = rect.left - mr.left;
-              }
-            } catch (e) {}
-          }
+          const markerRect = marker.getBoundingClientRect();
+          const mr = _wrapMeasure.getBoundingClientRect();
+          let rectTop = markerRect.top - mr.top;
+          let rectLeft = markerRect.left - mr.left;
+
+          _wrapMeasure.textContent = "";
           document.body.removeChild(_wrapMeasure);
 
           // Snap top to the lineHeight grid: rect.top sits on the glyph,
