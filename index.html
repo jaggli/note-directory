@@ -665,7 +665,7 @@
       /* Zen mode */
       .zen-mode .sidebar,
       .zen-mode .sidebar-resize,
-      .zen-mode .statusbar,
+      .zen-mode ~ .statusbar,
       .zen-mode .md-tab-bar,
       .zen-mode .find-replace-bar {
         display: none !important;
@@ -1822,9 +1822,9 @@
           max-width: 100%;
         }
 
-        .app.sidebar-open .btn-wrap,
-        .app.sidebar-open .file-menu-container,
-        .app.sidebar-open #syncMenuContainer {
+        .app.sidebar-open ~ .statusbar .btn-wrap,
+        .app.sidebar-open ~ .statusbar .file-menu-container,
+        .app.sidebar-open ~ .statusbar #syncMenuContainer {
           display: none !important;
         }
 
@@ -2123,177 +2123,177 @@
             </button>
           </div>
         </div>
-        <div class="statusbar">
-          <button class="btn-files" id="btnFiles" onclick="toggleSidebar()">
-            note
-          </button>
-          <button
-            class="status-hint"
-            onclick="createNote()"
-            >new <kbd>ctrl+n</kbd></button
-          >
-          <button
-            class="status-hint"
-            onclick="openSearch()"
-            >search <kbd>ctrl+p</kbd></button
-          >
-          <button
-            class="status-hint"
-            id="btnReplace"
-            onclick="openFindReplace()"
-            >replace <kbd>ctrl+h</kbd></button
-          >
-          <button
-            class="status-hint"
-            id="btnVim"
-            onclick="toggleVim()"
-            >vim <kbd>ctrl+shift+m</kbd></button
-          >
-          <div class="status-right">
-            <span class="status-info">
-              <span id="cursorPos">Ln 1, Col 1</span>
-            </span>
-            <span
-              id="storageUsage"
-              class="storage-meter"
-              title="localStorage usage"
-            ></span>
-            <button
-              class="btn-wrap"
-              id="btnWrap"
-              onclick="toggleWrap()"
-              title="Toggle word wrap"
-            >
-              wrap
-            </button>
-            <div class="file-menu-container" id="fileMenuContainer">
-              <button class="btn-share" onclick="toggleFileMenu()">file</button>
-              <div class="file-menu" id="fileMenu" role="menu" aria-label="File menu">
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  onclick="
-                    openHelp();
-                    closeFileMenu();
-                  "
-                >
-                  help
-                </button>
-                <hr class="file-menu-separator" />
-                <button
-                  class="file-menu-item mobile-only"
-                  role="menuitem"
-                  onclick="
-                    createNote();
-                    closeFileMenu();
-                  "
-                >
-                  new
-                </button>
-                <button
-                  class="file-menu-item mobile-only"
-                  role="menuitem"
-                  onclick="
-                    openFindReplace();
-                    closeFileMenu();
-                  "
-                >
-                  find &amp; replace
-                </button>
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  id="btnShare"
-                  onclick="shareNote()"
-                >
-                  share file
-                </button>
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  onclick="
-                    downloadNote();
-                    closeFileMenu();
-                  "
-                >
-                  download file
-                </button>
-                <hr class="file-menu-separator mobile-only" />
-                <button
-                  class="file-menu-item mobile-only"
-                  role="menuitem"
-                  onclick="
-                    openSearch();
-                    closeFileMenu();
-                  "
-                >
-                  search all
-                </button>
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  onclick="
-                    downloadAll();
-                    closeFileMenu();
-                  "
-                >
-                  export all
-                </button>
-                <hr class="file-menu-separator" />
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  id="btnDriveSync"
-                  onclick="driveSync()"
-                >
-                  sync google drive
-                </button>
-                <a
-                  class="file-menu-item file-menu-link"
-                  role="menuitem"
-                  href="legal/privacy-policy.html"
-                  target="_blank"
-                >
-                  privacy policy
-                </a>
-              </div>
-            </div>
-            <div
-              class="file-menu-container"
-              id="syncMenuContainer"
-              style="display: none"
-            >
-              <button class="btn-share" onclick="toggleSyncMenu()">
-                <span id="syncLabel">sync</span>
-                <span class="sync-dot">&#9679;</span>
-              </button>
-              <div class="file-menu" id="syncMenu" role="menu" aria-label="Sync menu">
-                <div id="syncMenuConnected">
-                  <button class="file-menu-item" role="menuitem" onclick="driveSync()">
-                    sync now
-                  </button>
-                  <hr class="file-menu-separator" />
-                  <button class="file-menu-item" role="menuitem" onclick="driveSignOut()">
-                    disconnect
-                  </button>
-                </div>
-                <div id="syncMenuFailed" style="display: none">
-                  <button class="file-menu-item" role="menuitem" onclick="driveSync()">
-                    reconnect
-                  </button>
-                </div>
-                <div id="syncMenuDisconnected" style="display: none">
-                  <button class="file-menu-item" role="menuitem" onclick="driveSync()">
-                    connect
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
         <div class="vim-command-bar" id="vimCommandBar">
           <span class="vim-command-prefix">:</span>
           <input id="vimCommandInput" type="text" aria-label="Vim command" spellcheck="false" />
+        </div>
+      </div>
+    </div>
+    <div class="statusbar">
+      <button class="btn-files" id="btnFiles" onclick="toggleSidebar()">
+        note
+      </button>
+      <button
+        class="status-hint"
+        onclick="createNote()"
+        >new <kbd>ctrl+n</kbd></button
+      >
+      <button
+        class="status-hint"
+        onclick="openSearch()"
+        >search <kbd>ctrl+p</kbd></button
+      >
+      <button
+        class="status-hint"
+        id="btnReplace"
+        onclick="openFindReplace()"
+        >replace <kbd>ctrl+h</kbd></button
+      >
+      <button
+        class="status-hint"
+        id="btnVim"
+        onclick="toggleVim()"
+        >vim <kbd>ctrl+shift+m</kbd></button
+      >
+      <div class="status-right">
+        <span class="status-info">
+          <span id="cursorPos">Ln 1, Col 1</span>
+        </span>
+        <span
+          id="storageUsage"
+          class="storage-meter"
+          title="localStorage usage"
+        ></span>
+        <button
+          class="btn-wrap"
+          id="btnWrap"
+          onclick="toggleWrap()"
+          title="Toggle word wrap"
+        >
+          wrap
+        </button>
+        <div class="file-menu-container" id="fileMenuContainer">
+          <button class="btn-share" onclick="toggleFileMenu()">file</button>
+          <div class="file-menu" id="fileMenu" role="menu" aria-label="File menu">
+            <button
+              class="file-menu-item"
+              role="menuitem"
+              onclick="
+                openHelp();
+                closeFileMenu();
+              "
+            >
+              help
+            </button>
+            <hr class="file-menu-separator" />
+            <button
+              class="file-menu-item mobile-only"
+              role="menuitem"
+              onclick="
+                createNote();
+                closeFileMenu();
+              "
+            >
+              new
+            </button>
+            <button
+              class="file-menu-item mobile-only"
+              role="menuitem"
+              onclick="
+                openFindReplace();
+                closeFileMenu();
+              "
+            >
+              find &amp; replace
+            </button>
+            <button
+              class="file-menu-item"
+              role="menuitem"
+              id="btnShare"
+              onclick="shareNote()"
+            >
+              share file
+            </button>
+            <button
+              class="file-menu-item"
+              role="menuitem"
+              onclick="
+                downloadNote();
+                closeFileMenu();
+              "
+            >
+              download file
+            </button>
+            <hr class="file-menu-separator mobile-only" />
+            <button
+              class="file-menu-item mobile-only"
+              role="menuitem"
+              onclick="
+                openSearch();
+                closeFileMenu();
+              "
+            >
+              search all
+            </button>
+            <button
+              class="file-menu-item"
+              role="menuitem"
+              onclick="
+                downloadAll();
+                closeFileMenu();
+              "
+            >
+              export all
+            </button>
+            <hr class="file-menu-separator" />
+            <button
+              class="file-menu-item"
+              role="menuitem"
+              id="btnDriveSync"
+              onclick="driveSync()"
+            >
+              sync google drive
+            </button>
+            <a
+              class="file-menu-item file-menu-link"
+              role="menuitem"
+              href="legal/privacy-policy.html"
+              target="_blank"
+            >
+              privacy policy
+            </a>
+          </div>
+        </div>
+        <div
+          class="file-menu-container"
+          id="syncMenuContainer"
+          style="display: none"
+        >
+          <button class="btn-share" onclick="toggleSyncMenu()">
+            <span id="syncLabel">sync</span>
+            <span class="sync-dot">&#9679;</span>
+          </button>
+          <div class="file-menu" id="syncMenu" role="menu" aria-label="Sync menu">
+            <div id="syncMenuConnected">
+              <button class="file-menu-item" role="menuitem" onclick="driveSync()">
+                sync now
+              </button>
+              <hr class="file-menu-separator" />
+              <button class="file-menu-item" role="menuitem" onclick="driveSignOut()">
+                disconnect
+              </button>
+            </div>
+            <div id="syncMenuFailed" style="display: none">
+              <button class="file-menu-item" role="menuitem" onclick="driveSync()">
+                reconnect
+              </button>
+            </div>
+            <div id="syncMenuDisconnected" style="display: none">
+              <button class="file-menu-item" role="menuitem" onclick="driveSync()">
+                connect
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
