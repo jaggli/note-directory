@@ -1,5 +1,5 @@
 ---
-name: note-directory
+name: note-directory-read
 description: Decode and display the contents of a https://note.directory URL. The note content is base64url-encoded raw-deflate compressed in the URL anchor fragment. USE WHEN user pastes or provides a URL containing note.directory/.
 ---
 

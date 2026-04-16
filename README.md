@@ -38,7 +38,8 @@ across devices via Google Drive.
   asset is the Victor Mono font file served alongside
   the HTML.
 
-## Features
+<details>
+<summary><strong>Features</strong></summary>
 
 - Syntax highlighting for 12 languages
   (JS, TS, Python, Rust, Go, CSS/SCSS, HTML/XML,
@@ -83,7 +84,10 @@ across devices via Google Drive.
 - Built-in help page (accessible from file menu)
 - Mobile-optimized UI with touch-friendly controls
 
-## Vim mode
+</details>
+
+<details>
+<summary><strong>Vim mode</strong></summary>
 
 Toggle vim mode via the `vim` button in the toolbar
 (desktop only, hidden on touch devices). The setting
@@ -110,7 +114,10 @@ Features include:
   `:%s/find/replace/g` (opens find & replace)
 - Count prefixes (e.g. `3dw`, `5j`, `2>>`)
 
-## Keyboard shortcuts
+</details>
+
+<details>
+<summary><strong>Keyboard shortcuts</strong></summary>
 
 | Shortcut        | Action                                         |
 | --------------- | ---------------------------------------------- |
@@ -133,12 +140,13 @@ When vim mode is active, standard vim keybindings take
 precedence in the editor. The shortcuts above still work
 in input fields (search, find & replace).
 
-## Mobile
+</details>
 
-On mobile, the sidebar opens as a full-screen overlay.
-The file menu (bottom-right) provides access to new note,
-find & replace, search, sharing, and downloads. New notes
-prompt for a filename via a styled dialog.
+## Claude Code skills
+
+Two companion Claude Code skills let you decode and create `note.directory` links from chat: `note-directory-read` and `note-directory-share`.
+
+See [skills/README.md](skills/README.md) for usage and install instructions.
 
 ## Tech
 
