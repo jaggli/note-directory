@@ -4,7 +4,7 @@
 
 A private, local-first text editor that runs entirely in
 your browser. No data is collected, transmitted, or stored
-on any server. No signup, no backend, no dependencies.
+on any server. No signup, no backend, no dependencies, no BS.
 Just open the page and start typing.
 
 Built as a single `index.html` file with vanilla JS and
