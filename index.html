@@ -2157,7 +2157,7 @@
                 >
                   enable google drive
                 </button>
-                <hr class="file-menu-separator" />
+                <hr class="file-menu-separator" id="btnDriveSyncSeparator" />
                 <a
                   class="file-menu-item file-menu-link"
                   role="menuitem"
@@ -9278,6 +9278,7 @@
       function showSyncConnected() {
         document.getElementById("syncMenuContainer").style.display = "";
         document.getElementById("btnDriveSync").style.display = "none";
+        document.getElementById("btnDriveSyncSeparator").style.display = "none";
         document.querySelector(".sync-dot").classList.remove("disconnected");
         document.getElementById("syncLabel").textContent = "sync";
         document.getElementById("syncMenuConnected").style.display = "";
@@ -9288,6 +9289,7 @@
       function showSyncFailed() {
         document.getElementById("syncMenuContainer").style.display = "";
         document.getElementById("btnDriveSync").style.display = "none";
+        document.getElementById("btnDriveSyncSeparator").style.display = "none";
         document.querySelector(".sync-dot").classList.add("disconnected");
         document.getElementById("syncLabel").textContent = "sync failed";
         document.getElementById("syncMenuConnected").style.display = "none";
@@ -9298,6 +9300,7 @@
       function hideSyncConnected() {
         document.getElementById("syncMenuContainer").style.display = "none";
         document.getElementById("btnDriveSync").style.display = "";
+        document.getElementById("btnDriveSyncSeparator").style.display = "";
         document.querySelector(".sync-dot").classList.remove("disconnected");
       }
 
