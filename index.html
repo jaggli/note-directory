@@ -4696,6 +4696,19 @@
           text = result.join("\n");
         }
 
+        // Backslash escapes (CommonMark) — must run before inline parsing so
+        // \` isn't consumed by inline-code matching. Entity-encoded chars
+        // (&amp; &lt; &gt; &quot;) are matched in their already-escaped form.
+        const escapes = [];
+        text = text.replace(
+          /\\(&amp;|&lt;|&gt;|&quot;|[!#$%'()*+,\-./:;=?@\[\\\]^_`{|}~])/g,
+          (_, ch) => {
+            const idx = escapes.length;
+            escapes.push(ch);
+            return "\x00ES" + idx + "\x00";
+          },
+        );
+
         // Inline code (must come before other inline formatting)
         const inlineCodes = [];
         text = text.replace(/`([^`\n]+)`/g, (_, code) => {
@@ -4978,9 +4991,10 @@
 
         text = result;
 
-        // Step 3: restore code blocks and inline codes
+        // Step 3: restore code blocks, inline codes, and backslash escapes
         text = text.replace(/\x00CB(\d+)\x00/g, (_, idx) => codeBlocks[+idx]);
         text = text.replace(/\x00IC(\d+)\x00/g, (_, idx) => inlineCodes[+idx]);
+        text = text.replace(/\x00ES(\d+)\x00/g, (_, idx) => escapes[+idx]);
 
         // Step 4: selectively re-enable <details> and <summary> ONLY
         // These were escaped in step 1. We match the escaped forms exactly.
