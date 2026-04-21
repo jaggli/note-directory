@@ -1408,7 +1408,7 @@
         border: 1px solid var(--border);
         border-radius: 6px;
         padding: 4px 0;
-        min-width: 160px;
+        min-width: 230px;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
         z-index: 50;
       }
@@ -1848,7 +1848,7 @@
           max-width: 100%;
         }
 
-        .app.sidebar-open ~ .statusbar .btn-wrap {
+        .app.sidebar-open ~ .statusbar {
           display: none !important;
         }
 
@@ -1858,7 +1858,7 @@
           top: 0;
           left: 0;
           right: 0;
-          bottom: 36px;
+          bottom: 0;
           z-index: 50;
           border-right: none;
         }
@@ -1955,8 +1955,14 @@
           padding: 4px 10px;
         }
 
+        .md-tab,
+        .md-tab-bar .btn-share {
+          font-size: 16px;
+          padding: 10px 14px;
+        }
+
         .file-menu {
-          min-width: 220px;
+          min-width: 250px;
         }
 
         .file-menu-item.mobile-only {
@@ -2083,17 +2089,6 @@
                 aria-label="File menu"
               >
                 <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  onclick="
-                    openHelp();
-                    closeFileMenu();
-                  "
-                >
-                  help
-                </button>
-                <hr class="file-menu-separator" />
-                <button
                   class="file-menu-item mobile-only"
                   role="menuitem"
                   onclick="
@@ -2119,7 +2114,7 @@
                   id="btnShare"
                   onclick="shareNote()"
                 >
-                  share file
+                  share
                 </button>
                 <button
                   class="file-menu-item"
@@ -2129,7 +2124,7 @@
                     closeFileMenu();
                   "
                 >
-                  download file
+                  download
                 </button>
                 <hr class="file-menu-separator mobile-only" />
                 <button
@@ -2159,8 +2154,9 @@
                   id="btnDriveSync"
                   onclick="driveSync()"
                 >
-                  sync google drive
+                  enable google drive
                 </button>
+                <hr class="file-menu-separator" />
                 <a
                   class="file-menu-item file-menu-link"
                   role="menuitem"
@@ -2169,6 +2165,16 @@
                 >
                   privacy policy
                 </a>
+                <button
+                  class="file-menu-item"
+                  role="menuitem"
+                  onclick="
+                    openHelp();
+                    closeFileMenu();
+                  "
+                >
+                  help
+                </button>
               </div>
             </div>
             <div
