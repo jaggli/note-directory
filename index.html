@@ -754,6 +754,8 @@
         font-family: var(--font);
         font-size: 13px;
         color: var(--subtext);
+        user-select: none;
+        -webkit-user-select: none;
       }
       .zen-bar-left {
         display: flex;
@@ -870,6 +872,12 @@
         color: var(--overlay2);
         font-weight: normal;
         transition: opacity 0.15s;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .md-preview .heading-anchor::before {
+        content: "#";
       }
 
       .md-preview h1:hover .heading-anchor,
@@ -4718,7 +4726,7 @@
             '">' +
             '<a class="heading-anchor" href="#' +
             slug +
-            '">#</a>' +
+            '" aria-label="permalink"></a>' +
             title +
             "</h" +
             level +
@@ -9052,7 +9060,7 @@
           (document.activeElement.tagName === "INPUT" ||
             document.activeElement.tagName === "TEXTAREA");
 
-        // In zen mode, block all shortcuts except "e" and Escape
+        // In zen mode, block all shortcuts except "e", Escape, and Cmd/Ctrl+A
         if (zenModeActive) {
           if (
             !inInput &&
@@ -9066,6 +9074,17 @@
           } else if (e.key === "Escape") {
             e.preventDefault();
             exitZenMode();
+          } else if (
+            !inInput &&
+            (e.metaKey || e.ctrlKey) &&
+            (e.key === "a" || e.key === "A")
+          ) {
+            e.preventDefault();
+            const sel = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(mdPreview);
+            sel.removeAllRanges();
+            sel.addRange(range);
           }
           return;
         }
