@@ -1950,7 +1950,8 @@
           display: none;
         }
 
-        .btn-wrap {
+        .btn-wrap,
+        .statusbar .btn-share {
           font-size: 16px;
           padding: 4px 10px;
         }
@@ -2177,58 +2178,6 @@
                 </button>
               </div>
             </div>
-            <div
-              class="file-menu-container"
-              id="syncMenuContainer"
-              style="display: none"
-            >
-              <button class="btn-share" onclick="toggleSyncMenu()">
-                <span id="syncLabel">sync</span>
-                <span class="sync-dot">&#9679;</span>
-              </button>
-              <div
-                class="file-menu"
-                id="syncMenu"
-                role="menu"
-                aria-label="Sync menu"
-              >
-                <div id="syncMenuConnected">
-                  <button
-                    class="file-menu-item"
-                    role="menuitem"
-                    onclick="driveSync()"
-                  >
-                    sync now
-                  </button>
-                  <hr class="file-menu-separator" />
-                  <button
-                    class="file-menu-item"
-                    role="menuitem"
-                    onclick="driveSignOut()"
-                  >
-                    disconnect
-                  </button>
-                </div>
-                <div id="syncMenuFailed" style="display: none">
-                  <button
-                    class="file-menu-item"
-                    role="menuitem"
-                    onclick="driveSync()"
-                  >
-                    reconnect
-                  </button>
-                </div>
-                <div id="syncMenuDisconnected" style="display: none">
-                  <button
-                    class="file-menu-item"
-                    role="menuitem"
-                    onclick="driveSync()"
-                  >
-                    connect
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
           <div
             class="md-tabs"
@@ -2381,6 +2330,58 @@
         >
           wrap
         </button>
+        <div
+          class="file-menu-container"
+          id="syncMenuContainer"
+          style="display: none"
+        >
+          <button class="btn-share" onclick="toggleSyncMenu()">
+            <span id="syncLabel">sync</span>
+            <span class="sync-dot">&#9679;</span>
+          </button>
+          <div
+            class="file-menu"
+            id="syncMenu"
+            role="menu"
+            aria-label="Sync menu"
+          >
+            <div id="syncMenuConnected">
+              <button
+                class="file-menu-item"
+                role="menuitem"
+                onclick="driveSync()"
+              >
+                sync now
+              </button>
+              <hr class="file-menu-separator" />
+              <button
+                class="file-menu-item"
+                role="menuitem"
+                onclick="driveSignOut()"
+              >
+                disconnect
+              </button>
+            </div>
+            <div id="syncMenuFailed" style="display: none">
+              <button
+                class="file-menu-item"
+                role="menuitem"
+                onclick="driveSync()"
+              >
+                reconnect
+              </button>
+            </div>
+            <div id="syncMenuDisconnected" style="display: none">
+              <button
+                class="file-menu-item"
+                role="menuitem"
+                onclick="driveSync()"
+              >
+                connect
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
