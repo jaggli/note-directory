@@ -3992,8 +3992,6 @@
         }
         updateGutterActive();
         if (typeof vimUpdateBlockCursor === "function") vimUpdateBlockCursor();
-        if (typeof ensureCursorScrolloff === "function")
-          ensureCursorScrolloff();
         scheduleOccurrenceUpdate();
       }
 
@@ -8906,6 +8904,7 @@
         }
         updateLineNumbers();
         updateCursorPos();
+        ensureCursorScrolloff();
         scheduleHighlight();
         if (!vimActive) {
           scheduleSave();
@@ -10155,6 +10154,7 @@
             editor.selectionStart = editor.selectionEnd = pos;
           }
           updateCursorPos();
+          ensureCursorScrolloff();
           // Sync highlight layer and gutter after browser layout
           requestAnimationFrame(() => {
             gutter.scrollTop = editor.scrollTop;
