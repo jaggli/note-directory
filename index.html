@@ -22,12 +22,18 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://note.directory/" />
-    <meta property="og:image" content="https://note.directory/img/android-chrome-512x512.png" />
+    <meta
+      property="og:image"
+      content="https://note.directory/img/android-chrome-512x512.png"
+    />
     <meta property="og:image:width" content="512" />
     <meta property="og:image:height" content="512" />
     <meta property="og:image:type" content="image/png" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:image" content="https://note.directory/img/android-chrome-512x512.png" />
+    <meta
+      name="twitter:image"
+      content="https://note.directory/img/android-chrome-512x512.png"
+    />
     <link rel="canonical" href="https://note.directory/" />
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#1e1e2e" />
@@ -602,17 +608,44 @@
         z-index: 0;
       }
 
-      /* Markdown tab bar */
+      /* Editor top bar */
       .md-tab-bar {
-        display: none;
+        display: flex;
+        align-items: center;
         border-bottom: 1px solid var(--border);
         background: var(--sidebar);
-        padding: 0;
+        padding: 0 4px;
         gap: 0;
       }
 
-      .md-tab-bar.visible {
+      .md-tab-bar-left {
         display: flex;
+        align-items: center;
+        gap: 0;
+      }
+
+      .md-tabs {
+        display: none;
+        margin-left: auto;
+      }
+
+      .md-tabs.visible {
+        display: flex;
+      }
+
+      .md-tab-bar .file-menu {
+        top: 100%;
+        bottom: auto;
+        left: 0;
+        right: auto;
+        margin-top: 4px;
+        margin-bottom: 0;
+      }
+
+      .md-tab-bar .btn-share {
+        font-size: 13px;
+        padding: 6px 14px;
+        border-radius: 0;
       }
 
       .md-tab {
@@ -1482,7 +1515,8 @@
           display: none;
         }
 
-        .md-tab {
+        .md-tab,
+        .md-tab-bar .btn-share {
           font-size: 16px;
           padding: 10px 18px;
         }
@@ -1495,8 +1529,6 @@
           width: 24px;
           height: 24px;
         }
-
-
       }
 
       .vim-cursor {
@@ -1816,9 +1848,7 @@
           max-width: 100%;
         }
 
-        .app.sidebar-open ~ .statusbar .btn-wrap,
-        .app.sidebar-open ~ .statusbar .file-menu-container,
-        .app.sidebar-open ~ .statusbar #syncMenuContainer {
+        .app.sidebar-open ~ .statusbar .btn-wrap {
           display: none !important;
         }
 
@@ -1864,7 +1894,6 @@
         .note-item-input {
           font-size: 18px;
         }
-
 
         .note-item-time {
           font-size: 13px;
@@ -1922,11 +1951,6 @@
         }
 
         .btn-wrap {
-          font-size: 16px;
-          padding: 4px 10px;
-        }
-
-        .btn-share {
           font-size: 16px;
           padding: 4px 10px;
         }
@@ -2003,10 +2027,20 @@
             </button>
           </span>
         </div>
-        <div class="note-list" id="noteList" role="list" aria-label="Notes"></div>
+        <div
+          class="note-list"
+          id="noteList"
+          role="list"
+          aria-label="Notes"
+        ></div>
       </div>
       <div class="editor-container" role="main">
-        <div class="find-replace-bar" id="findReplaceBar" role="search" aria-label="Find and replace">
+        <div
+          class="find-replace-bar"
+          id="findReplaceBar"
+          role="search"
+          aria-label="Find and replace"
+        >
           <input
             type="text"
             id="findInput"
@@ -2025,7 +2059,11 @@
           <button onclick="findPrev()">prev</button>
           <button onclick="replaceCurrent()">replace</button>
           <button onclick="replaceAll()">all</button>
-          <span class="find-replace-count" id="findReplaceCount" aria-live="polite"></span>
+          <span
+            class="find-replace-count"
+            id="findReplaceCount"
+            aria-live="polite"
+          ></span>
           <button
             onclick="closeFindReplace()"
             style="margin-left: auto; border: none"
@@ -2034,34 +2072,192 @@
             &times;
           </button>
         </div>
-        <div class="md-tab-bar" id="mdTabBar" role="tablist" aria-label="Editor mode">
-          <button
-            class="md-tab active"
-            id="mdTabEdit"
-            role="tab"
-            aria-selected="true"
-            onclick="switchMdTab('edit', true)"
+        <div class="md-tab-bar" id="mdTabBar" aria-label="Editor top bar">
+          <div class="md-tab-bar-left">
+            <div class="file-menu-container" id="fileMenuContainer">
+              <button class="btn-share" onclick="toggleFileMenu()">file</button>
+              <div
+                class="file-menu"
+                id="fileMenu"
+                role="menu"
+                aria-label="File menu"
+              >
+                <button
+                  class="file-menu-item"
+                  role="menuitem"
+                  onclick="
+                    openHelp();
+                    closeFileMenu();
+                  "
+                >
+                  help
+                </button>
+                <hr class="file-menu-separator" />
+                <button
+                  class="file-menu-item mobile-only"
+                  role="menuitem"
+                  onclick="
+                    createNote();
+                    closeFileMenu();
+                  "
+                >
+                  new
+                </button>
+                <button
+                  class="file-menu-item mobile-only"
+                  role="menuitem"
+                  onclick="
+                    openFindReplace();
+                    closeFileMenu();
+                  "
+                >
+                  find &amp; replace
+                </button>
+                <button
+                  class="file-menu-item"
+                  role="menuitem"
+                  id="btnShare"
+                  onclick="shareNote()"
+                >
+                  share file
+                </button>
+                <button
+                  class="file-menu-item"
+                  role="menuitem"
+                  onclick="
+                    downloadNote();
+                    closeFileMenu();
+                  "
+                >
+                  download file
+                </button>
+                <hr class="file-menu-separator mobile-only" />
+                <button
+                  class="file-menu-item mobile-only"
+                  role="menuitem"
+                  onclick="
+                    openSearch();
+                    closeFileMenu();
+                  "
+                >
+                  search all
+                </button>
+                <button
+                  class="file-menu-item"
+                  role="menuitem"
+                  onclick="
+                    downloadAll();
+                    closeFileMenu();
+                  "
+                >
+                  export all
+                </button>
+                <hr class="file-menu-separator" />
+                <button
+                  class="file-menu-item"
+                  role="menuitem"
+                  id="btnDriveSync"
+                  onclick="driveSync()"
+                >
+                  sync google drive
+                </button>
+                <a
+                  class="file-menu-item file-menu-link"
+                  role="menuitem"
+                  href="legal/privacy-policy.html"
+                  target="_blank"
+                >
+                  privacy policy
+                </a>
+              </div>
+            </div>
+            <div
+              class="file-menu-container"
+              id="syncMenuContainer"
+              style="display: none"
+            >
+              <button class="btn-share" onclick="toggleSyncMenu()">
+                <span id="syncLabel">sync</span>
+                <span class="sync-dot">&#9679;</span>
+              </button>
+              <div
+                class="file-menu"
+                id="syncMenu"
+                role="menu"
+                aria-label="Sync menu"
+              >
+                <div id="syncMenuConnected">
+                  <button
+                    class="file-menu-item"
+                    role="menuitem"
+                    onclick="driveSync()"
+                  >
+                    sync now
+                  </button>
+                  <hr class="file-menu-separator" />
+                  <button
+                    class="file-menu-item"
+                    role="menuitem"
+                    onclick="driveSignOut()"
+                  >
+                    disconnect
+                  </button>
+                </div>
+                <div id="syncMenuFailed" style="display: none">
+                  <button
+                    class="file-menu-item"
+                    role="menuitem"
+                    onclick="driveSync()"
+                  >
+                    reconnect
+                  </button>
+                </div>
+                <div id="syncMenuDisconnected" style="display: none">
+                  <button
+                    class="file-menu-item"
+                    role="menuitem"
+                    onclick="driveSync()"
+                  >
+                    connect
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            class="md-tabs"
+            id="mdTabs"
+            role="tablist"
+            aria-label="Editor mode"
           >
-            edit
-          </button>
-          <button
-            class="md-tab"
-            id="mdTabView"
-            role="tab"
-            aria-selected="false"
-            onclick="switchMdTab('view', true)"
-          >
-            view
-          </button>
-          <button
-            class="md-tab"
-            id="mdTabZen"
-            role="tab"
-            aria-selected="false"
-            onclick="switchMdTab('zen', true)"
-          >
-            zen
-          </button>
+            <button
+              class="md-tab active"
+              id="mdTabEdit"
+              role="tab"
+              aria-selected="true"
+              onclick="switchMdTab('edit', true)"
+            >
+              edit
+            </button>
+            <button
+              class="md-tab"
+              id="mdTabView"
+              role="tab"
+              aria-selected="false"
+              onclick="switchMdTab('view', true)"
+            >
+              view
+            </button>
+            <button
+              class="md-tab"
+              id="mdTabZen"
+              role="tab"
+              aria-selected="false"
+              onclick="switchMdTab('zen', true)"
+            >
+              zen
+            </button>
+          </div>
         </div>
         <div class="editor-wrap">
           <div class="gutter" id="gutter" aria-hidden="true"></div>
@@ -2086,7 +2282,11 @@
             ></textarea>
             <div class="vim-cursor" id="vimCursor" aria-hidden="true"></div>
           </div>
-          <div class="occurrence-track" id="occurrenceTrack" aria-hidden="true"></div>
+          <div
+            class="occurrence-track"
+            id="occurrenceTrack"
+            aria-hidden="true"
+          ></div>
           <div class="md-preview" id="mdPreview"></div>
           <div class="zen-bar" id="zenBar" style="display: none">
             <div class="zen-bar-left">
@@ -2095,15 +2295,29 @@
                 src="img/favicon-32x32.png"
                 alt="note"
               />
-              <span class="zen-bar-filename" id="zenBarFilename"><span class="zen-bar-filename-start"></span><span class="zen-bar-filename-end"></span></span>
+              <span class="zen-bar-filename" id="zenBarFilename"
+                ><span class="zen-bar-filename-start"></span
+                ><span class="zen-bar-filename-end"></span
+              ></span>
             </div>
             <div class="zen-bar-right">
               <span class="zen-copied" id="zenCopied">copied to clipboard</span>
-              <button class="zen-close-btn" onclick="exitZenMode()" title="Close zen mode [Esc]" aria-label="Close zen mode">
+              <button
+                class="zen-close-btn"
+                onclick="exitZenMode()"
+                title="Close zen mode [Esc]"
+                aria-label="Close zen mode"
+              >
                 &times;
               </button>
             </div>
-            <button class="zen-share-btn" id="zenShareBtn" onclick="zenShare()" style="display:none" aria-label="Share note">
+            <button
+              class="zen-share-btn"
+              id="zenShareBtn"
+              onclick="zenShare()"
+              style="display: none"
+              aria-label="Share note"
+            >
               share
             </button>
           </div>
@@ -2119,36 +2333,31 @@
         </div>
         <div class="vim-command-bar" id="vimCommandBar">
           <span class="vim-command-prefix">:</span>
-          <input id="vimCommandInput" type="text" aria-label="Vim command" spellcheck="false" />
+          <input
+            id="vimCommandInput"
+            type="text"
+            aria-label="Vim command"
+            spellcheck="false"
+          />
         </div>
       </div>
     </div>
     <div class="statusbar">
       <button class="btn-files" id="btnFiles" onclick="toggleSidebar()">
-        note
+        notes
       </button>
-      <button
-        class="status-hint"
-        onclick="createNote()"
-        >new <kbd>ctrl+n</kbd></button
-      >
-      <button
-        class="status-hint"
-        onclick="openSearch()"
-        >search <kbd>ctrl+p</kbd></button
-      >
-      <button
-        class="status-hint"
-        id="btnReplace"
-        onclick="openFindReplace()"
-        >replace <kbd>ctrl+h</kbd></button
-      >
-      <button
-        class="status-hint"
-        id="btnVim"
-        onclick="toggleVim()"
-        >vim <kbd>ctrl+shift+m</kbd></button
-      >
+      <button class="status-hint" onclick="createNote()">
+        new <kbd>ctrl+n</kbd>
+      </button>
+      <button class="status-hint" onclick="openSearch()">
+        search <kbd>ctrl+p</kbd>
+      </button>
+      <button class="status-hint" id="btnReplace" onclick="openFindReplace()">
+        replace <kbd>ctrl+h</kbd>
+      </button>
+      <button class="status-hint" id="btnVim" onclick="toggleVim()">
+        vim <kbd>ctrl+shift+m</kbd>
+      </button>
       <div class="status-right">
         <span class="status-info">
           <span id="cursorPos">Ln 1, Col 1</span>
@@ -2166,133 +2375,16 @@
         >
           wrap
         </button>
-        <div class="file-menu-container" id="fileMenuContainer">
-          <button class="btn-share" onclick="toggleFileMenu()">file</button>
-          <div class="file-menu" id="fileMenu" role="menu" aria-label="File menu">
-            <button
-              class="file-menu-item"
-              role="menuitem"
-              onclick="
-                openHelp();
-                closeFileMenu();
-              "
-            >
-              help
-            </button>
-            <hr class="file-menu-separator" />
-            <button
-              class="file-menu-item mobile-only"
-              role="menuitem"
-              onclick="
-                createNote();
-                closeFileMenu();
-              "
-            >
-              new
-            </button>
-            <button
-              class="file-menu-item mobile-only"
-              role="menuitem"
-              onclick="
-                openFindReplace();
-                closeFileMenu();
-              "
-            >
-              find &amp; replace
-            </button>
-            <button
-              class="file-menu-item"
-              role="menuitem"
-              id="btnShare"
-              onclick="shareNote()"
-            >
-              share file
-            </button>
-            <button
-              class="file-menu-item"
-              role="menuitem"
-              onclick="
-                downloadNote();
-                closeFileMenu();
-              "
-            >
-              download file
-            </button>
-            <hr class="file-menu-separator mobile-only" />
-            <button
-              class="file-menu-item mobile-only"
-              role="menuitem"
-              onclick="
-                openSearch();
-                closeFileMenu();
-              "
-            >
-              search all
-            </button>
-            <button
-              class="file-menu-item"
-              role="menuitem"
-              onclick="
-                downloadAll();
-                closeFileMenu();
-              "
-            >
-              export all
-            </button>
-            <hr class="file-menu-separator" />
-            <button
-              class="file-menu-item"
-              role="menuitem"
-              id="btnDriveSync"
-              onclick="driveSync()"
-            >
-              sync google drive
-            </button>
-            <a
-              class="file-menu-item file-menu-link"
-              role="menuitem"
-              href="legal/privacy-policy.html"
-              target="_blank"
-            >
-              privacy policy
-            </a>
-          </div>
-        </div>
-        <div
-          class="file-menu-container"
-          id="syncMenuContainer"
-          style="display: none"
-        >
-          <button class="btn-share" onclick="toggleSyncMenu()">
-            <span id="syncLabel">sync</span>
-            <span class="sync-dot">&#9679;</span>
-          </button>
-          <div class="file-menu" id="syncMenu" role="menu" aria-label="Sync menu">
-            <div id="syncMenuConnected">
-              <button class="file-menu-item" role="menuitem" onclick="driveSync()">
-                sync now
-              </button>
-              <hr class="file-menu-separator" />
-              <button class="file-menu-item" role="menuitem" onclick="driveSignOut()">
-                disconnect
-              </button>
-            </div>
-            <div id="syncMenuFailed" style="display: none">
-              <button class="file-menu-item" role="menuitem" onclick="driveSync()">
-                reconnect
-              </button>
-            </div>
-            <div id="syncMenuDisconnected" style="display: none">
-              <button class="file-menu-item" role="menuitem" onclick="driveSync()">
-                connect
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
-    <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalText">
+    <div
+      class="modal-overlay"
+      id="modalOverlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modalText"
+    >
       <div class="modal">
         <div class="modal-text" id="modalText"></div>
         <input
@@ -2312,7 +2404,13 @@
     </div>
 
     <div class="search-backdrop" id="searchBackdrop"></div>
-    <div class="search-results" id="searchResults" role="dialog" aria-modal="true" aria-label="Search notes">
+    <div
+      class="search-results"
+      id="searchResults"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search notes"
+    >
       <div class="search-results-header">
         <input
           class="search-input"
@@ -2323,8 +2421,17 @@
           aria-label="Search notes"
           spellcheck="false"
         />
-        <span class="search-results-count" id="searchCount" aria-live="polite"></span>
-        <button class="btn-search-close" onclick="closeSearch()" title="Close" aria-label="Close search">
+        <span
+          class="search-results-count"
+          id="searchCount"
+          aria-live="polite"
+        ></span>
+        <button
+          class="btn-search-close"
+          onclick="closeSearch()"
+          title="Close"
+          aria-label="Close search"
+        >
           &times;
         </button>
       </div>
@@ -2620,7 +2727,7 @@
       const findInput = document.getElementById("findInput");
       const replaceInput = document.getElementById("replaceInput");
       const findReplaceCount = document.getElementById("findReplaceCount");
-      const mdTabBar = document.getElementById("mdTabBar");
+      const mdTabs = document.getElementById("mdTabs");
       const mdTabEdit = document.getElementById("mdTabEdit");
       const mdTabView = document.getElementById("mdTabView");
       const mdPreview = document.getElementById("mdPreview");
@@ -3868,7 +3975,8 @@
         }
         updateGutterActive();
         if (typeof vimUpdateBlockCursor === "function") vimUpdateBlockCursor();
-        if (typeof ensureCursorScrolloff === "function") ensureCursorScrolloff();
+        if (typeof ensureCursorScrolloff === "function")
+          ensureCursorScrolloff();
         scheduleOccurrenceUpdate();
       }
 
@@ -4079,7 +4187,10 @@
           const pinBtn = document.createElement("button");
           pinBtn.className = "btn-pin" + (note.pinned ? " pinned" : "");
           pinBtn.title = note.pinned ? "Unpin" : "Pin";
-          pinBtn.setAttribute("aria-label", (note.pinned ? "Unpin " : "Pin ") + note.name);
+          pinBtn.setAttribute(
+            "aria-label",
+            (note.pinned ? "Unpin " : "Pin ") + note.name,
+          );
           pinBtn.innerHTML =
             '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01z"/></svg>';
           pinBtn.addEventListener("click", (e) => {
@@ -4875,7 +4986,7 @@
         const note = getActiveNote();
         const isMd = note && isMarkdownFile(note.name);
         const zenEphemeral = zenModeActive && zenFromUrl && zenEphemeralNote;
-        mdTabBar.classList.toggle("visible", isMd || zenEphemeral);
+        mdTabs.classList.toggle("visible", isMd || zenEphemeral);
         if (!isMd && !zenEphemeral && mdViewActive) {
           switchMdTab("edit");
         }
@@ -4904,7 +5015,9 @@
           .classList.toggle("active", tab === "zen");
         mdTabEdit.setAttribute("aria-selected", tab === "edit");
         mdTabView.setAttribute("aria-selected", tab === "view");
-        document.getElementById("mdTabZen").setAttribute("aria-selected", tab === "zen");
+        document
+          .getElementById("mdTabZen")
+          .setAttribute("aria-selected", tab === "zen");
 
         const appEl = document.querySelector(".app");
         const zenBar = document.getElementById("zenBar");
@@ -5030,8 +5143,10 @@
           const zenEl = document.getElementById("zenBarFilename");
           const zenEndLen = 8;
           const zenSplit = Math.max(zenName.length - zenEndLen, 1);
-          zenEl.querySelector(".zen-bar-filename-start").textContent = zenName.slice(0, zenSplit);
-          zenEl.querySelector(".zen-bar-filename-end").textContent = zenName.slice(zenSplit);
+          zenEl.querySelector(".zen-bar-filename-start").textContent =
+            zenName.slice(0, zenSplit);
+          zenEl.querySelector(".zen-bar-filename-end").textContent =
+            zenName.slice(zenSplit);
           zenBar.style.display = "";
           document.getElementById("zenShareBtn").style.display = "";
         } else if (tab === "view") {
@@ -5182,7 +5297,6 @@
         render();
         updateUrl();
       }
-
 
       async function zenShare() {
         try {
@@ -5628,11 +5742,15 @@
       }
 
       function closeSearch() {
-        if (searchRemoveTrap) { searchRemoveTrap(); searchRemoveTrap = null; }
+        if (searchRemoveTrap) {
+          searchRemoveTrap();
+          searchRemoveTrap = null;
+        }
         searchResults.classList.remove("visible");
         searchBackdrop.classList.remove("visible");
         searchSelectedIdx = -1;
-        if (searchPreviousFocus && searchPreviousFocus.focus) searchPreviousFocus.focus();
+        if (searchPreviousFocus && searchPreviousFocus.focus)
+          searchPreviousFocus.focus();
         searchPreviousFocus = null;
       }
 
