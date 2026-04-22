@@ -10149,10 +10149,8 @@
           const note = getActiveNote();
           editor.focus();
           // Restore cursor position after focus (focus can move cursor to end)
-          if (note.cursorPos !== undefined) {
-            const pos = Math.min(note.cursorPos, editor.value.length);
-            editor.selectionStart = editor.selectionEnd = pos;
-          }
+          const pos = Math.min(note.cursorPos ?? 0, editor.value.length);
+          editor.selectionStart = editor.selectionEnd = pos;
           updateCursorPos();
           ensureCursorScrolloff();
           // Sync highlight layer and gutter after browser layout
