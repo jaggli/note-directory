@@ -90,12 +90,14 @@ saveState()
 
 ## Debounced Saves
 
-Editing triggers a chain of debounced operations:
+Editing renders synchronously, then schedules the expensive work:
 
 ```
 editor "input" event
   ├─ note.content = editor.value          immediate (in-memory)
-  ├─ scheduleHighlight()                  30ms  → updateHighlight()
+  ├─ updateHighlight()                    immediate — the textarea text is
+  │                                       transparent, this is what you see
+  ├─ updateLineNumbers / updateCursorPos  immediate
   ├─ scheduleSave()                       300ms → saveState() → scheduleDriveUpload()
   ├─ scheduleHistorySnapshot()            400ms → pushHistory()
   └─ scheduleUrlUpdate()                  500ms → updateUrl()
@@ -103,20 +105,20 @@ editor "input" event
 
 | Operation               | Debounce | Function                    | Purpose                     |
 | ----------------------- | -------- | --------------------------- | --------------------------- |
-| Syntax highlight        | 30ms     | `scheduleHighlight()`       | Re-render highlight layer   |
 | Persist to localStorage | 300ms    | `scheduleSave()`            | Batch rapid keystrokes      |
 | Undo history snapshot   | 400ms    | `scheduleHistorySnapshot()` | Group edits into undo steps |
 | URL update              | 500ms    | `scheduleUrlUpdate()`       | Compress content into URL   |
-| Cursor position save    | 1000ms   | `cursorSaveTimeout`         | Persist cursor pos to state |
+| Vim swap file           | 300ms    | `scheduleSwap()`            | Crash recovery for `:w`-less edits |
 | Drive upload            | 30s      | `scheduleDriveUpload()`     | Batch multiple saves        |
 
 ### Flush on Tab Close
 
 ```
+document "visibilitychange" (hidden)       mobile may discard hidden tabs
+  → flush vim swap, saveState()            also persists cursor position
+
 window "beforeunload"
-  → if (isTabLeader && saveTimeout)
-    → clearTimeout(saveTimeout)
-    → saveState()                          force immediate persist
+  → if saveTimeout pending → saveState()   force immediate persist
 ```
 
 ---
@@ -204,7 +206,7 @@ loadFromUrl()
 File extension determines the highlight rules:
 
 ```
-getExtension(name)  →  langRules[ext]  →  tokenize(code, rules)  →  buildHTML()
+getExtension(name)  →  langRules[ext]  →  tokenize(code, rules)  →  buildHTMLLines()
 ```
 
 Supported: js/jsx/ts/tsx, py, rb, go, rs, java, c/cpp, css, json, yaml, sql, toml.
@@ -214,18 +216,31 @@ HTML/XML/SVG use a dedicated `highlightHTML()` parser.
 
 ```
 updateHighlight()
-  → highlightCode(editor.value, note.name)
+  → highlightLines(editor.value, note.name)   one HTML string per line
+    → over 300k chars: plain escaped lines (keeps typing responsive)
     → if HTML ext:  highlightHTML(code)
-    → if rules exist: tokenize(code, rules) → buildHTML(code, tokens)
-    → else: escapeHTML(code)
-  → highlightLayer.innerHTML = result
+    → if rules exist: tokenize(code, rules) → buildHTMLLines(code, tokens)
+  → diff against the previously rendered lines (common prefix/suffix)
+  → replace only the changed <div class="hl-line"> rows
 ```
+
+Rendering is per line because layout dominates: re-rendering a 240kB note
+as one block costs ~120ms, replacing a single row well under 1ms. Tokens
+spanning lines (block comments) are split so no `<span>` crosses a row.
+
+The rows double as the measuring layer for wrap mode: gutter heights are
+read from the row heights, and `caretCoords(pos)` reads the caret position
+from the row's text (used by the vim block cursor and scroll-off).
+
+Rules must not backtrack quadratically on long runs (a lookahead after an
+unanchored `[a-z]+` re-scans the run from every position). The perf tests
+fuzz every rule set with 40kB runs of each character class.
 
 Each language defines rules as `[regex, cssClass]` pairs. `tokenize()` finds all regex matches, sorts by position, removes overlaps, and `buildHTML()` wraps matched ranges in `<span class="hl-*">` elements.
 
 ### When Highlighting Runs
 
-- On every keystroke (30ms debounce)
+- On every edit, synchronously (no debounce)
 - On note switch (`renderEditor()` → `updateHighlight()`)
 - On switching from view/zen back to edit (`switchMdTab("edit")`)
 
@@ -479,21 +494,14 @@ updateOccurrenceMarkers()
   → read editor.selectionStart / selectionEnd
   → if selection < 2 chars or whitespace-only → clear all
   → if same query as last time → skip (cached)
-  → case-insensitive indexOf scan
+  → case-insensitive search (findAll — offsets valid for any case folding)
   → if < 2 occurrences → clear all
-  → build line-start index for fast line/col lookup (binary search)
-  → for each occurrence:
-      → compute line number via binary search on lineStarts
-      → scrollbar marker: map line to vertical position in track
-      → in-text highlight (skip current selection):
-          compute column from lineStarts, position absolutely using
-          charWidth × col (x) and lineHeight × line (y)
+  → scrollbar markers: one per pixel row of the track
+  → in-text highlights only for matches in the visible highlight rows
+    (binary search over row rects), positioned from a Range on the row's
+    text; scrolling redraws them (100ms after the last scroll event)
   → render into occurrenceTrack and occurrenceOverlay
 ```
-
-### Character Width Measurement
-
-`getOccurrenceCharWidth()` measures a single character width by inserting a hidden `<span>` with the editor's font and measuring its `getBoundingClientRect().width`. The result is cached for the session.
 
 ### DOM Structure
 

@@ -3,9 +3,12 @@
 // ═══════════════════════════════════════════════════
 
 function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function relativeTime(ts) {
@@ -434,6 +437,13 @@ function saveSwap(noteId, content) {
   } catch {}
 }
 
+// Swap (vim crash recovery) writes the whole buffer — not on every key
+let swapTimeout = null;
+function scheduleSwap(noteId) {
+  clearTimeout(swapTimeout);
+  swapTimeout = setTimeout(() => saveSwap(noteId, editor.value), 300);
+}
+
 function loadSwap(noteId) {
   try {
     const raw = localStorage.getItem(swapKey(noteId));
@@ -444,6 +454,7 @@ function loadSwap(noteId) {
 }
 
 function deleteSwap(noteId) {
+  clearTimeout(swapTimeout);
   localStorage.removeItem(swapKey(noteId));
 }
 
@@ -811,6 +822,19 @@ function getHistory(id) {
   return histories[id];
 }
 
+// Full snapshots: cap count and size (a 1MB note × 200 would be 400MB)
+const HISTORY_MAX = 200;
+const HISTORY_MAX_CHARS = 5e6;
+
+function trimHistory(h) {
+  let chars = h.past.reduce((n, e) => n + e.content.length, 0);
+  while (
+    h.past.length > HISTORY_MAX ||
+    (chars > HISTORY_MAX_CHARS && h.past.length > 10)
+  )
+    chars -= h.past.shift().content.length;
+}
+
 function pushHistory(id, content) {
   const h = getHistory(id);
   const lastContent = h.past.length
@@ -818,8 +842,8 @@ function pushHistory(id, content) {
     : null;
   if (content === lastContent) return;
   h.past.push({ content });
-  if (h.past.length > 200) h.past.shift();
   h.future = [];
+  trimHistory(h);
 }
 
 function scheduleHistorySnapshot() {
@@ -899,7 +923,7 @@ function redo() {
   if (!h.future.length) return;
   const oldContent = editor.value;
   h.past.push({ content: oldContent });
-  if (h.past.length > 200) h.past.shift();
+  trimHistory(h);
   const entry = h.future.pop();
   editor.value = entry.content;
   const diffPos = findFirstDiff(oldContent, entry.content);
@@ -950,16 +974,28 @@ function tokenize(code, rules) {
   return out;
 }
 
-function buildHTML(code, tokens) {
-  let r = "",
-    p = 0;
+// One HTML string per source line; tokens spanning lines are split so
+// no <span> crosses a newline
+function buildHTMLLines(code, tokens) {
+  const lines = [""];
+  const emit = (text, cls) => {
+    const parts = text.split("\n");
+    for (let i = 0; i < parts.length; i++) {
+      if (i) lines.push("");
+      if (parts[i])
+        lines[lines.length - 1] += cls
+          ? `<span class="${cls}">${escapeHtml(parts[i])}</span>`
+          : escapeHtml(parts[i]);
+    }
+  };
+  let p = 0;
   for (const t of tokens) {
-    if (t.s > p) r += escapeHtml(code.substring(p, t.s));
-    r += `<span class="${t.cls}">${escapeHtml(t.t)}</span>`;
+    if (t.s > p) emit(code.substring(p, t.s));
+    emit(t.t, t.cls);
     p = t.e;
   }
-  if (p < code.length) r += escapeHtml(code.substring(p));
-  return r;
+  if (p < code.length) emit(code.substring(p));
+  return lines;
 }
 
 // --- Language rules ---
@@ -1027,7 +1063,7 @@ const cssRules = [
     /\b(important|inherit|initial|unset|none|auto|flex|grid|block|inline|relative|absolute|fixed|sticky)\b/g,
     "hl-kw",
   ],
-  [/[a-z\-]+(?=\s*:\s)/g, "hl-fn"],
+  [/(?<![a-z\-])[a-z\-]+(?=\s*:\s)/g, "hl-fn"],
   [/[{}();:,]/g, "hl-punc"],
 ];
 
@@ -1038,7 +1074,7 @@ const htmlBaseRules = [
   [/'(?:[^'\\]|\\.)*'/g, "hl-str"],
   [/<\/?[a-zA-Z][a-zA-Z0-9\-]*/g, "hl-tag"],
   [/\/?>/g, "hl-tag"],
-  [/\b[a-zA-Z\-:]+(?==)/g, "hl-attr"],
+  [/(?<![a-zA-Z\-:])[a-zA-Z\-:]+(?==)/g, "hl-attr"],
   [/&[a-zA-Z]+;|&#\d+;/g, "hl-bi"],
 ];
 
@@ -1055,7 +1091,7 @@ const mdRules = [
   [/`[^`\n]+`/g, "hl-str"],
   [/```[\s\S]*?```/g, "hl-str"],
   [/\*\*[^*]+\*\*/g, "hl-bold"],
-  [/\[([^\]]+)\]\([^)]+\)/g, "hl-link"],
+  [/\[([^\]\n]+)\]\([^)\n]+\)/g, "hl-link"],
   [/^(\s*[-*+]|\d+\.)\s/gm, "hl-kw"],
   [/^>\s.*/gm, "hl-cmt"],
 ];
@@ -1145,7 +1181,7 @@ const yamlRules = [
 
 const tomlRules = [
   [/#[^\n]*/g, "hl-cmt"],
-  [/\[+[^\]]*\]+/g, "hl-tag"],
+  [/^[ \t]*\[\[?[^\]\n]*\]\]?/gm, "hl-tag"],
   [/^[a-zA-Z_][a-zA-Z0-9_\-]*(?=\s*=)/gm, "hl-key"],
   [/"""[\s\S]*?"""/g, "hl-str"],
   [/"(?:[^"\\]|\\.)*"/g, "hl-str"],
@@ -1226,36 +1262,62 @@ function highlightHTML(code) {
       end = t.e;
     }
   }
-  return buildHTML(code, merged);
+  return buildHTMLLines(code, merged);
 }
 
-function highlightCode(code, name) {
+// Beyond this, notes are shown unhighlighted to keep typing responsive
+const HIGHLIGHT_MAX_CHARS = 300000;
+
+function highlightLines(code, name) {
+  const plain = () => code.split("\n").map(escapeHtml);
   try {
+    if (code.length > HIGHLIGHT_MAX_CHARS) return plain();
     const ext = getExtension(name);
     if (htmlExts.has(ext)) return highlightHTML(code);
     const rules = langRules[ext];
-    if (!rules) return escapeHtml(code);
-    return buildHTML(code, tokenize(code, rules));
+    return rules ? buildHTMLLines(code, tokenize(code, rules)) : plain();
   } catch (e) {
     console.error("Highlight error:", e);
-    return escapeHtml(code);
+    return plain();
   }
 }
+
+function highlightCode(code, name) {
+  return highlightLines(code, name).join("\n");
+}
+
+// The textarea's own text is transparent — this layer is what the user
+// sees, so it is updated synchronously on every edit. One <div> per line;
+// only lines whose HTML changed are replaced, keeping layout work small.
+let _hlLines = [];
 
 function updateHighlight() {
   const note = getActiveNote();
   if (!note) {
-    highlightLayer.innerHTML = "";
+    highlightLayer.textContent = "";
+    _hlLines = [];
     return;
   }
-  highlightLayer.innerHTML =
-    highlightCode(editor.value, note.name) + "\n";
-}
-
-let highlightTimeout = null;
-function scheduleHighlight() {
-  clearTimeout(highlightTimeout);
-  highlightTimeout = setTimeout(updateHighlight, 30);
+  const lines = highlightLines(editor.value, note.name);
+  const old = _hlLines;
+  const kids = highlightLayer.children;
+  if (kids.length !== old.length) {
+    highlightLayer.textContent = ""; // DOM out of step — full render
+    old.length = 0;
+  }
+  const n = Math.min(lines.length, old.length);
+  let a = 0;
+  while (a < n && lines[a] === old[a]) a++;
+  let b = 0;
+  while (b < n - a && lines[lines.length - 1 - b] === old[old.length - 1 - b]) b++;
+  for (let i = old.length - b - 1; i >= a; i--) kids[i].remove();
+  let html = "";
+  for (let i = a; i < lines.length - b; i++)
+    html += '<div class="hl-line">' + lines[i] + "\n</div>";
+  const before = kids[a] || null;
+  if (before) before.insertAdjacentHTML("beforebegin", html);
+  else highlightLayer.insertAdjacentHTML("beforeend", html);
+  _hlLines = lines;
 }
 
 // ═══════════════════════════════════════════════════
@@ -1264,18 +1326,8 @@ function scheduleHighlight() {
 
 let currentLine = 1;
 
-// Reusable measurement element for wrapped line heights
-const _wrapMeasure = document.createElement("div");
-_wrapMeasure.style.position = "absolute";
-_wrapMeasure.style.visibility = "hidden";
-_wrapMeasure.style.height = "auto";
-_wrapMeasure.style.padding = "0";
-_wrapMeasure.style.border = "none";
-_wrapMeasure.style.whiteSpace = "pre-wrap";
-_wrapMeasure.style.overflowWrap = "break-word";
-
 let _gutterLineCount = 0;
-let _wrapMeasureRAF = 0;
+let _gutterActive = null;
 
 function updateLineNumbers() {
   const text = editor.value || "";
@@ -1283,59 +1335,81 @@ function updateLineNumbers() {
   const wrapOn = editorArea.classList.contains("wrap");
 
   if (!wrapOn) {
-    // Only rebuild gutter DOM if line count changed
-    if (lineCount !== _gutterLineCount) {
+    // Rebuild if the line count changed or heights are left from wrap mode
+    if (lineCount !== _gutterLineCount || gutter.children[0]?.style.height) {
       _gutterLineCount = lineCount;
       let html = "";
       for (let i = 1; i <= lineCount; i++) {
         html += `<div class="gutter-line${i === currentLine ? " active" : ""}">${i}</div>`;
       }
       gutter.innerHTML = html;
+      _gutterActive = gutter.children[currentLine - 1] || null;
     }
     return;
   }
 
-  // Wrap mode: debounce expensive measurement to next frame
-  cancelAnimationFrame(_wrapMeasureRAF);
-  _wrapMeasureRAF = requestAnimationFrame(() => {
-    _measureWrappedLines(text);
-  });
+  // Wrap mode: each gutter line is as tall as its rendered line
+  const rows = highlightLayer.children;
+  if (rows.length !== lineCount) updateHighlight();
+  const heights = Array.from(rows, (r) => r.offsetHeight);
+  if (lineCount !== _gutterLineCount || !gutter.children[0]?.style.height) {
+    _gutterLineCount = lineCount;
+    let html = "";
+    for (let i = 0; i < lineCount; i++)
+      html += `<div class="gutter-line${i + 1 === currentLine ? " active" : ""}" style="height:${heights[i]}px">${i + 1}</div>`;
+    gutter.innerHTML = html;
+    _gutterActive = gutter.children[currentLine - 1] || null;
+    return;
+  }
+  const g = gutter.children;
+  for (let i = 0; i < lineCount; i++)
+    if (g[i].offsetHeight !== heights[i]) g[i].style.height = heights[i] + "px";
 }
 
-function _measureWrappedLines(text) {
-  const lines = text.split("\n");
-  const cs = window.getComputedStyle(editor);
-  const contentWidth =
-    editor.clientWidth -
-    parseFloat(cs.paddingLeft) -
-    parseFloat(cs.paddingRight);
-
-  _wrapMeasure.style.font = cs.font;
-  _wrapMeasure.style.letterSpacing = cs.letterSpacing;
-  _wrapMeasure.style.tabSize = cs.tabSize;
-  _wrapMeasure.style.lineHeight = cs.lineHeight;
-  _wrapMeasure.style.width = contentWidth + "px";
-  document.body.appendChild(_wrapMeasure);
-
-  let html = "";
-  for (let i = 0; i < lines.length; i++) {
-    _wrapMeasure.textContent = lines[i] || " ";
-    const h = _wrapMeasure.offsetHeight;
-    const isActive = i + 1 === currentLine;
-    html += `<div class="gutter-line${isActive ? " active" : ""}" style="height:${h}px">${i + 1}</div>`;
-  }
-
-  document.body.removeChild(_wrapMeasure);
-  _gutterLineCount = lines.length;
-  gutter.innerHTML = html;
+// Caret position in content coordinates (padding included, scroll ignored),
+// read from the rendered highlight line. Needed in wrap mode, where a line
+// can span several rows.
+function caretCoords(pos) {
+  if (highlightLayer.children.length !== vimLineStarts().length)
+    updateHighlight();
+  const li = vimLineOf(pos);
+  const row = highlightLayer.children[li];
+  if (!row) return null;
+  const layer = highlightLayer.getBoundingClientRect();
+  const at = (r, x) => ({
+    top: r.top - layer.top + highlightLayer.scrollTop,
+    left: x - layer.left + highlightLayer.scrollLeft,
+  });
+  // Rect of the character at `col` (a collapsed range is ambiguous at
+  // soft-wrap points); every row ends in "\n" so the char exists
+  const charRect = (col) => {
+    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode()) && col >= node.nodeValue.length)
+      col -= node.nodeValue.length;
+    if (!node) return null;
+    const range = document.createRange();
+    range.setStart(node, col);
+    range.setEnd(node, col + 1);
+    const r = range.getClientRects()[0];
+    return r && (r.width || r.height) ? r : null;
+  };
+  const col = pos - vimLineStart(li);
+  const r = charRect(col);
+  if (r) return at(r, r.left);
+  // Firefox/Safari give no rect for "\n": use the previous char's right edge
+  const prev = col > 0 && charRect(col - 1);
+  if (prev) return at(prev, prev.right);
+  return at(row.getBoundingClientRect(), row.getBoundingClientRect().left);
 }
 
 // Update only the active gutter line highlight without rebuilding DOM
 function updateGutterActive() {
-  const gutterLines = gutter.querySelectorAll(".gutter-line");
-  gutterLines.forEach((el, i) => {
-    el.classList.toggle("active", i + 1 === currentLine);
-  });
+  const el = gutter.children[currentLine - 1] || null;
+  if (el === _gutterActive) return;
+  _gutterActive?.classList.remove("active");
+  el?.classList.add("active");
+  _gutterActive = el;
 }
 
 const STORAGE_LIMIT = 5 * 1024 * 1024; // 5MB
@@ -1374,37 +1448,37 @@ function syncOccurrenceScroll() {
 }
 let lastOccurrenceQuery = "";
 
-// Build a flat text-node map of the highlight layer for Range-based positioning
-function buildTextNodeMap() {
-  const nodes = [];
-  const walker = document.createTreeWalker(
-    highlightLayer,
-    NodeFilter.SHOW_TEXT,
-  );
-  let charOffset = 0;
+// Text node + offset for a buffer position, via the line's highlight row
+function highlightNodeAt(pos) {
+  const li = vimLineOf(pos);
+  const row = highlightLayer.children[li];
+  if (!row) return null;
+  let off = pos - vimLineStart(li);
+  const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
   let node;
-  while ((node = walker.nextNode())) {
-    const len = node.nodeValue.length;
-    nodes.push({ node, start: charOffset, end: charOffset + len });
-    charOffset += len;
-  }
-  return nodes;
+  while ((node = walker.nextNode()) && off > node.nodeValue.length)
+    off -= node.nodeValue.length;
+  return node ? { node, offset: off } : null;
 }
 
-function findNodeAtOffset(nodeMap, offset) {
-  let lo = 0,
-    hi = nodeMap.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (nodeMap[mid].end <= offset) lo = mid + 1;
-    else hi = mid;
-  }
-  const entry = nodeMap[lo];
-  if (!entry) return null;
-  return { node: entry.node, offset: offset - entry.start };
+// First/last highlight rows intersecting the viewport (binary search)
+function visibleRows() {
+  const rows = highlightLayer.children;
+  const view = highlightLayer.getBoundingClientRect();
+  const find = (y) => {
+    let lo = 0;
+    let hi = rows.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (rows[mid].getBoundingClientRect().bottom < y) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+  return rows.length ? [find(view.top), find(view.bottom)] : [0, -1];
 }
 
-function updateOccurrenceMarkers() {
+function updateOccurrenceMarkers(force) {
   const start = editor.selectionStart;
   const end = editor.selectionEnd;
   const text = editor.value || "";
@@ -1420,82 +1494,51 @@ function updateOccurrenceMarkers() {
     return;
   }
 
-  // Skip if same query
-  if (selected === lastOccurrenceQuery) return;
+  // Skip if same query (scrolling forces a redraw of the visible part)
+  if (selected === lastOccurrenceQuery && !force) return;
   lastOccurrenceQuery = selected;
 
-  const positions = findAll(text, selected).map((m) => m.start);
-
-  if (positions.length < 2) {
-    occurrenceTrack.innerHTML = "";
-    occurrenceOverlay.innerHTML = "";
-    return;
-  }
-
-  // Build line-start index for track markers
-  const lineStarts = [0];
-  for (let j = 0; j < text.length; j++) {
-    if (text.charCodeAt(j) === 10) lineStarts.push(j + 1);
-  }
-  const totalLines = lineStarts.length;
+  const matches = findAll(text, selected);
   const trackHeight = occurrenceTrack.clientHeight;
-  if (totalLines === 0 || trackHeight === 0) {
+  if (matches.length < 2 || !trackHeight) {
     occurrenceTrack.innerHTML = "";
     occurrenceOverlay.innerHTML = "";
     return;
   }
 
-  function lineOf(pos) {
-    let lo = 0,
-      hi = lineStarts.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (lineStarts[mid] <= pos) lo = mid;
-      else hi = mid - 1;
-    }
-    return lo;
-  }
-
-  const selLen = selected.length;
-
-  // Use highlight layer's rendered text for pixel-perfect positioning
-  const nodeMap = buildTextNodeMap();
-  const layerRect = highlightLayer.getBoundingClientRect();
-  const scrollLeft = highlightLayer.scrollLeft;
-  const scrollTop = highlightLayer.scrollTop;
+  // Scrollbar track: one marker per pixel row is enough
+  const totalLines = vimLastLine() + 1;
+  const tops = new Set(
+    matches.map((m) => Math.round((vimLineOf(m.start) / totalLines) * trackHeight)),
+  );
   let trackHtml = "";
-  let overlayHtml = "";
+  for (const top of tops)
+    trackHtml += '<div class="occurrence-marker" style="top:' + top + 'px"></div>';
+
+  // Text highlights only for matches on screen
+  const [first, last] = visibleRows();
+  const layerRect = highlightLayer.getBoundingClientRect();
   const range = document.createRange();
-
-  for (let i = 0; i < positions.length; i++) {
-    const line = lineOf(positions[i]);
-    const top = Math.round((line / totalLines) * trackHeight);
-    trackHtml +=
-      '<div class="occurrence-marker" style="top:' + top + 'px"></div>';
-
-    if (positions[i] !== start) {
-      const startInfo = findNodeAtOffset(nodeMap, positions[i]);
-      const endInfo = findNodeAtOffset(nodeMap, positions[i] + selLen);
-      if (startInfo && endInfo) {
-        range.setStart(startInfo.node, startInfo.offset);
-        range.setEnd(endInfo.node, endInfo.offset);
-        const rects = range.getClientRects();
-        for (let r = 0; r < rects.length; r++) {
-          const rect = rects[r];
-          const x = rect.left - layerRect.left + scrollLeft;
-          const y = rect.top - layerRect.top + scrollTop;
-          overlayHtml +=
-            '<div class="occurrence-highlight" style="top:' +
-            y +
-            "px;left:" +
-            x +
-            "px;width:" +
-            rect.width +
-            "px;height:" +
-            (rect.height + 1) +
-            'px"></div>';
-        }
-      }
+  let overlayHtml = "";
+  for (const m of matches) {
+    const li = vimLineOf(m.start);
+    if (li < first || li > last || m.start === start) continue;
+    const a = highlightNodeAt(m.start);
+    const b = highlightNodeAt(m.end);
+    if (!a || !b) continue;
+    range.setStart(a.node, a.offset);
+    range.setEnd(b.node, b.offset);
+    for (const rect of range.getClientRects()) {
+      overlayHtml +=
+        '<div class="occurrence-highlight" style="top:' +
+        (rect.top - layerRect.top + highlightLayer.scrollTop) +
+        "px;left:" +
+        (rect.left - layerRect.left + highlightLayer.scrollLeft) +
+        "px;width:" +
+        rect.width +
+        "px;height:" +
+        (rect.height + 1) +
+        'px"></div>';
     }
   }
 
@@ -1515,19 +1558,13 @@ function clearOccurrenceHighlights() {
   clearTimeout(occurrenceTimeout);
 }
 
-let cursorSaveTimeout = null;
+// cursorPos is persisted with the next save, or when the tab is hidden
 function updateCursorPos() {
-  const val = editor.value || "";
   const pos = editor.selectionStart;
   const note = getActiveNote();
-  if (note) {
-    note.cursorPos = pos;
-    clearTimeout(cursorSaveTimeout);
-    cursorSaveTimeout = setTimeout(saveState, 1000);
-  }
-  const before = val.substring(0, pos);
-  const line = before.split("\n").length;
-  const col = pos - before.lastIndexOf("\n");
+  if (note) note.cursorPos = pos;
+  const line = vimLineOf(pos) + 1;
+  const col = pos - vimLineStart(line - 1) + 1;
   currentLine = line;
   if (vimState.enabled) {
     if (typeof vimCursorMoving === "function") vimCursorMoving();
@@ -1718,7 +1755,7 @@ function renderNoteList() {
       note.updatedAt = Date.now();
       scheduleSave();
       scheduleUrlUpdate();
-      scheduleHighlight();
+      updateHighlight();
       updateTitle();
       updateMdTabBar();
     });
@@ -3804,7 +3841,7 @@ function replaceCurrent() {
     note.updatedAt = Date.now();
     scheduleSave();
   }
-  scheduleHighlight();
+  updateHighlight();
   updateLineNumbers();
 
   updateFindMatches();
@@ -3968,39 +4005,10 @@ function ensureCursorScrolloff() {
   let absTop;
 
   if (editorArea.classList.contains("wrap")) {
-    const padLeftPx = parseFloat(_editorCS.paddingLeft);
-    const contentWidth =
-      editor.clientWidth - padLeftPx - parseFloat(_editorCS.paddingRight);
-    _wrapMeasure.style.font = _editorCS.font;
-    _wrapMeasure.style.letterSpacing = _editorCS.letterSpacing;
-    _wrapMeasure.style.tabSize = _editorCS.tabSize;
-    _wrapMeasure.style.lineHeight = _editorCS.lineHeight;
-    _wrapMeasure.style.width = contentWidth + "px";
-    _wrapMeasure.style.whiteSpace = "pre-wrap";
-    _wrapMeasure.style.overflowWrap = "break-word";
-    const safePos = Math.min(pos, val.length);
-    _wrapMeasure.textContent = "";
-    if (safePos > 0) {
-      _wrapMeasure.appendChild(
-        document.createTextNode(val.substring(0, safePos)),
-      );
-    }
-    const marker = document.createElement("span");
-    marker.textContent = "\u200b";
-    _wrapMeasure.appendChild(marker);
-    if (safePos < val.length) {
-      _wrapMeasure.appendChild(
-        document.createTextNode(val.substring(safePos)),
-      );
-    }
-    document.body.appendChild(_wrapMeasure);
-    const markerRect = marker.getBoundingClientRect();
-    const mr = _wrapMeasure.getBoundingClientRect();
-    const rectTop = markerRect.top - mr.top;
-    _wrapMeasure.textContent = "";
-    document.body.removeChild(_wrapMeasure);
-    const rowIdx = Math.max(0, Math.round(rectTop / lineHeight));
-    absTop = padTop + rowIdx * lineHeight;
+    const c = caretCoords(Math.min(pos, val.length));
+    // Snap to the row grid: the glyph box sits inside the line box
+    absTop =
+      padTop + Math.max(0, Math.round(((c?.top ?? padTop) - padTop) / lineHeight)) * lineHeight;
   } else {
     const lineIdx = (val.substring(0, pos).match(/\n/g) || []).length;
     absTop = padTop + lineIdx * lineHeight;
@@ -4025,7 +4033,6 @@ function vimUpdateBlockCursor() {
   editor.style.caretColor = "transparent";
   vimCursorEl.style.display = "block";
 
-  const val = editor.value || "";
   // Use saved pre-click position so mouse clicks don't move block cursor
   const pos =
     vimState.mode === "visual"
@@ -4047,58 +4054,10 @@ function vimUpdateBlockCursor() {
   let absTop, absLeft;
 
   if (editorArea.classList.contains("wrap")) {
-    // Locate the cursor by placing the ENTIRE editor value in a mirror
-    // div and querying a Range at the cursor position. Measuring text
-    // prefixes (the previous approach) is unreliable near wrap
-    // boundaries because `overflow-wrap: break-word` may break a word
-    // mid-way in a prefix while the full line wraps cleanly at the
-    // word boundary, making the binary search land several characters
-    // off from the real wrap position.
-    const cs = window.getComputedStyle(editor);
-    const padLeftPx = parseFloat(cs.paddingLeft);
-    const contentWidth =
-      editor.clientWidth - padLeftPx - parseFloat(cs.paddingRight);
-    _wrapMeasure.style.font = cs.font;
-    _wrapMeasure.style.letterSpacing = cs.letterSpacing;
-    _wrapMeasure.style.tabSize = cs.tabSize;
-    _wrapMeasure.style.lineHeight = cs.lineHeight;
-    _wrapMeasure.style.width = contentWidth + "px";
-    _wrapMeasure.style.whiteSpace = "pre-wrap";
-    _wrapMeasure.style.overflowWrap = "break-word";
-    // Insert a marker span at the cursor position. Measuring via
-    // a Range on a plain text node returns no client rects on empty
-    // lines in some browsers (Firefox, Safari), so the cursor would
-    // snap to (0,0). A zero-width span always has a measurable box.
-    const safePos = Math.min(pos, val.length);
-    _wrapMeasure.textContent = "";
-    if (safePos > 0) {
-      _wrapMeasure.appendChild(
-        document.createTextNode(val.substring(0, safePos)),
-      );
-    }
-    const marker = document.createElement("span");
-    marker.textContent = "\u200b";
-    _wrapMeasure.appendChild(marker);
-    if (safePos < val.length) {
-      _wrapMeasure.appendChild(
-        document.createTextNode(val.substring(safePos)),
-      );
-    }
-    document.body.appendChild(_wrapMeasure);
-
-    const markerRect = marker.getBoundingClientRect();
-    const mr = _wrapMeasure.getBoundingClientRect();
-    let rectTop = markerRect.top - mr.top;
-    let rectLeft = markerRect.left - mr.left;
-
-    _wrapMeasure.textContent = "";
-    document.body.removeChild(_wrapMeasure);
-
-    // Snap top to the lineHeight grid: rect.top sits on the glyph,
-    // not the line box, so it is typically a few pixels off.
-    const rowIdx = Math.max(0, Math.round(rectTop / lineHeight));
+    const c = caretCoords(pos);
+    const rowIdx = Math.max(0, Math.round(((c?.top ?? padTop) - padTop) / lineHeight));
     absTop = padTop + rowIdx * lineHeight;
-    absLeft = padLeftPx + rectLeft;
+    absLeft = c ? c.left : padLeft;
   } else {
     absTop = padTop + lineIdx * lineHeight;
     absLeft = padLeft + col * cw;
@@ -4274,12 +4233,27 @@ function vimPushUndoOnce() {
   vimState._undoPushed = true;
 }
 
-// Every buffer edit goes through here (undo point, change tracking)
+// Every buffer edit goes through here (undo point, change tracking).
+// Inside a command the input event (highlight, save, swap) fires once at
+// the end — >> on 1000 lines would otherwise re-render 1000 times.
 function vimEdit(start, end, text) {
   vimPushUndoOnce();
   editor.setRangeText(text, start, end, "end");
   vimState._changed = true;
-  editor.dispatchEvent(new Event("input"));
+  if (!vimState._batch) editor.dispatchEvent(new Event("input"));
+  else vimState._batchDirty = true;
+}
+
+function vimBatch(fn) {
+  if (vimState._batch) return fn();
+  vimState._batch = true;
+  vimState._batchDirty = false;
+  try {
+    return fn();
+  } finally {
+    vimState._batch = false;
+    if (vimState._batchDirty) editor.dispatchEvent(new Event("input"));
+  }
 }
 
 function vimSetRegister(text, linewise) {
@@ -4719,33 +4693,37 @@ function vimExecNormal(key) {
   // Temporarily allow editing for commands that modify text
   editor.readOnly = false;
   try {
-    vimState.keys.push(key);
-    const cmd = vimParse(vimState.keys);
-    if (!cmd) return;
-    const keys = vimState.keys;
-    vimState.keys = [];
-    if (cmd.invalid) return;
-    vimState._undoPushed = false;
-    vimState._changed = false;
-    _vimExecNormal(cmd);
-    // Remember changes for "." (inserts are completed on Escape)
-    if (
-      !vimState._replaying &&
-      cmd.cmd !== "." &&
-      (vimState._changed || vimState.mode === "insert")
-    ) {
-      vimState.lastChange = {
-        keys: keys.slice(countKeys(keys)),
-        count: cmd.count,
-        insert: null,
-      };
-    }
+    vimBatch(() => _vimExecKey(key));
   } finally {
     if (vimState.mode === "normal") {
       if (!vimState.keys.length) vimClampCursor();
       editor.readOnly = true;
     } else if (vimState.mode === "visual") editor.readOnly = true;
     updateCursorPos();
+  }
+}
+
+function _vimExecKey(key) {
+  vimState.keys.push(key);
+  const cmd = vimParse(vimState.keys);
+  if (!cmd) return;
+  const keys = vimState.keys;
+  vimState.keys = [];
+  if (cmd.invalid) return;
+  vimState._undoPushed = false;
+  vimState._changed = false;
+  _vimExecNormal(cmd);
+  // Remember changes for "." (inserts are completed on Escape)
+  if (
+    !vimState._replaying &&
+    cmd.cmd !== "." &&
+    (vimState._changed || vimState.mode === "insert")
+  ) {
+    vimState.lastChange = {
+      keys: keys.slice(countKeys(keys)),
+      count: cmd.count,
+      insert: null,
+    };
   }
 }
 
@@ -5036,7 +5014,7 @@ function vimVisualRange() {
 function vimExecVisual(key) {
   editor.readOnly = false;
   try {
-    _vimExecVisual(key);
+    vimBatch(() => _vimExecVisual(key));
   } finally {
     if (vimState.mode === "normal") vimClampCursor();
     if (vimState.mode !== "insert") editor.readOnly = true;
@@ -5236,7 +5214,7 @@ function vimDiscardBuffer() {
   deleteSwap(note.id);
   vimState.bufferDirty = false;
   updateLineNumbers();
-  scheduleHighlight();
+  updateHighlight();
   updateCursorPos();
 }
 
@@ -6128,6 +6106,14 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("focus", reclaimLeadership);
 
 // Flush pending saves when the tab is closed
+// Mobile browsers may discard hidden tabs without firing beforeunload
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) return;
+  const note = getActiveNote();
+  if (note && vimState.bufferDirty) saveSwap(note.id, editor.value);
+  saveState();
+});
+
 window.addEventListener("beforeunload", () => {
   if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
   if (saveTimeout) {
@@ -6159,15 +6145,17 @@ editor.addEventListener("input", () => {
   }
   if (vimActive) {
     vimState.bufferDirty = true;
-    saveSwap(note.id, editor.value);
+    scheduleSwap(note.id);
   } else {
     note.content = editor.value;
     note.updatedAt = Date.now();
   }
+  // Highlight first: it is what shows the typed character, and line
+  // heights / caret positions are measured from it
+  updateHighlight();
   updateLineNumbers();
   updateCursorPos();
   ensureCursorScrolloff();
-  scheduleHighlight();
   // Keep find offsets valid — replace/next would otherwise hit shifted text
   if (findMatches.length) updateFindMatches(false);
   if (!vimActive) {
@@ -6184,6 +6172,11 @@ editor.addEventListener("scroll", () => {
   if (editorArea.classList.contains("wrap")) syncScrollbarGap();
   syncOccurrenceScroll();
   vimUpdateBlockCursor();
+  // Occurrence highlights are drawn for visible rows only
+  if (lastOccurrenceQuery) {
+    clearTimeout(occurrenceTimeout);
+    occurrenceTimeout = setTimeout(() => updateOccurrenceMarkers(true), 100);
+  }
 });
 
 // Track cursor position for line/col and current line highlight
