@@ -166,6 +166,18 @@ See [skills/README.md](skills/README.md) for usage and install instructions.
   Services (lazy-loaded). Drive API calls use plain
   `fetch` — no `gapi` client library needed
 
+## Tests
+
+The app itself has no dependencies; Playwright is only
+used for browser tests (they serve the repo with
+`python3 -m http.server`):
+
+```sh
+npm install
+npx playwright install chromium
+npm test
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
