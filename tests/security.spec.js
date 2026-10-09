@@ -67,3 +67,22 @@ test("Google sign-in script is allowed by CSP", async ({ page }) => {
 test("malformed URL hash does not break startup", async ({ page }) => {
   await openApp(page, "/#%");
 });
+
+test("the app stays hidden when framed by another page", async ({ page }) => {
+  await openApp(page);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).visibility)).toBe(
+    "visible",
+  );
+  // A foreign page embedding the app: another origin served by the real
+  // loopback server (Chrome blocks public pages from framing localhost).
+  // The sandbox keeps the app from redirecting the top window.
+  await page.goto("http://127.0.0.1:4173/legal/terms.html");
+  await page.setContent(
+    '<iframe sandbox="allow-scripts allow-same-origin" src="http://localhost:4173/"></iframe>',
+  );
+  const frame = page.frames()[1];
+  await frame.waitForFunction(() => document.querySelector(".note-item"));
+  expect(
+    await frame.evaluate(() => getComputedStyle(document.documentElement).visibility),
+  ).toBe("hidden");
+});

@@ -34,9 +34,10 @@ across devices via Google Drive.
   Google Drive's hidden app folder — no storage cost to
   the app. The Google library is lazy-loaded only when
   you initiate sync.
-- **Offline**: Works fully offline. The only external
-  asset is the Victor Mono font file served alongside
-  the HTML.
+- **No network needed while editing**: Once loaded,
+  editing never touches the network (Drive sync aside).
+  There is no service worker, so opening the page offline
+  only works while the browser still has it cached.
 
 <details>
 <summary><strong>Features</strong></summary>
@@ -157,7 +158,8 @@ See [skills/README.md](skills/README.md) for usage and install instructions.
 
 - **Theme**: [Catppuccin Mocha](https://catppuccin.com)
 - **Font**: [Victor Mono](https://github.com/rubjo/victor-mono)
-  by Rune Bjørnerås (served locally)
+  by Rune Bjørnerås (served locally, SIL OFL 1.1 — see
+  `victor-mono/OFL.txt`)
 - **Compression**: deflate-raw via `CompressionStream` /
   `DecompressionStream` APIs for URL sharing
 - **Zip**: Custom minimal zip builder (no library)

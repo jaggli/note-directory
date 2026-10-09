@@ -92,6 +92,14 @@ const CASES = [
   ["|a\nb\nc", "VjJ", "a| b\nc"],
   ["|abc", "vlU", "|ABc"],
 
+  // dot after visual changes: same amount of text from the cursor
+  ["|abcdef", "vld.", "|ef"],
+  ["|a\nb\nc\nd", "Vjd.", "|"],
+  ["|a\nb\nc", "V>j.", "  a\n  |b\nc"],
+  ["|foo bar", "vecx<Esc>w.", "x |x"],
+  ["|ab\ncd\nef", "vjd.", "|f"],
+  ["|abc", "vl~l.", "A|bC"],
+
   // undo
   ["|abc", "xxu", "|bc"],
   ["|abc", "xxuu", "|abc"],

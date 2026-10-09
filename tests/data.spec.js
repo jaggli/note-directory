@@ -204,3 +204,33 @@ test("rename without a change keeps updatedAt", async ({ page }) => {
   });
   expect(unchanged).toBe(true);
 });
+
+test("zip round trip keeps unicode names and dotfiles", async ({ page }) => {
+  await openApp(page);
+  const r = await page.evaluate(async () => {
+    const zip = await buildZip([
+      { name: "Ü.md", content: "u" },
+      { name: ".env", content: "e" },
+      { name: "dir/a..b.md", content: "d" },
+      { name: "__MACOSX/._x", content: "m" },
+      { name: "../evil.md", content: "x" },
+    ]);
+    const flag = new DataView(zip.buffer).getUint16(6, true);
+    const names = (await readZip(zip.buffer)).map((e) => e.name);
+    return { utf8Flag: (flag & 0x0800) !== 0, names };
+  });
+  expect(r.utf8Flag).toBe(true);
+  expect(r.names).toEqual(["Ü.md", ".env", "a..b.md", "evil.md"]);
+});
+
+test("deletion records expire after six months", async ({ page }) => {
+  await openApp(page);
+  const r = await page.evaluate(() => {
+    const day = 24 * 3600 * 1000;
+    state.deletedIds = ["old", "recent", "legacy"];
+    state.deletedAt = { old: Date.now() - 200 * day, recent: Date.now() - 10 * day };
+    pruneTombstones();
+    return [state.deletedIds, typeof state.deletedAt.legacy];
+  });
+  expect(r).toEqual([["recent", "legacy"], "number"]);
+});

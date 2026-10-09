@@ -64,6 +64,12 @@
     />
     <link rel="manifest" href="manifest.json" />
     <style>
+      /* Shown by app.js only when not inside a frame (clickjacking defense:
+         GitHub Pages can't send frame-ancestors / X-Frame-Options) */
+      html {
+        visibility: hidden;
+      }
+
       @font-face {
         font-family: "Victor Mono";
         src: url("victor-mono/VictorMono-Regular.woff2") format("woff2");

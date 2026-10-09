@@ -153,5 +153,8 @@ others. Local notes are **not** deleted.
 Settings are per device: remote settings are applied only when this device has
 none yet (first connect).
 
-`deletedIds` only grows. Tombstones from older app versions have no
-`deletedAt`; for those, deletion wins when there is no sync history.
+Tombstones (`deletedIds` + `deletedAt`) expire after 6 months
+(`pruneTombstones`, applied at every merge so tabs and devices agree). A
+device that stays offline longer can bring a deleted note back. Tombstones
+from older app versions have no `deletedAt`; they get one on first load and
+expire 6 months later.

@@ -1,3 +1,13 @@
+// Clickjacking defense: the page stays hidden (index.html) when framed.
+// Hidden elements can't be clicked, so an overlay attack has nothing to hit.
+if (window.top === window.self) {
+  document.documentElement.style.visibility = "visible";
+} else {
+  try {
+    window.top.location = window.location.href;
+  } catch {}
+}
+
 // ═══════════════════════════════════════════════════
 //  Utilities
 // ═══════════════════════════════════════════════════
@@ -85,6 +95,7 @@ async function buildZip(files) {
     const lv = new DataView(local.buffer);
     lv.setUint32(0, 0x04034b50, true);
     lv.setUint16(4, 20, true);
+    lv.setUint16(6, 0x0800, true); // UTF-8 filename
     lv.setUint16(8, 8, true);
     lv.setUint32(14, entry.crc, true);
     lv.setUint32(18, entry.compressed.length, true);
@@ -99,6 +110,7 @@ async function buildZip(files) {
     cv.setUint32(0, 0x02014b50, true);
     cv.setUint16(4, 20, true);
     cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true); // UTF-8 filename
     cv.setUint16(10, 8, true);
     cv.setUint32(16, entry.crc, true);
     cv.setUint32(20, entry.compressed.length, true);
@@ -239,12 +251,11 @@ async function readZip(buf) {
         data = new Uint8Array(await new Response(stream).arrayBuffer());
       }
 
-      // Sanitize filename: strip directories, reject traversal
-      let name = entry.rawName;
-      if (name.includes("..")) return null;
-      const slash = name.lastIndexOf("/");
-      if (slash >= 0) name = name.slice(slash + 1);
-      if (!name) return null;
+      // macOS resource forks, not files
+      if (entry.rawName.startsWith("__MACOSX/")) return null;
+      // Only the base name is used (also for Windows "\\" paths)
+      const name = entry.rawName.split(/[\\/]/).pop();
+      if (!name || name === "." || name === "..") return null;
 
       return { name, data };
     }),
@@ -262,8 +273,6 @@ const gutter = document.getElementById("gutter");
 const highlightLayer = document.getElementById("highlightLayer");
 const editorArea = document.getElementById("editorArea");
 const noteList = document.getElementById("noteList");
-const charCount = document.getElementById("charCount");
-const wordCount = document.getElementById("wordCount");
 const cursorPos = document.getElementById("cursorPos");
 const btnShare = document.getElementById("btnShare");
 const btnWrap = document.getElementById("btnWrap");
@@ -321,6 +330,22 @@ function revokeLeadership() {
   } catch {}
 }
 
+// Deletion records ("tombstones") stop deleted notes from coming back via
+// another tab or device. They expire after 6 months; a device offline for
+// longer could bring a deleted note back. Records from before deletedAt
+// existed get their 6 months from now.
+const TOMBSTONE_TTL = 183 * 24 * 3600 * 1000;
+
+function pruneTombstones() {
+  const now = Date.now();
+  state.deletedIds = state.deletedIds.filter((id) => {
+    state.deletedAt[id] ??= now;
+    if (now - state.deletedAt[id] < TOMBSTONE_TTL) return true;
+    delete state.deletedAt[id];
+    return false;
+  });
+}
+
 // Merge another tab's stored state into ours: per note the newer updatedAt
 // wins, deletions are unioned. Returns true if our state changed.
 function mergeStoredState(stored) {
@@ -345,6 +370,7 @@ function mergeStoredState(stored) {
   state.deletedIds = [...deleted];
   for (const [id, t] of Object.entries(stored.deletedAt || {}))
     state.deletedAt[id] = Math.max(state.deletedAt[id] || 0, t);
+  pruneTombstones();
   if (!getActiveNote()) state.activeId = state.notes[0]?.id ?? null;
   return changed;
 }
@@ -386,6 +412,7 @@ function loadState() {
     if (raw) state = JSON.parse(raw);
     if (!state.deletedIds) state.deletedIds = [];
     if (!state.deletedAt) state.deletedAt = {};
+    pruneTombstones();
   } catch {}
 }
 
@@ -1416,12 +1443,7 @@ const STORAGE_LIMIT = 5 * 1024 * 1024; // 5MB
 const storageUsage = document.getElementById("storageUsage");
 
 function updateStorageUsage() {
-  let total = 0;
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    total += key.length + localStorage.getItem(key).length;
-  }
-  const bytes = total * 2;
+  const bytes = getStorageUsed();
   if (bytes < 200 * 1024) {
     storageUsage.innerHTML = "";
     storageUsage.title = "";
@@ -1795,9 +1817,7 @@ function renderNoteList() {
     // Timestamp
     const timeEl = document.createElement("div");
     timeEl.className = "note-item-time";
-    timeEl.textContent =
-      relativeTime(note.updatedAt) +
-      (note.content ? ", " + formatSize(note.content) : "");
+    timeEl.textContent = noteMetaText(note);
     meta.appendChild(timeEl);
 
     // Pin button
@@ -1848,21 +1868,23 @@ function renderNoteList() {
   }
 }
 
+function noteMetaText(note) {
+  return (
+    relativeTime(note.updatedAt) +
+    (note.content ? ", " + formatSize(note.content) : "")
+  );
+}
+
 // Refresh timestamps periodically
 let timestampInterval = null;
 function startTimestampRefresh() {
   clearInterval(timestampInterval);
   timestampInterval = setInterval(() => {
-    const times = noteList.querySelectorAll(".note-item-time");
-    const sorted = state.notes.slice();
-    sortNotes();
-    times.forEach((el, i) => {
-      if (state.notes[i])
-        el.textContent =
-          relativeTime(state.notes[i].updatedAt) +
-          ", " +
-          formatSize(state.notes[i].content);
-    });
+    for (const item of noteList.querySelectorAll(".note-item")) {
+      const note = state.notes.find((n) => n.id === item.dataset.id);
+      const el = item.querySelector(".note-item-time");
+      if (note && el) el.textContent = noteMetaText(note);
+    }
   }, 30000);
 }
 
@@ -2940,8 +2962,7 @@ function persistZenNote() {
         id,
         name: uniqueName(name),
         content,
-        createdAt: now,
-        updatedAt: now,
+          updatedAt: now,
       });
       state.activeId = id;
     }
@@ -2952,7 +2973,6 @@ function persistZenNote() {
       id,
       name,
       content,
-      createdAt: now,
       updatedAt: now,
     });
     state.activeId = id;
@@ -3265,7 +3285,7 @@ async function createNote(name, content, focusName) {
     return null;
   }
   const note = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    id: crypto.randomUUID(),
     name: name || nextNoteName(),
     content: contentStr,
     updatedAt: Date.now(),
@@ -3576,8 +3596,7 @@ function showSearchResults(results) {
       nameDiv.textContent = r.note.name;
     }
     div.appendChild(nameDiv);
-    const linesToShow = r.lines.length ? r.lines : [];
-    for (const lm of linesToShow) {
+    for (const lm of r.lines) {
       const snippetDiv = document.createElement("div");
       snippetDiv.className = "search-result-snippet";
       const prefix = lm.lineNum + ": ";
@@ -3599,7 +3618,6 @@ function showSearchResults(results) {
           snippetText.slice(start, end) +
           (end < lm.line.length ? "\u2026" : "");
         // Shift indices to match the sliced text
-        const offset = start - (start > 0 ? 1 : 0);
         indices = indices
           .map((i) => i - start + (start > 0 ? 1 : 0))
           .filter((i) => i >= 0 && i < snippetText.length);
@@ -3611,7 +3629,7 @@ function showSearchResults(results) {
         highlightFuzzy(snippetText, indices);
       div.appendChild(snippetDiv);
     }
-    const target = linesToShow[0] || null;
+    const target = r.lines[0] || null;
     div.addEventListener("click", () => {
       const query = searchInput.value.trim();
       // Auto-save dirty vim buffer before switching
@@ -3845,9 +3863,6 @@ function replaceCurrent() {
   updateLineNumbers();
 
   updateFindMatches();
-  if (findMatches.length && findMatchIdx >= findMatches.length) {
-    findMatchIdx = 0;
-  }
   if (findMatches.length) selectFindMatch(true);
 }
 
@@ -4849,9 +4864,12 @@ function _vimExecNormal(cmd) {
       if (!lc) return;
       vimState._replaying = true;
       try {
-        const count = cmd.count || lc.count;
-        const keys = (count ? String(count).split("") : []).concat(lc.keys);
-        for (const k of keys) vimExecNormal(k);
+        if (lc.visual) vimRepeatVisual(lc);
+        else {
+          const count = cmd.count || lc.count;
+          const keys = (count ? String(count).split("") : []).concat(lc.keys);
+          for (const k of keys) vimExecNormal(k);
+        }
         if (vimState.mode === "insert") {
           if (lc.insert) vimEdit(editor.selectionStart, editor.selectionStart, lc.insert);
           vimLeaveInsert();
@@ -5065,6 +5083,9 @@ function _vimExecVisual(key) {
   vimState._undoPushed = false;
   const range = vimVisualRange();
   const start = range.linewise ? vimLineStart(range.first) : range.start;
+  // "." repeats a visual change on the same amount of text from the cursor
+  if ("dxcs><J~uU".includes(k) && !vimState._replaying)
+    vimState.lastChange = { visual: vimVisualShape(range), key: k, insert: null };
 
   switch (k) {
     case "Escape":
@@ -5119,6 +5140,33 @@ function _vimExecVisual(key) {
       return vimSetCursor(s);
     }
   }
+}
+
+// Size of a visual selection, relative to its start (see :help visual-repeat)
+function vimVisualShape(range) {
+  if (range.linewise) return { linewise: true, lines: range.last - range.first };
+  const first = vimLineOf(range.start);
+  const last = vimLineOf(Math.max(range.start, range.end - 1));
+  return last === first
+    ? { lines: 0, chars: range.end - range.start }
+    : { lines: last - first, endCol: range.end - 1 - vimLineStart(last) };
+}
+
+// Re-select a recorded shape at the cursor and apply the visual command
+function vimRepeatVisual(lc) {
+  const pos = editor.selectionStart;
+  const li = vimLineOf(pos);
+  const v = lc.visual;
+  const target = Math.min(li + v.lines, vimLastLine());
+  vimState.visualLine = !!v.linewise;
+  vimState.visualAnchor = pos;
+  vimState.visualHead = v.linewise
+    ? vimLineStart(target)
+    : v.lines
+      ? Math.min(vimLineStart(target) + v.endCol, vimLastCol(target))
+      : Math.min(pos + v.chars - 1, vimLastCol(li));
+  vimSetMode("visual");
+  _vimExecVisual(lc.key);
 }
 
 // Cursor motion without the parser (scroll wheel, Ctrl+D/U)
@@ -5818,8 +5866,6 @@ async function importZip(file) {
     // Strip control characters, limit length
     name = name.replace(/[\x00-\x1f\x7f]/g, "");
     if (name.length > 255) name = name.slice(0, 255);
-    // Strip leading dots (except .note.directory already filtered)
-    if (name.startsWith(".")) name = name.slice(1);
     if (!name) continue;
 
     const content = new TextDecoder().decode(entry.data);
@@ -6954,6 +7000,7 @@ function mergeDriveState(remote, base) {
   state.notes = [...added, ...merged];
   state.deletedIds = [...deleted];
   state.deletedAt = deletedAt;
+  pruneTombstones();
   if (!getActiveNote()) state.activeId = state.notes[0]?.id ?? null;
   sortNotes();
 

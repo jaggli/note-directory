@@ -92,7 +92,6 @@ modal shows stale labels and button clicks do nothing (only Enter/Esc work).
 - Zip: header-declared sizes trusted (zip bomb only self-inflicted); no UTF-8 flag (bit 11) on export → non-ASCII names garble in some unzippers; `..` filter rejects legit names like `a..b.md`; leading dot stripped (`.env` → `env`).
 - README says "works fully offline" — there's no service worker; it only works offline from HTTP cache.
 - `.nojekyl` is misspelled (should be `.nojekyll`) — currently harmless, but the file does nothing.
-- `.claude/settings.json` is committed with machine-specific paths/PIDs (`kill 27180`).
 - Victor Mono (OFL) shipped without its license file.
 - Dead code: `charCount`/`wordCount` refs (null), `getStorageUsed` duplicates `updateStorageUsage`, `ie.cnt`, `Math.min(0, …)`, triple-duplicated `J` and `>>`/`<<` logic, `createdAt` missing on `createNote` but present elsewhere, two ID schemes (`Date.now()+random` vs `randomUUID`).
 - `deletedIds` grows forever and is uploaded on every sync.
@@ -114,7 +113,10 @@ motion table with inclusive/exclusive/linewise rules, key-replay dot repeat,
 real `:s`). Phase 5 done (synchronous per-line highlight rendering — typed
 text visible in ~1ms instead of ~45ms; no quadratic highlighter rules;
 wrap mode measures from rendered rows; capped undo memory). Browser tests
-in `tests/` (`npm test`).
+in `tests/` (`npm test`). Phase 6 done (cleanup; README offline wording
+instead of a service worker). Follow-ups: tombstones expire after 6 months;
+page hidden when framed (JS clickjacking defense — a `frame-ancestors`
+header would need a host that can set headers); `.` repeats visual changes.
 
 ### Phase 1 — security & crash fixes (½ day)
 1. **S1**: in the link handler, run the scheme check on the *fully restored* URL (restore `\x00ES` placeholders first) and use an allowlist parse: `new URL(url, location.href)` → permit only `http:`, `https:`, `mailto:` or same-origin relative. In the preview click handler, `preventDefault()` for anything not allowlisted. Add regression strings to a test page.
@@ -155,6 +157,10 @@ Replace ad-hoc regex motions with a motion table `{fn, inclusive, linewise}` and
 
 ### Phase 6 — hygiene (1 h)
 Rename `.nojekyl` → `.nojekyll`; untrack `.claude/settings.json` (add to `.gitignore`); add the OFL license; fix the README offline claim (or add a 20-line service worker); delete dead code; set the UTF-8 flag in `buildZip`; decide whether note content belongs in the URL at all (opt-in "share" only, keep `?id=` for navigation).
+
+*Correction:* `.claude/settings.json` was never tracked — that finding was a
+misread of `.gitignore` output. Note content in the URL is intended (it is
+the app's sharing model) and stays.
 
 ### Testing
 There are no tests. Minimum viable: extract pure functions (`renderMarkdown`, `formatMarkdown`, `readZip`/`buildZip`, find/replace, vim motions, the sync merge) behind a `if (typeof module !== "undefined") module.exports = …` footer and run them with `node --test`, without a bundler. Write regression tests first for S1, task mapping, Turkish-İ replace and the merge rules.
