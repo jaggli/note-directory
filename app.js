@@ -560,8 +560,13 @@ function buildHash(map) {
 
 const URL_MAX_LENGTH = 60000;
 
+let urlSeq = 0;
+
 async function updateUrl() {
   if (zenModeActive && zenFromUrl && zenEphemeralNote) return;
+  // Compression is async: a slower call for a previous note must not
+  // overwrite the URL of the current one
+  const seq = ++urlSeq;
   const note = getActiveNote();
   if (!note) {
     history.replaceState(null, "", location.pathname);
@@ -570,6 +575,7 @@ async function updateUrl() {
   }
   try {
     const compressed = await compress(note.content);
+    if (seq !== urlSeq) return;
     const queryParams = new URLSearchParams();
     if (zenModeActive) queryParams.set("view", "zen");
     else if (mdViewActive) queryParams.set("view", "md");
@@ -2993,13 +2999,10 @@ function exitZenMode() {
 
 async function zenShare() {
   try {
-    const hashMap = parseHashParams(location.hash);
-    hashMap.delete("anchor");
-    const shareUrl =
-      location.origin +
-      location.pathname +
-      location.search +
-      buildHash(hashMap);
+    const note = zenFromUrl && zenEphemeralNote ? zenEphemeralNote : getActiveNote();
+    if (!note) return;
+    const shareUrl = await shareUrlFor(note);
+    if (!shareUrl) return showModal("Note is too large to share via URL.", "ok", null);
     await navigator.clipboard.writeText(shareUrl);
     const label = document.getElementById("zenCopied");
     label.classList.add("visible");
@@ -3098,7 +3101,7 @@ mdPreview.addEventListener("click", (e) => {
   hashMap.set("anchor", slug);
   const newHash = buildHash(hashMap);
   history.replaceState(
-    null,
+    history.state,
     "",
     location.pathname + location.search + newHash,
   );
@@ -3155,7 +3158,7 @@ mdPreview.addEventListener("click", (e) => {
     const hashMap = parseHashParams(location.hash);
     hashMap.set("anchor", slug);
     history.replaceState(
-      null,
+      history.state,
       "",
       location.pathname + location.search + buildHash(hashMap),
     );
@@ -3211,10 +3214,11 @@ window.addEventListener("popstate", async (e) => {
       }
     }
   } else {
-    // Fallback: try to find note by name in hash
+    // Fallback: try to find note by name in hash — unless the URL carries
+    // the content itself (a newly opened share link): that must be shown
     const hashMap = parseHashParams(location.hash);
     const name = hashMap.get("name");
-    if (name) {
+    if (name && !hashMap.get("note")) {
       const note = state.notes.find((n) => n.name === name);
       if (note) {
         const viewParam = new URLSearchParams(location.search).get(
@@ -3296,6 +3300,7 @@ async function createNote(name, content, focusName) {
   scheduleDriveUpload(true);
   if (mdViewActive) switchMdTab("edit");
   render();
+  updateUrl();
   if (focusName && !isMobile()) {
     const input = noteList.querySelector(
       ".note-item.active .note-item-input",
@@ -4480,6 +4485,33 @@ function vimNextWordEnd(p, big) {
   return p;
 }
 
+// End of the previous word (ge); an empty line counts as a word
+function vimPrevWordEnd(p, big) {
+  const val = editor.value;
+  const cls = vimWordClass(big);
+  if (p <= 0) return 0;
+  const c = cls(val[p]);
+  if (c) while (p > 0 && cls(val[p - 1]) === c) p--;
+  p--;
+  while (p > 0 && !cls(val[p])) {
+    if (val[p] === "\n" && val[p - 1] === "\n") return p;
+    p--;
+  }
+  return Math.max(p, 0);
+}
+
+// Lines fully on screen, shrunk by the 3-line scroll margin (vim's
+// scrolloff) unless the screen already shows the start/end of the buffer
+function vimScreenLines() {
+  const rows = highlightLayer.children;
+  const view = highlightLayer.getBoundingClientRect();
+  let [top, bottom] = visibleRows();
+  if (top < bottom && rows[top].getBoundingClientRect().top < view.top - 1) top++;
+  if (top < bottom && rows[bottom].getBoundingClientRect().bottom > view.bottom + 1) bottom--;
+  const so = Math.min(3, (bottom - top) >> 1);
+  return [top > 0 ? top + so : top, bottom < vimLastLine() ? bottom - so : bottom];
+}
+
 function vimFindChar(pos, char, kind, count) {
   const val = editor.value;
   const li = vimLineOf(pos);
@@ -4497,7 +4529,9 @@ function vimFindChar(pos, char, kind, count) {
   return { pos: p, type: fwd ? "inclusive" : "exclusive" };
 }
 
-const VIM_MOTIONS = new Set("hjklwWbBeE0^$G{};,".split("").concat(["gg"]));
+const VIM_MOTIONS = new Set(
+  "hjklwWbBeE0^$G{};,%HML".split("").concat(["gg", "ge", "gE"]),
+);
 
 // opPending: motion is the target of an operator (affects l, $ and w)
 function vimMotion(m, count, opPending) {
@@ -4569,6 +4603,44 @@ function vimMotion(m, count, opPending) {
       let p = pos;
       for (let i = 0; i < c; i++) p = vimNextWordEnd(p, m.name === "E");
       return p <= pos ? null : { pos: p, type: "inclusive" };
+    }
+    case "ge":
+    case "gE": {
+      let p = pos;
+      for (let i = 0; i < c; i++) p = vimPrevWordEnd(p, m.name === "gE");
+      return p === pos ? null : { pos: p, type: "inclusive" };
+    }
+    case "%": {
+      // N% goes to N percent of the buffer
+      if (count) {
+        const tl = Math.min(Math.ceil((count * (last + 1)) / 100), last + 1) - 1;
+        return { pos: vimFirstNonBlank(Math.max(tl, 0)), type: "linewise" };
+      }
+      // Bracket under the cursor, else the next one on the line
+      const pairs = "()[]{}";
+      const le = vimLineEnd(li);
+      let p = pos;
+      while (p < le && !pairs.includes(val[p])) p++;
+      if (p >= le) return null;
+      const idx = pairs.indexOf(val[p]);
+      const other = pairs[idx ^ 1];
+      const d = idx % 2 ? -1 : 1;
+      for (let q = p, depth = 0; q >= 0 && q < val.length; q += d) {
+        if (val[q] === val[p]) depth++;
+        else if (val[q] === other && --depth === 0) return { pos: q, type: "inclusive" };
+      }
+      return null;
+    }
+    case "H":
+    case "M":
+    case "L": {
+      const [top, bottom] = vimScreenLines();
+      const l =
+        m.name === "H" ? top + c - 1 : m.name === "L" ? bottom - c + 1 : (top + bottom) >> 1;
+      return {
+        pos: vimFirstNonBlank(Math.max(top, Math.min(bottom, l))),
+        type: "linewise",
+      };
     }
     case "{":
     case "}": {
@@ -4654,7 +4726,8 @@ function vimParse(keys) {
     const k = keys[i++];
     if (k === "g") {
       if (i >= keys.length) return null;
-      return keys[i++] === "g" ? { name: "gg" } : { invalid: true };
+      const name = "g" + keys[i++];
+      return VIM_MOTIONS.has(name) ? { name } : { invalid: true };
     }
     if ("fFtT".includes(k)) {
       if (i >= keys.length) return null;
@@ -4863,16 +4936,23 @@ function _vimExecNormal(cmd) {
       const lc = vimState.lastChange;
       if (!lc) return;
       vimState._replaying = true;
+      const finishInsert = () => {
+        if (vimState.mode !== "insert") return;
+        if (lc.insert) vimEdit(editor.selectionStart, editor.selectionStart, lc.insert);
+        vimLeaveInsert();
+      };
       try {
-        if (lc.visual) vimRepeatVisual(lc);
-        else {
+        if (lc.visual) {
+          // A count repeats the visual change that many times
+          for (let i = 0; i < cnt; i++) {
+            vimRepeatVisual(lc);
+            finishInsert();
+          }
+        } else {
           const count = cmd.count || lc.count;
           const keys = (count ? String(count).split("") : []).concat(lc.keys);
           for (const k of keys) vimExecNormal(k);
-        }
-        if (vimState.mode === "insert") {
-          if (lc.insert) vimEdit(editor.selectionStart, editor.selectionStart, lc.insert);
-          vimLeaveInsert();
+          finishInsert();
         }
       } finally {
         vimState._replaying = false;
@@ -5517,6 +5597,14 @@ function vimHandleKeydown(e) {
       return;
     }
 
+    if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      e.preventDefault();
+      e.stopPropagation();
+      moveLines(e.key === "ArrowUp" ? -1 : 1);
+      updateCursorPos();
+      return;
+    }
+
     // Let these keys pass through
     if (e.key === "Tab" || e.key === "Shift") return;
     if (e.key.startsWith("F") && e.key.length > 1) return;
@@ -5658,25 +5746,25 @@ async function downloadAll() {
   );
 }
 
+// Share link for a note, built from its content (never from location,
+// which may still show the previous note). null if too long for a URL.
+async function shareUrlFor(note) {
+  const query = zenModeActive ? "?view=zen" : mdViewActive ? "?view=md" : "";
+  const hashMap = new Map([
+    ["name", note.name],
+    ["note", await compress(note.content)],
+    ["ts", String(note.updatedAt || Date.now())],
+  ]);
+  const url = location.origin + location.pathname + query + buildHash(hashMap);
+  return url.length > URL_MAX_LENGTH ? null : url;
+}
+
 async function shareNote() {
   const note = getActiveNote();
   if (!note) return;
   try {
-    const compressed = await compress(note.content);
-    const queryParams = new URLSearchParams();
-    if (zenModeActive) queryParams.set("view", "zen");
-    else if (mdViewActive) queryParams.set("view", "md");
-    const queryStr = queryParams.toString();
-    const query = queryStr ? "?" + queryStr : "";
-
-    const hashMap = new Map();
-    hashMap.set("name", note.name);
-    hashMap.set("note", compressed);
-    hashMap.set("ts", String(note.updatedAt));
-
-    const url =
-      location.origin + location.pathname + query + buildHash(hashMap);
-    if (url.length > URL_MAX_LENGTH) {
+    const url = await shareUrlFor(note);
+    if (!url) {
       showModal("Note is too large to share via URL.", "ok", null);
       closeFileMenu();
       return;
@@ -6279,6 +6367,46 @@ editor.addEventListener(
   { passive: false },
 );
 
+// Move the lines touched by the cursor/selection one line up or down
+function moveLines(dir) {
+  const val = editor.value;
+  const s = editor.selectionStart;
+  const e = editor.selectionEnd;
+  // A selection ending at a line start doesn't include that line
+  const blockEnd = e > s && val[e - 1] === "\n" ? e - 1 : e;
+  const first = val.lastIndexOf("\n", s - 1) + 1;
+  const nl = val.indexOf("\n", blockEnd);
+  const last = nl === -1 ? val.length : nl;
+  if (dir < 0 ? first === 0 : nl === -1) return;
+  const block = val.slice(first, last);
+  let start, end, text, delta;
+  if (dir < 0) {
+    start = val.lastIndexOf("\n", first - 2) + 1;
+    end = last;
+    text = block + "\n" + val.slice(start, first - 1);
+    delta = start - first;
+  } else {
+    const ne = val.indexOf("\n", last + 1);
+    start = first;
+    end = ne === -1 ? val.length : ne;
+    const next = val.slice(last + 1, end);
+    text = next + "\n" + block;
+    delta = next.length + 1;
+  }
+  const note = getActiveNote();
+  // Vim mode keeps its own undo points (the input handler skips them)
+  if (note && vimState.enabled && vimState.mode !== "insert")
+    pushHistory(note.id, val);
+  const ro = editor.readOnly;
+  editor.readOnly = false;
+  editor.setRangeText(text, start, end);
+  editor.readOnly = ro;
+  editor.setSelectionRange(s + delta, e + delta);
+  // Text typed before the move no longer sits at insertEntry.pos
+  if (vimState.insertEntry) vimState.insertEntry.pos = editor.selectionStart;
+  editor.dispatchEvent(new Event("input"));
+}
+
 editor.addEventListener("keydown", (e) => {
   // Skip in vim normal/visual mode
   if (vimState.enabled && vimState.mode !== "insert") return;
@@ -6286,45 +6414,7 @@ editor.addEventListener("keydown", (e) => {
   // Alt+Arrow Up/Down — move line(s) up/down
   if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
     e.preventDefault();
-    const val = editor.value;
-    const selStart = editor.selectionStart;
-    const selEnd = editor.selectionEnd;
-    // Expand selection to cover full lines
-    const blockStart = val.lastIndexOf("\n", selStart - 1) + 1;
-    const blockEndNl = val.indexOf("\n", selEnd);
-    const blockEnd = blockEndNl === -1 ? val.length : blockEndNl;
-    const block = val.substring(blockStart, blockEnd);
-    // Offsets of selection within the block
-    const offStart = selStart - blockStart;
-    const offEnd = selEnd - blockStart;
-
-    if (e.key === "ArrowUp" && blockStart > 0) {
-      const prevLineStart = val.lastIndexOf("\n", blockStart - 2) + 1;
-      const prevLine = val.substring(prevLineStart, blockStart - 1);
-      editor.value =
-        val.substring(0, prevLineStart) +
-        block +
-        "\n" +
-        prevLine +
-        val.substring(blockEnd);
-      editor.selectionStart = prevLineStart + offStart;
-      editor.selectionEnd = prevLineStart + offEnd;
-    } else if (e.key === "ArrowDown" && blockEndNl !== -1) {
-      const nextLineEndNl = val.indexOf("\n", blockEnd + 1);
-      const nextLineEnd =
-        nextLineEndNl === -1 ? val.length : nextLineEndNl;
-      const nextLine = val.substring(blockEnd + 1, nextLineEnd);
-      editor.value =
-        val.substring(0, blockStart) +
-        nextLine +
-        "\n" +
-        block +
-        val.substring(nextLineEnd);
-      const newBlockStart = blockStart + nextLine.length + 1;
-      editor.selectionStart = newBlockStart + offStart;
-      editor.selectionEnd = newBlockStart + offEnd;
-    }
-    editor.dispatchEvent(new Event("input"));
+    moveLines(e.key === "ArrowUp" ? -1 : 1);
     return;
   }
 
@@ -7289,6 +7379,8 @@ const HELP_DESKTOP = [
   "- 0 / $ / _ — line start/end/first char",
   "- gg / G — top/bottom of file",
   "- { / } — prev/next blank line",
+  "- % — matching bracket, ge — end of previous word",
+  "- H / M / L — top / middle / bottom of screen",
   "- f/F + char — jump to char, t/T stops before",
   "- ; / , — repeat last f/F/t/T",
   "- Ctrl+D / Ctrl+U — half page down/up",

@@ -12,6 +12,7 @@ const CASES = [
   ["|foo.bar baz", "W", "foo.bar |baz"],
   ["|abc\ndef", "$", "ab|c\ndef"],
   ["|abc\ndef", "$l", "ab|c\ndef"],
+  ["|abc\ndef", "$ax<Esc>", "abc|x\ndef"], // $ lands on the last char; a appends
   ["|abcdef\nab\nabcdef", "$jj", "abcdef\nab\nabcde|f"],
   ["abc|def\nx\nabcdef", "jj", "abcdef\nx\nabc|def"],
   ["|a\nb\nc", "G", "a\nb\n|c"],
@@ -99,6 +100,21 @@ const CASES = [
   ["|foo bar", "vecx<Esc>w.", "x |x"],
   ["|ab\ncd\nef", "vjd.", "|f"],
   ["|abc", "vl~l.", "A|bC"],
+  ["|abcdefghij", "vld3.", "|ij"],
+  ["|a\nb\nc", "V>2.", "      |a\nb\nc"],
+
+  // %, ge
+  ["f|oo(a, (b)) x", "%", "foo(a, (b)|) x"],
+  ["foo(a, (b)|) x", "%", "foo|(a, (b)) x"],
+  ["|x [1, 2] y", "d%", "| y"],
+  ["x |[1, 2] y", "d%", "x | y"],
+  ["x {a\n|}", "%", "x |{a\n}"],
+  ["|a\nb\nc\nd", "50%", "a\n|b\nc\nd"],
+  ["foo b|ar", "ge", "fo|o bar"],
+  ["foo.b|ar", "ge", "foo|.bar"],
+  ["a\n\n|b", "ge", "a\n|\nb"],
+  ["foo ba|r", "dge", "f|o"],
+  ["foo.bar b|az", "gE", "foo.ba|r baz"],
 
   // undo
   ["|abc", "xxu", "|bc"],
@@ -244,4 +260,26 @@ test("real keyboard: normal, insert, visual, command bar, search", async ({ page
     false,
     " threehi\n4",
   ]);
+});
+
+test("H / M / L move within the visible screen", async ({ page }) => {
+  await setup(page);
+  const r = await page.evaluate(() => {
+    editor.value = Array.from({ length: 300 }, (_, i) => "line " + i).join("\n");
+    editor.dispatchEvent(new Event("input"));
+    vimSetMode("normal");
+    vimSetCursor(vimLineStart(100));
+    vimUpdateBlockCursor(); // scrolls line 100 into view
+    const lineAt = (k) => {
+      vimSetCursor(vimLineStart(100));
+      vimExecNormal(k);
+      return vimLineOf(editor.selectionStart);
+    };
+    const [top, bottom] = visibleRows();
+    return { top, bottom, H: lineAt("H"), M: lineAt("M"), L: lineAt("L") };
+  });
+  expect(r.H).toBeGreaterThan(r.top); // scroll margin
+  expect(r.L).toBeLessThan(r.bottom);
+  expect(r.M).toBeGreaterThan(r.H);
+  expect(r.M).toBeLessThan(r.L);
 });
