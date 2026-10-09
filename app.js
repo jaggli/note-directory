@@ -308,54 +308,53 @@ function claimLeadership() {
   localStorage.setItem(TAB_LEADER_KEY, tabId);
 }
 
+// Leadership only decides which tab syncs with Drive — every tab saves locally
 function revokeLeadership() {
   if (!isTabLeader) return;
   isTabLeader = false;
-  // Stop all pending syncs & Drive timers
-  clearTimeout(saveTimeout);
   try {
     clearTimeout(gdriveSyncTimeout);
     clearTimeout(gdriveRefreshTimer);
   } catch {}
 }
 
-/**
- * Pull latest state from localStorage (written by the leader tab).
- * If the user edited a note in this (non-leader) tab, preserve those
- * edits by keeping the in-memory version when it's newer.
- */
-function pullStateFromStorage() {
+// Merge another tab's stored state into ours: per note the newer updatedAt
+// wins, deletions are unioned. Returns true if our state changed.
+function mergeStoredState(stored) {
+  if (!stored || !Array.isArray(stored.notes)) return false;
+  const deleted = new Set([...state.deletedIds, ...(stored.deletedIds || [])]);
+  const storedById = new Map(stored.notes.map((n) => [n.id, n]));
+  const localIds = new Set(state.notes.map((n) => n.id));
+  let changed = deleted.size !== state.deletedIds.length;
+  const notes = stored.notes.filter((n) => !localIds.has(n.id));
+  if (notes.length) changed = true;
+  for (const local of state.notes) {
+    const s = storedById.get(local.id);
+    if (s && s.updatedAt > local.updatedAt) {
+      // Update in place — UI closures hold references to note objects
+      for (const k of Object.keys(local)) delete local[k];
+      Object.assign(local, s);
+      changed = true;
+    }
+    notes.push(local);
+  }
+  state.notes = notes.filter((n) => !deleted.has(n.id));
+  state.deletedIds = [...deleted];
+  if (!getActiveNote()) state.activeId = state.notes[0]?.id ?? null;
+  return changed;
+}
+
+function activeNoteVersion() {
+  const note = getActiveNote();
+  return note ? note.id + ":" + note.updatedAt : "";
+}
+
+function mergeFromStorage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const newState = JSON.parse(raw);
-    const activeNote = getActiveNote();
-
-    // Build a map of local in-memory notes that may have unsaved edits
-    const localById = new Map(state.notes.map((n) => [n.id, n]));
-
-    // Merge: prefer the version with the latest updatedAt
-    state.notes = newState.notes.map((remote) => {
-      const local = localById.get(remote.id);
-      if (local && local.updatedAt > remote.updatedAt) {
-        return local; // keep unsaved in-memory edits
-      }
-      return remote;
-    });
-    // Also keep any notes that exist locally but not in storage
-    for (const local of localById.values()) {
-      if (!newState.notes.some((n) => n.id === local.id)) {
-        state.notes.push(local);
-      }
-    }
-
-    if (activeNote && state.notes.find((n) => n.id === activeNote.id)) {
-      state.activeId = activeNote.id;
-    } else {
-      state.activeId = newState.activeId;
-    }
-    render();
-  } catch {}
+    return mergeStoredState(JSON.parse(localStorage.getItem(STORAGE_KEY)));
+  } catch {
+    return false;
+  }
 }
 
 let _vimPreClickPos = null; // saved cursor pos before mouse click
@@ -399,7 +398,7 @@ function getStorageUsed() {
 }
 
 function saveState() {
-  if (!isTabLeader) return;
+  mergeFromStorage();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) {
@@ -413,7 +412,6 @@ function saveState() {
 }
 
 function scheduleSave() {
-  if (!isTabLeader) return;
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
     saveState();
@@ -804,6 +802,7 @@ function showImportModal(filename) {
 
 const histories = {};
 let historyTimeout = null;
+let historyNoteId = null;
 
 function getHistory(id) {
   if (!histories[id]) histories[id] = { past: [], future: [] };
@@ -827,6 +826,7 @@ function scheduleHistorySnapshot() {
   if (!note) return;
   const id = note.id;
   const content = editor.value;
+  historyNoteId = id;
   historyTimeout = setTimeout(() => {
     pushHistory(id, content);
     historyTimeout = null;
@@ -848,9 +848,15 @@ function findFirstDiff(a, b) {
   return len;
 }
 
+function cancelHistorySnapshot() {
+  clearTimeout(historyTimeout);
+  historyTimeout = null;
+}
+
 function undo() {
   const note = getActiveNote();
   if (!note) return;
+  cancelHistorySnapshot();
   const h = getHistory(note.id);
   if (!h.past.length) return;
   const oldContent = editor.value;
@@ -883,10 +889,12 @@ function undo() {
 function redo() {
   const note = getActiveNote();
   if (!note) return;
+  cancelHistorySnapshot();
   const h = getHistory(note.id);
   if (!h.future.length) return;
   const oldContent = editor.value;
   h.past.push({ content: oldContent });
+  if (h.past.length > 200) h.past.shift();
   const entry = h.future.pop();
   editor.value = entry.content;
   const diffPos = findFirstDiff(oldContent, entry.content);
@@ -1408,15 +1416,7 @@ function updateOccurrenceMarkers() {
   if (selected === lastOccurrenceQuery) return;
   lastOccurrenceQuery = selected;
 
-  // Find all occurrences (case-insensitive)
-  const lower = text.toLowerCase();
-  const qLower = selected.toLowerCase();
-  const positions = [];
-  let idx = 0;
-  while ((idx = lower.indexOf(qLower, idx)) !== -1) {
-    positions.push(idx);
-    idx += 1;
-  }
+  const positions = findAll(text, selected).map((m) => m.start);
 
   if (positions.length < 2) {
     occurrenceTrack.innerHTML = "";
@@ -1562,15 +1562,13 @@ function renderEditor() {
     editor.value = note.content;
     editor.disabled = false;
     btnShare.disabled = false;
-    if (note.cursorPos !== undefined) {
-      editor.selectionStart = editor.selectionEnd = Math.min(
-        note.cursorPos,
-        note.content.length,
-      );
-    }
-    // Recover from swap file
+    // Recover from swap file — unless the note was saved/synced after it
     const swap = loadSwap(note.id);
-    if (swap && swap.content !== note.content) {
+    if (
+      swap &&
+      swap.content !== note.content &&
+      swap.timestamp > (note.updatedAt || 0)
+    ) {
       if (vimState.enabled) {
         // In vim mode: load swap into buffer, mark dirty
         editor.value = swap.content;
@@ -1586,8 +1584,14 @@ function renderEditor() {
         deleteSwap(note.id);
       }
     } else if (swap) {
-      // Swap matches saved content — clean up
+      // Swap is redundant or outdated — clean up
       deleteSwap(note.id);
+    }
+    if (note.cursorPos !== undefined) {
+      editor.selectionStart = editor.selectionEnd = Math.min(
+        note.cursorPos,
+        editor.value.length,
+      );
     }
   } else {
     editor.value = "";
@@ -1719,7 +1723,9 @@ function renderNoteList() {
     });
     input.addEventListener("blur", () => {
       input.classList.remove("editing");
-      note.name = input.value.trim() || "untitled";
+      const name = input.value.trim() || "untitled";
+      if (name === note.name) return renderNoteList();
+      note.name = name;
       note.updatedAt = Date.now();
       saveState();
       scheduleDriveUpload(true);
@@ -2569,6 +2575,42 @@ function renderMarkdown(src) {
   return text;
 }
 
+// Task items exactly as renderMarkdown sees them (outside code fences,
+// any list marker), so data-task indices map to the right source line
+const TASK_RE = /^(\s*(?:[-*+]|\d+\.)\s)\[(x|\s)\](?=\s)/;
+
+function findTasks(content) {
+  const tasks = [];
+  const fences = [];
+  let prevQuote = false;
+  content.split("\n").forEach((line, i) => {
+    // Consecutive "> " lines are merged into one blockquote, which
+    // leaves the 2nd+ lines unprefixed and parsed as list items
+    const quote = !fences.length && line.startsWith(">");
+    const continued = quote && prevQuote;
+    prevQuote = quote;
+    if (!fences.length) {
+      const open = line.match(/^(`{3,})\S*\s*$/);
+      if (open) return fences.push(open[1]);
+      const body = continued ? line.replace(/^>\s?/, "") : line;
+      const m = body.match(TASK_RE);
+      if (m)
+        tasks.push({
+          line: i,
+          quote: line.length - body.length,
+          indent: Math.floor(m[1].match(/^\s*/)[0].length / 2),
+          checked: m[2] === "x",
+        });
+    } else if (line.match(/^(`{3,})\s*$/)?.[1] === fences[fences.length - 1]) {
+      fences.pop();
+    } else {
+      const nested = line.match(/^(`{3,})\S+\s*$/);
+      if (nested) fences.push(nested[1]);
+    }
+  });
+  return tasks;
+}
+
 function isSafeHref(href) {
   const url = href
     .replace(/&quot;/g, '"')
@@ -2644,28 +2686,21 @@ function switchMdTab(tab, pushHistory) {
       const clickedIdx = parseInt((li || input).dataset.task);
 
       function parseTasks(content) {
-        const re = /^(\s*)([-*+])\s+\[([ x])\]/gm;
-        const items = [];
-        let m;
-        while ((m = re.exec(content)) !== null)
-          items.push({
-            idx: items.length,
-            indent: Math.floor(m[1].length / 2),
-            checked: m[3] === "x",
-          });
-        return items;
+        return findTasks(content).map((t, idx) => ({ ...t, idx }));
       }
 
       function setTasks(content, indices, checked) {
-        let count = 0;
-        return content.replace(
-          /^(\s*[-*+]\s+)\[([ x])\]/gm,
-          (match, prefix) => {
-            if (indices.has(count++))
-              return prefix + (checked ? "[x]" : "[ ]");
-            return match;
-          },
-        );
+        const lines = content.split("\n");
+        findTasks(content).forEach((t, idx) => {
+          if (!indices.has(idx)) return;
+          const line = lines[t.line];
+          lines[t.line] =
+            line.slice(0, t.quote) +
+            line
+              .slice(t.quote)
+              .replace(TASK_RE, (_, prefix) => prefix + (checked ? "[x]" : "[ ]"));
+        });
+        return lines.join("\n");
       }
 
       const tasks = parseTasks(note.content);
@@ -2854,17 +2889,11 @@ function persistZenNote() {
     if (existing.content === content) {
       state.activeId = existing.id;
     } else {
-      const dot = name.lastIndexOf(".");
-      const base = dot > 0 ? name.slice(0, dot) : name;
-      const ext = dot > 0 ? name.slice(dot) : "";
-      let num = 1;
-      while (state.notes.some((n) => n.name === `${base}${num}${ext}`))
-        num++;
       const id = crypto.randomUUID();
       const now = Date.now();
       state.notes.unshift({
         id,
-        name: `${base}${num}${ext}`,
+        name: uniqueName(name),
         content,
         createdAt: now,
         updatedAt: now,
@@ -3163,6 +3192,16 @@ function nextNoteName() {
   return `note${num}.md`;
 }
 
+// "name.md" → "name1.md", "name2.md", … (first free)
+function uniqueName(name) {
+  const dot = name.lastIndexOf(".");
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : "";
+  let num = 1;
+  while (state.notes.some((n) => n.name === `${base}${num}${ext}`)) num++;
+  return `${base}${num}${ext}`;
+}
+
 async function createNote(name, content, focusName) {
   if (!name && isMobile()) {
     const result = await showPromptModal("Filename:", nextNoteName());
@@ -3227,6 +3266,7 @@ async function confirmDelete(id) {
   const idx = state.notes.findIndex((n) => n.id === id);
   if (idx === -1) return;
   deleteSwap(id);
+  delete histories[id];
   if (!state.deletedIds) state.deletedIds = [];
   state.deletedIds.push(id);
   state.notes.splice(idx, 1);
@@ -3376,10 +3416,11 @@ function fuzzyMatch(text, query) {
 }
 
 function exactMatch(text, query) {
-  const idx = text.toLowerCase().indexOf(query.toLowerCase());
-  if (idx === -1) return null;
+  const m = findAll(text, query)[0];
+  if (!m) return null;
+  const idx = m.start;
   const indices = [];
-  for (let i = idx; i < idx + query.length; i++) indices.push(i);
+  for (let i = idx; i < m.end; i++) indices.push(i);
   const score = query.length * 3 + (idx < 10 ? 5 : 0);
   return { indices, score };
 }
@@ -3612,6 +3653,23 @@ searchInput.addEventListener("keydown", (e) => {
 let findMatches = [];
 let findMatchIdx = -1;
 
+// Case-insensitive, non-overlapping. Offsets refer to `text` itself —
+// toLowerCase() can change string length (e.g. "İ"), so never search a copy.
+function findAll(text, query) {
+  const re = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  return Array.from(text.matchAll(re), (m) => ({
+    start: m.index,
+    end: m.index + m[0].length,
+  }));
+}
+
+function isFindMatchSelected() {
+  const m = findMatches[findMatchIdx];
+  return (
+    !!m && editor.selectionStart === m.start && editor.selectionEnd === m.end
+  );
+}
+
 function openFindReplace() {
   findReplaceBar.classList.add("visible");
   findInput.value = "";
@@ -3640,7 +3698,8 @@ function closeFindReplace() {
   editor.focus();
 }
 
-function updateFindMatches() {
+// select=false only refreshes offsets (after edits) without moving the cursor
+function updateFindMatches(select = true) {
   const query = findInput.value;
   findMatches = [];
   findMatchIdx = -1;
@@ -3648,14 +3707,7 @@ function updateFindMatches() {
     findReplaceCount.textContent = "";
     return;
   }
-  const text = editor.value;
-  const lower = text.toLowerCase();
-  const qLower = query.toLowerCase();
-  let idx = 0;
-  while ((idx = lower.indexOf(qLower, idx)) !== -1) {
-    findMatches.push({ start: idx, end: idx + query.length });
-    idx += 1;
-  }
+  findMatches = findAll(editor.value, query);
   if (findMatches.length === 0) {
     findReplaceCount.textContent = "0 matches";
     return;
@@ -3669,7 +3721,8 @@ function updateFindMatches() {
       break;
     }
   }
-  selectFindMatch();
+  if (select) selectFindMatch();
+  else findReplaceCount.textContent = findMatches.length + " matches";
 }
 
 function selectFindMatch(focusEditor) {
@@ -3699,7 +3752,9 @@ function findNext() {
     updateFindMatches();
     return;
   }
-  findMatchIdx = (findMatchIdx + 1) % findMatches.length;
+  // After edits findMatchIdx points at the first match after the cursor
+  if (isFindMatchSelected())
+    findMatchIdx = (findMatchIdx + 1) % findMatches.length;
   selectFindMatch(true);
 }
 
@@ -3714,7 +3769,12 @@ function findPrev() {
 }
 
 function replaceCurrent() {
-  if (findMatchIdx < 0 || findMatchIdx >= findMatches.length) return;
+  updateFindMatches(false);
+  // Only replace what the user can see selected; otherwise select it first
+  if (!isFindMatchSelected()) {
+    if (findMatches.length) selectFindMatch(true);
+    return;
+  }
   const m = findMatches[findMatchIdx];
   const replacement = replaceInput.value;
   const note = getActiveNote();
@@ -3754,20 +3814,16 @@ function replaceAll() {
   if (!note) return;
 
   const text = editor.value;
-  const lower = text.toLowerCase();
-  const qLower = query.toLowerCase();
+  const matches = findAll(text, query);
+  if (!matches.length) return;
   let result = "";
-  let idx = 0;
-  let count = 0;
   let pos = 0;
-  while ((idx = lower.indexOf(qLower, pos)) !== -1) {
-    result += text.substring(pos, idx) + replacement;
-    pos = idx + query.length;
-    count++;
+  for (const m of matches) {
+    result += text.substring(pos, m.start) + replacement;
+    pos = m.end;
   }
   result += text.substring(pos);
 
-  if (count === 0) return;
   editor.value = result;
   if (vimState.enabled) {
     vimState.bufferDirty = true;
@@ -6176,20 +6232,18 @@ async function importZip(file) {
         saveState();
         render();
       } else if (action === "keep-both") {
-        const dot = name.lastIndexOf(".");
-        let base = dot > 0 ? name.slice(0, dot) : name;
-        let ext = dot > 0 ? name.slice(dot) : "";
-        let num = 1;
-        while (state.notes.some((n) => n.name === `${base}${num}${ext}`))
-          num++;
-        createNote(`${base}${num}${ext}`, content);
+        createNote(uniqueName(name), content);
       }
       // "skip": do nothing
     } else {
       // No conflict
       if (meta) {
+        // The id may belong to a renamed or deleted note — don't reuse it
+        const idTaken =
+          state.notes.some((n) => n.id === meta.id) ||
+          state.deletedIds.includes(meta.id);
         const note = {
-          id: meta.id,
+          id: idTaken ? crypto.randomUUID() : meta.id,
           name: name,
           content: content,
           updatedAt: meta.updatedAt,
@@ -6281,15 +6335,7 @@ document.addEventListener("drop", async (e) => {
           saveState();
           render();
         } else {
-          const dot = file.name.lastIndexOf(".");
-          let base = dot > 0 ? file.name.slice(0, dot) : file.name;
-          let ext = dot > 0 ? file.name.slice(dot) : "";
-          let num = 1;
-          while (
-            state.notes.some((n) => n.name === `${base}${num}${ext}`)
-          )
-            num++;
-          createNote(`${base}${num}${ext}`, reader.result);
+          createNote(uniqueName(file.name), reader.result);
         }
       } else {
         createNote(file.name, reader.result);
@@ -6360,28 +6406,12 @@ window.addEventListener("storage", (e) => {
     revokeLeadership();
   }
   if (e.key === STORAGE_KEY && e.newValue) {
-    // Only non-leader tabs should react to storage changes
-    // (the leader wrote them, so it already has the data)
-    if (isTabLeader) return;
     try {
-      const newState = JSON.parse(e.newValue);
-      const currentContent = editor.value;
-      const activeNote = getActiveNote();
-      state.notes = newState.notes;
-      if (activeNote && state.notes.find((n) => n.id === activeNote.id)) {
-        state.activeId = activeNote.id;
-      } else {
-        state.activeId = newState.activeId;
-      }
-      render();
-      const note = getActiveNote();
-      if (
-        note &&
-        note.id === activeNote?.id &&
-        note.content === currentContent
-      ) {
-        editor.value = currentContent;
-      }
+      const before = activeNoteVersion();
+      if (!mergeStoredState(JSON.parse(e.newValue))) return;
+      // Only touch the editor if the open note itself changed
+      if (activeNoteVersion() !== before) render();
+      else renderNoteList();
     } catch {}
   }
   if (e.key === SIDEBAR_WIDTH_KEY && e.newValue) {
@@ -6417,11 +6447,9 @@ window.addEventListener("storage", (e) => {
 
 function reclaimLeadership() {
   if (isTabLeader) return;
-  // Pull latest state written by the previous leader, then take over
-  pullStateFromStorage();
+  const before = activeNoteVersion();
+  if (mergeFromStorage() && activeNoteVersion() !== before) render();
   claimLeadership();
-  // Persist merged state now that we're leader
-  saveState();
   // Resume Drive sync if connected
   if (gdriveConnected) driveSyncQuiet();
 }
@@ -6432,15 +6460,10 @@ document.addEventListener("visibilitychange", () => {
 
 window.addEventListener("focus", reclaimLeadership);
 
-// Flush pending saves when the leader tab is closed
+// Flush pending saves when the tab is closed
 window.addEventListener("beforeunload", () => {
-  // Flush unsaved vim buffer before closing (leader only — non-leader
-  // tabs can't persist via saveState, so vimWriteBuffer would delete
-  // the swap file without actually saving the content)
-  if (isTabLeader && vimState.enabled && vimState.bufferDirty) {
-    vimWriteBuffer();
-  }
-  if (isTabLeader && saveTimeout) {
+  if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
+  if (saveTimeout) {
     clearTimeout(saveTimeout);
     saveState();
   }
@@ -6463,7 +6486,8 @@ editor.addEventListener("input", () => {
       ? h.past[h.past.length - 1].content
       : null;
     if (lastContent !== note.content) {
-      if (!historyTimeout) pushHistory(note.id, note.content);
+      if (!historyTimeout || historyNoteId !== note.id)
+        pushHistory(note.id, note.content);
     }
   }
   if (vimActive) {
@@ -6477,6 +6501,8 @@ editor.addEventListener("input", () => {
   updateCursorPos();
   ensureCursorScrolloff();
   scheduleHighlight();
+  // Keep find offsets valid — replace/next would otherwise hit shifted text
+  if (findMatches.length) updateFindMatches(false);
   if (!vimActive) {
     scheduleSave();
     scheduleHistorySnapshot();
@@ -6746,13 +6772,18 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   // Undo
-  if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+  const key = e.key.toLowerCase();
+  if (!inInput && (e.metaKey || e.ctrlKey) && key === "z" && !e.shiftKey) {
     e.preventDefault();
     undo();
     return;
   }
   // Redo
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "z") {
+  if (
+    !inInput &&
+    (((e.metaKey || e.ctrlKey) && e.shiftKey && key === "z") ||
+      (e.ctrlKey && !e.metaKey && key === "y"))
+  ) {
     e.preventDefault();
     redo();
     return;
@@ -7641,33 +7672,49 @@ const MD_DEMO = [
   "*Written in [note](https://note.directory/) — where all good tales begin.*",
 ].join("\n");
 
-async function openMdDemo() {
+// Opens an app-provided note (help, demo). Refreshes it only while the user
+// hasn't edited it — `builtin` holds the hash of what the app last wrote.
+async function openBuiltinNote(name, content) {
+  const hash = (text) => crc32(new TextEncoder().encode(text));
+  const dot = name.lastIndexOf(".");
+  const isVariant = (n) =>
+    n === name ||
+    (n.startsWith(name.slice(0, dot)) &&
+      n.endsWith(name.slice(dot)) &&
+      /^\d+$/.test(n.slice(dot, n.length - (name.length - dot))));
   const existing = state.notes.find(
-    (n) => n.name === "markdown-features.md",
+    (n) =>
+      isVariant(n.name) &&
+      (n.content === content || n.builtin === hash(n.content)),
   );
   if (existing) {
-    existing.content = MD_DEMO;
-    existing.updatedAt = Date.now();
+    if (existing.content !== content) {
+      existing.content = content;
+      existing.updatedAt = Date.now();
+    }
+    existing.builtin = hash(content);
     switchNote(existing.id);
     saveState();
   } else {
-    await createNote("markdown-features.md", MD_DEMO);
+    const taken = state.notes.some((n) => n.name === name);
+    const note = await createNote(taken ? uniqueName(name) : name, content);
+    if (note) {
+      note.builtin = hash(content);
+      saveState();
+    }
   }
+}
+
+async function openMdDemo() {
+  await openBuiltinNote("markdown-features.md", MD_DEMO);
 }
 
 async function openHelp() {
   const mobile = isMobile();
-  const content = mobile ? HELP_MOBILE : HELP_DESKTOP;
-  const name = mobile ? "help-mobile.md" : "help.md";
-  const existing = state.notes.find((n) => n.name === name);
-  if (existing) {
-    existing.content = content;
-    existing.updatedAt = Date.now();
-    switchNote(existing.id);
-    saveState();
-  } else {
-    await createNote(name, content);
-  }
+  await openBuiltinNote(
+    mobile ? "help-mobile.md" : "help.md",
+    mobile ? HELP_MOBILE : HELP_DESKTOP,
+  );
   // Enable word wrap on mobile so help reads nicely
   if (mobile && !editorArea.classList.contains("wrap")) {
     toggleWrap();
@@ -7680,8 +7727,9 @@ async function init() {
   loadWrap();
   loadVim();
 
-  // This tab is the newest — claim leadership so it can sync
-  claimLeadership();
+  // Tabs opened in the background must not take Drive sync from the
+  // tab the user is working in — they claim it on focus instead
+  if (document.visibilityState === "visible") claimLeadership();
 
   // Restore Google Drive session
   const tokenState = restoreToken();
@@ -7707,7 +7755,7 @@ async function init() {
   }
   const loaded = await loadFromUrl();
   if (!loaded && state.notes.length === 0 && isFirstVisit) {
-    createNote(
+    await openBuiltinNote(
       isMobile() ? "help-mobile.md" : "help.md",
       isMobile() ? HELP_MOBILE : HELP_DESKTOP,
     );

@@ -105,6 +105,10 @@ modal shows stale labels and button clicks do nothing (only Enter/Esc work).
 
 Ordered by risk × effort. Each phase is independently shippable.
 
+**Status:** Phase 1 done (9f4816e, JS moved to `app.js`, strict CSP). Phase 2 done
+(merge-on-write replaces tab leadership for local saves; leadership now only gates
+Drive sync). Browser tests in `tests/` (`npm test`).
+
 ### Phase 1 — security & crash fixes (½ day)
 1. **S1**: in the link handler, run the scheme check on the *fully restored* URL (restore `\x00ES` placeholders first) and use an allowlist parse: `new URL(url, location.href)` → permit only `http:`, `https:`, `mailto:` or same-origin relative. In the preview click handler, `preventDefault()` for anything not allowlisted. Add regression strings to a test page.
 2. Move inline `onclick=` handlers to `addEventListener` (one delegated listener with `data-action`), then drop `'unsafe-inline'` from `script-src`. This turns any future markdown bug into a non-event.
