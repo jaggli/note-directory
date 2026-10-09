@@ -109,7 +109,9 @@ Ordered by risk × effort. Each phase is independently shippable.
 (merge-on-write replaces tab leadership for local saves; leadership now only gates
 Drive sync). Phase 3 done (single serialized download→merge→upload sync,
 three-way merge with conflict copies, no popups outside clicks; see
-`docs/google-drive-flow.md`). Browser tests in `tests/` (`npm test`).
+`docs/google-drive-flow.md`). Phase 4 done (vim engine rebuilt: parser,
+motion table with inclusive/exclusive/linewise rules, key-replay dot repeat,
+real `:s`). Browser tests in `tests/` (`npm test`).
 
 ### Phase 1 — security & crash fixes (½ day)
 1. **S1**: in the link handler, run the scheme check on the *fully restored* URL (restore `\x00ES` placeholders first) and use an allowlist parse: `new URL(url, location.href)` → permit only `http:`, `https:`, `mailto:` or same-origin relative. In the preview click handler, `preventDefault()` for anything not allowlisted. Add regression strings to a test page.
