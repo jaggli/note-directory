@@ -3650,6 +3650,7 @@ function showSearchResults(results) {
       if (query) {
         findInput.value = query;
         vimState.searchDirection = 1;
+        vimState.lastSearch = { pattern: "\\V" + query.replace(/\\/g, "\\\\"), ignoreCase: true };
         updateFindMatches();
         if (findMatches.length) selectFindMatch(true);
         updateCursorPos();
@@ -4115,6 +4116,11 @@ function vimUpdateBlockCursor() {
 }
 
 function vimSetMode(mode) {
+  if (vimState.mode === "visual" && mode !== "visual") {
+    const a = vimLineOf(vimState.visualAnchor);
+    const h = vimLineOf(vimState.visualHead);
+    vimState.visualMarks = { first: Math.min(a, h), last: Math.max(a, h) };
+  }
   // When entering insert mode, snapshot current state as the undo point
   // (only if no edit command already pushed — e.g. plain i/a/I/A)
   if (mode === "insert" && vimState.mode !== "insert") {
@@ -4303,14 +4309,19 @@ function vimDeleteLines(first, last) {
   vimSetCursor(vimFirstNonBlank(Math.min(first, vimLastLine())));
 }
 
-function vimShiftLines(first, last, dir) {
+// Shift lines by `times` indent levels (2 spaces or a tab per level)
+function vimShiftLines(first, last, dir, times = 1) {
   for (let li = last; li >= first; li--) {
     const ls = vimLineStart(li);
     const text = vimLineText(li);
     if (dir > 0) {
-      if (text) vimEdit(ls, ls, "  ");
+      if (text) vimEdit(ls, ls, "  ".repeat(times));
     } else {
-      const strip = text.startsWith("  ") ? 2 : text.startsWith("\t") ? 1 : 0;
+      let strip = 0;
+      for (let i = 0; i < times; i++) {
+        const rest = text.slice(strip);
+        strip += rest.startsWith("  ") ? 2 : rest.startsWith("\t") ? 1 : 0;
+      }
       if (strip) vimEdit(ls, ls + strip, "");
     }
   }
@@ -4844,7 +4855,8 @@ function _vimExecNormal(cmd) {
   if (cmd.op) {
     let range;
     if (cmd.lines) {
-      range = { linewise: true, first: li, last: Math.min(li + cnt - 1, vimLastLine()) };
+      if (cnt > 1 && li === vimLastLine()) return;
+    range = { linewise: true, first: li, last: Math.min(li + cnt - 1, vimLastLine()) };
     } else if (cmd.textobj) {
       const obj = vimTextObject(cmd.textobj.type, cmd.textobj.inner);
       if (!obj) return;
@@ -4943,11 +4955,9 @@ function _vimExecNormal(cmd) {
       };
       try {
         if (lc.visual) {
-          // A count repeats the visual change that many times
-          for (let i = 0; i < cnt; i++) {
-            vimRepeatVisual(lc);
-            finishInsert();
-          }
+          // Vim ignores a count on "." for visual changes
+          vimRepeatVisual(lc);
+          finishInsert();
         } else {
           const count = cmd.count || lc.count;
           const keys = (count ? String(count).split("") : []).concat(lc.keys);
@@ -4983,16 +4993,19 @@ function _vimExecNormal(cmd) {
     case "n":
     case "N":
       return vimSearch(
-        findInput.value,
+        null,
         cmd.cmd === "n" ? vimState.searchDirection : -vimState.searchDirection,
         cnt,
       );
     case "*":
     case "#": {
+      // Whole keyword, case-insensitive (vim ignores smartcase for *)
       const obj = vimTextObject("w", true);
       if (!obj) return;
+      const word = val.slice(obj.start, obj.end);
       vimState.searchDirection = cmd.cmd === "*" ? 1 : -1;
-      return vimSearch(val.slice(obj.start, obj.end), vimState.searchDirection, cnt, true);
+      const pattern = /^\w+$/.test(word) ? `\\<${word}\\>` : "\\V" + word.replace(/\\/g, "\\\\");
+      return vimSearch(pattern, vimState.searchDirection, cnt, true);
     }
     case "/":
     case "?":
@@ -5003,7 +5016,7 @@ function _vimExecNormal(cmd) {
   }
 }
 
-function vimApplyOperator(op, range, pos) {
+function vimApplyOperator(op, range, pos, times = 1) {
   if (range.linewise) {
     const { first, last } = range;
     if (op === "d") return vimDeleteLines(first, last);
@@ -5013,7 +5026,7 @@ function vimApplyOperator(op, range, pos) {
       if (vimLineOf(pos) > first) vimSetCursor(vimColPos(first, pos - vimLineStart(vimLineOf(pos))));
       return;
     }
-    if (op === ">" || op === "<") return vimShiftLines(first, last, op === ">" ? 1 : -1);
+    if (op === ">" || op === "<") return vimShiftLines(first, last, op === ">" ? 1 : -1, times);
     if (op === "c") {
       vimSetRegister(vimLinesText(first, last), true);
       const indent = vimLineText(first).match(/^[ \t]*/)[0];
@@ -5034,7 +5047,7 @@ function vimApplyOperator(op, range, pos) {
     return vimEnterInsert(start, "c");
   }
   // > / < with a charwise motion still shift whole lines
-  vimShiftLines(vimLineOf(start), vimLineOf(Math.max(start, end - 1)), op === ">" ? 1 : -1);
+  vimShiftLines(vimLineOf(start), vimLineOf(Math.max(start, end - 1)), op === ">" ? 1 : -1, times);
 }
 
 // Leave insert mode: record typed text for ".", cursor back one (vim)
@@ -5051,27 +5064,311 @@ function vimLeaveInsert() {
   updateCursorPos();
 }
 
-// Case-insensitive literal search from the cursor, wrapping around
-function vimSearch(query, dir, count = 1, wholeWord = false) {
-  if (!query) return;
-  findInput.value = query; // n/N continue from the last search
+// Search with a vim pattern from the cursor, wrapping around. Without a
+// pattern, repeats the last search (n / N).
+function vimSearch(pattern, dir, count = 1, ignoreCase) {
+  if (!pattern) {
+    if (!vimState.lastSearch) return vimShowError("No previous regular expression");
+    ({ pattern, ignoreCase } = vimState.lastSearch);
+  }
+  let re;
+  try {
+    re = vimCompile(pattern, ignoreCase);
+  } catch (e) {
+    return vimShowError("Invalid pattern: " + e.message);
+  }
+  vimState.lastSearch = { pattern, ignoreCase };
   const val = editor.value;
-  let matches = findAll(val, query);
-  if (wholeWord)
-    matches = matches.filter(
-      (m) => !/\w/.test(val[m.start - 1] || "") && !/\w/.test(val[m.end] || ""),
-    );
-  if (!matches.length) return vimShowError("Pattern not found: " + query);
+  const starts = [];
+  for (let m; (m = re.exec(val)); ) {
+    starts.push(m.index);
+    if (!m[0]) re.lastIndex++;
+  }
+  if (!starts.length) return vimShowError("Pattern not found: " + pattern);
   let p = editor.selectionStart;
   for (let i = 0; i < count; i++) {
     const next =
       dir > 0
-        ? matches.find((m) => m.start > p) || matches[0]
-        : [...matches].reverse().find((m) => m.start < p) || matches[matches.length - 1];
-    p = next.start;
+        ? starts.find((s) => s > p) ?? starts[0]
+        : [...starts].reverse().find((s) => s < p) ?? starts[starts.length - 1];
+    p = next;
   }
   vimState.desiredCol = null;
   vimSetCursor(p);
+}
+
+// ── Vim regex ──
+// Translates vim pattern syntax to a JS RegExp: magic by default, \v \V \m
+// \M, \c \C, \( \| \+ \= \{n,m} \{-}, \< \>, \a \l \u \x \h …
+
+const VIM_CLASSES = {
+  a: "[A-Za-z]", A: "[^A-Za-z]", l: "[a-z]", L: "[^a-z]", u: "[A-Z]",
+  U: "[^A-Z]", x: "[0-9A-Fa-f]", X: "[^0-9A-Fa-f]", o: "[0-7]", O: "[^0-7]",
+  h: "[A-Za-z_]", H: "[^A-Za-z_]", s: "[ \\t]", S: "[^ \\t\\n]", d: "\\d",
+  D: "[^\\d\\n]", w: "[0-9A-Za-z_]", W: "[^0-9A-Za-z_\\n]", t: "\\t",
+  n: "\\n", r: "\\r", e: "\\x1b",
+};
+const VIM_POSIX = {
+  alpha: "A-Za-z", digit: "0-9", alnum: "A-Za-z0-9", upper: "A-Z",
+  lower: "a-z", space: " \\t\\n\\r\\f\\v", blank: " \\t", xdigit: "0-9A-Fa-f",
+};
+
+function vimRegexSource(p) {
+  let mode = "m";
+  let ic;
+  let out = "";
+  let i = 0;
+  const esc = (c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const atomStart = () => out === "" || /(\(|\||\(\?:)$/.test(out);
+  const brace = () => {
+    const j = p.indexOf("}", i);
+    if (j < 0) throw new Error("Missing } after \\{");
+    let body = p.slice(i, j).replace(/\\$/, "");
+    i = j + 1;
+    const lazy = body.startsWith("-");
+    if (lazy) body = body.slice(1);
+    let q;
+    if (body === "") q = "*";
+    else if (/^\d+$/.test(body)) q = `{${body}}`;
+    else if (/^\d*,\d*$/.test(body)) {
+      const [a, b] = body.split(",");
+      q = `{${a || 0},${b}}`;
+    } else throw new Error("Invalid \\{" + body + "}");
+    return q + (lazy ? "?" : "");
+  };
+  // [...] copied mostly as is; unclosed [ is a literal (as in vim)
+  const cls = () => {
+    let j = i;
+    let body = "[";
+    if (p[j] === "^") body += p[j++];
+    if (p[j] === "]") (body += "\\]"), j++;
+    while (j < p.length && p[j] !== "]") {
+      const posix = p.slice(j).match(/^\[:(\w+):\]/);
+      if (posix && VIM_POSIX[posix[1]]) {
+        body += VIM_POSIX[posix[1]];
+        j += posix[0].length;
+      } else if (p[j] === "\\" && j + 1 < p.length) {
+        body += p[j] + p[j + 1];
+        j += 2;
+      } else body += p[j] === "[" ? "\\[" : p[j], j++;
+    }
+    if (j >= p.length) return "\\[";
+    i = j + 1;
+    return body + "]";
+  };
+
+  while (i < p.length) {
+    const c = p[i++];
+    if (c === "\\") {
+      const n = p[i++];
+      if (n === undefined) {
+        out += "\\\\";
+        break;
+      }
+      if ("vVmM".includes(n)) {
+        mode = n === "v" ? "v" : n === "V" ? "V" : "m";
+        continue;
+      }
+      if (n === "c" || n === "C") {
+        ic = n === "c";
+        continue;
+      }
+      if (n === "<") out += "\\b(?=\\w)";
+      else if (n === ">") out += "\\b(?<=\\w)";
+      else if (VIM_CLASSES[n]) out += VIM_CLASSES[n];
+      else if (/[1-9]/.test(n)) out += "\\" + n;
+      else if (mode !== "v" && n === "(") out += "(";
+      else if (mode !== "v" && n === "%" && p[i] === "(") (out += "(?:"), i++;
+      else if (mode !== "v" && ")|+".includes(n)) out += n;
+      else if (mode !== "v" && (n === "=" || n === "?")) out += "?";
+      else if (mode !== "v" && n === "{") out += brace();
+      else if (mode === "V" && (n === "." || n === "*" || n === "^" || n === "$")) out += n;
+      else if (mode === "V" && n === "[") out += cls();
+      else out += esc(n);
+      continue;
+    }
+    if (mode === "V") {
+      if (c === "^" && atomStart()) out += "^";
+      else if (c === "$" && i === p.length) out += "$";
+      else out += esc(c);
+      continue;
+    }
+    if (mode === "v") {
+      if (c === "<") out += "\\b(?=\\w)";
+      else if (c === ">") out += "\\b(?<=\\w)";
+      else if (c === "=") out += "?";
+      else if (c === "{") out += brace();
+      else if (c === "[") out += cls();
+      else if (c === "%" && p[i] === "(") (out += "(?:"), i++;
+      else if (c === "/" || c === "}") out += esc(c);
+      else out += c;
+      continue;
+    }
+    // magic
+    if (c === ".") out += ".";
+    else if (c === "*") out += atomStart() ? "\\*" : "*";
+    else if (c === "[") out += cls();
+    else if (c === "^") out += atomStart() ? "^" : "\\^";
+    else if (c === "$") {
+      const rest = p.slice(i);
+      out += rest === "" || rest.startsWith("\\|") || rest.startsWith("\\)") ? "$" : "\\$";
+    } else if (c === "~") out += esc(vimState.lastSubRep || "");
+    else out += esc(c);
+  }
+  return { source: out, ic };
+}
+
+// Case: \c / \C win, then an explicit flag (:s i / I), then smartcase —
+// ignore case unless the pattern has an uppercase letter (vim with
+// 'ignorecase' + 'smartcase')
+function vimCompile(pattern, ignoreCase) {
+  const { source, ic } = vimRegexSource(pattern);
+  const smart = !/[A-Z]/.test(pattern.replace(/\\./g, ""));
+  return new RegExp(source, "gm" + (ic ?? ignoreCase ?? smart ? "i" : ""));
+}
+
+// ── Vim ex ranges ──
+// Addresses: N . $ '< '> with +N / -N offsets; % = all lines
+
+// `cur` is what . and bare +N are relative to
+function vimParseAddress(s, i, cur = vimCursorLine()) {
+  let line = null;
+  const num = s.slice(i).match(/^\d+/);
+  if (num) (line = parseInt(num[0], 10) - 1), (i += num[0].length);
+  else if (s[i] === ".") (line = cur), i++;
+  else if (s[i] === "$") (line = vimLastLine()), i++;
+  else if (s[i] === "'" && (s[i + 1] === "<" || s[i + 1] === ">")) {
+    const m = vimState.visualMarks;
+    if (!m) throw new Error("Mark not set");
+    line = s[i + 1] === "<" ? m.first : m.last;
+    i += 2;
+  }
+  let off;
+  while ((off = s.slice(i).match(/^([+-])(\d*)/))) {
+    line = (line ?? cur) + (off[1] === "+" ? 1 : -1) * (off[2] ? +off[2] : 1);
+    i += off[0].length;
+  }
+  return { line, i };
+}
+
+function vimParseRange(s) {
+  let i = s.match(/^\s*/)[0].length;
+  if (s[i] === "%") return { first: 0, last: vimLastLine(), rest: s.slice(i + 1) };
+  const a = vimParseAddress(s, i);
+  if (a.line === null) return { first: null, last: null, rest: s.slice(a.i) };
+  let first = a.line;
+  let last = a.line;
+  i = a.i;
+  if (s[i] === "," || s[i] === ";") {
+    // With ; the second address counts from the first (2;+1 = lines 2-3)
+    const b = vimParseAddress(s, i + 1, s[i] === ";" ? first : undefined);
+    if (b.line !== null) last = b.line;
+    i = b.i;
+  }
+  if (first > last) [first, last] = [last, first];
+  if (first < 0 || last > vimLastLine()) throw new Error("Invalid range");
+  return { first, last, rest: s.slice(i) };
+}
+
+// :[range]s/pat/rep/[flags] — vim regex and replacement syntax
+function vimSubstitute(cmd, first, last) {
+  const head = cmd.match(/^s(?:ubstitute)?(.)/);
+  const d = head[1];
+  let i = head[0].length;
+  const readPart = () => {
+    let part = "";
+    while (i < cmd.length && cmd[i] !== d) {
+      if (cmd[i] === "\\" && i + 1 < cmd.length) {
+        part += cmd[i + 1] === d ? d : cmd[i] + cmd[i + 1];
+        i += 2;
+      } else part += cmd[i++];
+    }
+    return part;
+  };
+  let pat = readPart();
+  let rep = cmd[i] === d ? (i++, readPart()) : "";
+  const flags = cmd[i] === d ? cmd.slice(i + 1).trim() : "";
+  if (!pat) pat = vimState.lastSearch?.pattern;
+  if (!pat) return vimShowError("No previous regular expression");
+  // ~ in the replacement is the previous replacement string
+  rep = rep.replace(/(^|[^\\])~/g, (_, pre) => pre + (vimState.lastSubRep || ""));
+  vimState.lastSubRep = rep;
+  let re;
+  try {
+    re = vimCompile(pat, flags.includes("i") ? true : flags.includes("I") ? false : undefined);
+  } catch (e) {
+    return vimShowError("Invalid pattern: " + e.message);
+  }
+  vimState.lastSearch = { pattern: pat };
+
+  const start = vimLineStart(first);
+  const end = vimLineEnd(last);
+  const text = editor.value.slice(start, end);
+  const nl = [];
+  for (let k = text.indexOf("\n"); k !== -1; k = text.indexOf("\n", k + 1)) nl.push(k);
+  const lineAt = (off) => {
+    let lo = 0;
+    let hi = nl.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (nl[mid] < off) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+  const all = flags.includes("g");
+  const lines = new Set();
+  let count = 0;
+  const out = text.replace(re, (...a) => {
+    const line = lineAt(a[a.length - 2]);
+    if (!all && lines.has(line)) return a[0];
+    lines.add(line);
+    count++;
+    return vimExpandReplacement(rep, a);
+  });
+  if (!count) return flags.includes("e") ? undefined : vimShowError("Pattern not found: " + pat);
+  const summary = `${count} substitution${count > 1 ? "s" : ""} on ${lines.size} line${lines.size > 1 ? "s" : ""}`;
+  if (flags.includes("n")) return showMdToast(summary.replace("substitution", "match"));
+  vimState._undoPushed = false;
+  vimEdit(start, end, out);
+  // Cursor on the last substituted line (shifted by inserted line breaks)
+  const grown = out.split("\n").length - text.split("\n").length;
+  vimSetCursor(vimFirstNonBlank(Math.min(first + Math.max(...lines) + Math.max(grown, 0), vimLastLine())));
+  if (lines.size > 2) showMdToast(summary);
+}
+
+// & \0-\9 \r (line break) \t \\ and case modifiers \u \l \U \L \e
+function vimExpandReplacement(rep, m) {
+  let out = "";
+  let once = null;
+  let all = null;
+  for (let k = 0; k < rep.length; k++) {
+    let piece = rep[k];
+    if (piece === "&") piece = m[0];
+    else if (piece === "\\" && k + 1 < rep.length) {
+      const n = rep[++k];
+      if (/\d/.test(n)) piece = n === "0" ? m[0] : typeof m[+n] === "string" ? m[+n] : "";
+      else if (n === "r" || n === "n") piece = "\n";
+      else if (n === "t") piece = "\t";
+      else if (n === "u" || n === "l") {
+        once = n;
+        continue;
+      } else if (n === "U" || n === "L") {
+        all = n;
+        continue;
+      } else if (n === "e" || n === "E") {
+        all = null;
+        continue;
+      } else piece = n;
+    }
+    if (all) piece = all === "U" ? piece.toUpperCase() : piece.toLowerCase();
+    if (once && piece) {
+      piece = (once === "u" ? piece[0].toUpperCase() : piece[0].toLowerCase()) + piece.slice(1);
+      once = null;
+    }
+    out += piece;
+  }
+  return out;
 }
 
 // ── Vim visual mode ──
@@ -5163,9 +5460,10 @@ function _vimExecVisual(key) {
   vimState._undoPushed = false;
   const range = vimVisualRange();
   const start = range.linewise ? vimLineStart(range.first) : range.start;
+  const count = n ? parseInt(keys.slice(0, n).join(""), 10) : 1;
   // "." repeats a visual change on the same amount of text from the cursor
   if ("dxcs><J~uU".includes(k) && !vimState._replaying)
-    vimState.lastChange = { visual: vimVisualShape(range), key: k, insert: null };
+    vimState.lastChange = { visual: vimVisualShape(range), key: k, count, insert: null };
 
   switch (k) {
     case "Escape":
@@ -5182,6 +5480,10 @@ function _vimExecVisual(key) {
     case "o":
       [vimState.visualAnchor, vimState.visualHead] = [vimState.visualHead, vimState.visualAnchor];
       return vimRenderVisual();
+    case ":":
+      vimSetCursor(vimState.visualHead);
+      exit();
+      return vimOpenCommandBar(":", "'<,'>");
     case "d":
     case "x":
     case "y":
@@ -5189,7 +5491,7 @@ function _vimExecVisual(key) {
     case "<":
       vimSetCursor(start);
       exit();
-      return vimApplyOperator(k === "x" ? "d" : k, range, start);
+      return vimApplyOperator(k === "x" ? "d" : k, range, start, count);
     case "c":
     case "s":
       vimSetCursor(start);
@@ -5246,6 +5548,8 @@ function vimRepeatVisual(lc) {
       ? Math.min(vimLineStart(target) + v.endCol, vimLastCol(target))
       : Math.min(pos + v.chars - 1, vimLastCol(li));
   vimSetMode("visual");
+  // Replays the original count (V3> then . shifts 3 again)
+  vimState.keys = lc.count > 1 ? String(lc.count).split("") : [];
   _vimExecVisual(lc.key);
 }
 
@@ -5270,7 +5574,7 @@ const vimCommandInput = document.getElementById("vimCommandInput");
 
 let vimErrorDismiss = null;
 
-function vimOpenCommandBar(prefix) {
+function vimOpenCommandBar(prefix, initial = "") {
   if (vimErrorDismiss) {
     vimCommandInput.removeEventListener("keydown", vimErrorDismiss);
     vimErrorDismiss = null;
@@ -5280,7 +5584,7 @@ function vimOpenCommandBar(prefix) {
   vimCommandBar.classList.add("visible");
   document.querySelector(".vim-command-prefix").textContent =
     prefix || ":";
-  vimCommandInput.value = "";
+  vimCommandInput.value = initial;
   vimCommandInput.focus();
 }
 
@@ -5347,7 +5651,37 @@ function vimDiscardBuffer() {
 }
 
 function vimExecCommand(cmd) {
-  const trimmed = cmd.trim();
+  let range;
+  try {
+    range = vimParseRange(cmd.trim());
+  } catch (e) {
+    return vimShowError(e.message);
+  }
+  const trimmed = range.rest.trim();
+  const hasRange = range.first !== null;
+  const cur = vimCursorLine();
+
+  // :N, :$, :'< … — a bare range jumps to its last line
+  if (hasRange && !trimmed) {
+    vimSetCursor(vimFirstNonBlank(range.last));
+    updateCursorPos();
+    return;
+  }
+
+  // :[range]s/pat/rep/[flags]
+  if (/^s(?:ubstitute)?[^\w\s"|]/.test(trimmed)) {
+    vimSubstitute(trimmed, range.first ?? cur, range.last ?? cur);
+    updateCursorPos();
+    return;
+  }
+
+  // :[range]d — delete lines
+  if (trimmed === "d" || trimmed === "delete") {
+    vimState._undoPushed = false;
+    vimDeleteLines(range.first ?? cur, range.last ?? cur);
+    updateCursorPos();
+    return;
+  }
 
   // :w — write buffer to storage
   if (trimmed === "w") {
@@ -5447,15 +5781,6 @@ function vimExecCommand(cmd) {
     return;
   }
 
-  // :d — delete current line
-  if (trimmed === "d") {
-    vimState._undoPushed = false;
-    const li = vimCursorLine();
-    vimDeleteLines(li, li);
-    updateCursorPos();
-    return;
-  }
-
   // :e <name> — open note by name (fuzzy match)
   const eMatch = trimmed.match(/^e\s+(.+)$/);
   if (eMatch) {
@@ -5465,53 +5790,6 @@ function vimExecCommand(cmd) {
       state.notes.find((n) => n.name.toLowerCase().includes(query));
     if (match) switchNote(match.id);
     else vimShowError("No note matching: " + eMatch[1]);
-    return;
-  }
-
-  // :<number> — jump to line
-  if (/^\d+$/.test(trimmed)) {
-    const li = Math.min(Math.max(1, parseInt(trimmed)) - 1, vimLastLine());
-    vimSetCursor(vimFirstNonBlank(li));
-    updateCursorPos();
-    return;
-  }
-
-  // :s/pat/rep/[gi] on the current line, :%s/… on all lines.
-  // JS regex syntax; replacement uses $1 / $& (not \1 / &).
-  const sMatch = trimmed.match(/^(%?)s\/((?:\\.|[^/])+)\/((?:\\.|[^/])*)(?:\/([gi]*))?$/);
-  if (sMatch) {
-    const [, all, pat, rep, flags = ""] = sMatch;
-    let re;
-    try {
-      // Without g only the first match of each line is replaced
-      re = new RegExp(pat, flags.replace(/[^gi]/g, ""));
-    } catch {
-      return vimShowError("Invalid pattern: " + pat);
-    }
-    const replacement = rep.replace(/\\\//g, "/");
-    const li = vimCursorLine();
-    const start = all ? 0 : vimLineStart(li);
-    const end = all ? editor.value.length : vimLineEnd(li);
-    let count = 0;
-    const out = editor.value
-      .slice(start, end)
-      .split("\n")
-      .map((line) =>
-        line.replace(re, (...args) => {
-          count++;
-          return replacement.replace(/\$(\d|&)/g, (_, g) => {
-            const v = g === "&" ? args[0] : args[+g];
-            return typeof v === "string" ? v : "";
-          });
-        }),
-      )
-      .join("\n");
-    if (!count) return vimShowError("Pattern not found: " + pat);
-    vimState._undoPushed = false;
-    vimEdit(start, end, out);
-    vimSetCursor(vimFirstNonBlank(li));
-    vimClampCursor();
-    updateCursorPos();
     return;
   }
 
@@ -7411,7 +7689,8 @@ const HELP_DESKTOP = [
   "",
   "### Search",
   "",
-  "- / — search forward, ? — backward",
+  "- / — search forward, ? — backward (vim regex,",
+  "  case-insensitive unless the pattern has capitals)",
   "- n/N — next/prev match",
   "- * / # — word under cursor fwd/back",
   "",
@@ -7427,7 +7706,8 @@ const HELP_DESKTOP = [
   "- :help — this page",
   "- :mddemo — markdown features showcase",
   "- :s/a/b/ — replace in line, :%s/a/b/g — everywhere",
-  "  (JavaScript regex, $1 for groups, flags g and i)",
+  "  :'<,'>s/… — in the visual selection (press : in visual)",
+  "  vim regex: \\( \\) \\| \\+ \\< \\>, \\v very magic; \\1 & \\r",
 ].join("\n");
 const HELP_MOBILE = [
   "# Welcome to note.",

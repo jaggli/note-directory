@@ -1,7 +1,8 @@
 const { test, expect, openApp } = require("./fixtures");
 
-// [text before ("|" = cursor), keys, text after] — expectations follow real
-// vim. Keys: one char each, <Esc> for Escape.
+// [text before ("|" = cursor), keys, text after] — checked against real vim
+// 9.1 with 'autoindent' (S/cc keep indent). Undo is per command, as when
+// typing (vim's :normal would group them). Keys: one char each, <Esc>.
 const CASES = [
   // motions
   ["|foo bar baz", "w", "foo |bar baz"],
@@ -36,7 +37,9 @@ const CASES = [
   ["|a\nb\nc\nd", "d2j", "|d"],
   ["|a b c d e f g", "2d3w", "|g"],
   ["abc\ndef\n|ghi", "dd", "abc\n|def"],
-  ["|a b", "2dd", "|"],
+  ["|a b", "2dd", "|a b"], // count past the last line fails
+  ["a\n|b\nc", "5dd", "|a"], // but clamps when it can move
+  ["a\nb\n|c", "3dd", "a\nb\n|c"],
   ["a|bc", "D", "|a"],
   ["|abc", "Cx<Esc>", "|x"],
   ["|  foo", "Sx<Esc>", "  |x"],
@@ -100,8 +103,11 @@ const CASES = [
   ["|foo bar", "vecx<Esc>w.", "x |x"],
   ["|ab\ncd\nef", "vjd.", "|f"],
   ["|abc", "vl~l.", "A|bC"],
-  ["|abcdefghij", "vld3.", "|ij"],
-  ["|a\nb\nc", "V>2.", "      |a\nb\nc"],
+  ["|abcdefghij", "vld3.", "|efghij"], // "." ignores its count after visual
+  ["|abcdef", "vl3d", "|cdef"],
+  ["|a\nb", "V3>", "      |a\nb"],
+  ["|a\nb", "V3>j.", "      a\n      |b"],
+  ["|a\nb\nc", "V>2.", "    |a\nb\nc"],
 
   // %, ge
   ["f|oo(a, (b)) x", "%", "foo(a, (b)|) x"],
@@ -167,41 +173,100 @@ test("vim keys behave like vim", async ({ page }) => {
   expect(failures).toEqual([]);
 });
 
-test("ex substitute and search", async ({ page }) => {
-  await setup(page);
-  const ex = (text, cmd) =>
-    page.evaluate(
-      ([text, cmd]) => {
-        editor.value = text;
-        vimSetMode("normal");
-        vimSetCursor(0);
-        vimExecCommand(cmd);
-        return editor.value;
-      },
-      [text, cmd],
-    );
-  expect(await ex("foo foo\nfoo", "s/foo/bar/")).toBe("bar foo\nfoo");
-  expect(await ex("foo foo\nfoo", "%s/foo/bar/g")).toBe("bar bar\nbar");
-  expect(await ex("foo foo\nfoo", "%s/foo/bar/")).toBe("bar foo\nbar");
-  expect(await ex("foo", "%s/(o+)/[$1]/")).toBe("f[oo]");
-  expect(await ex("a/b", "s/\\//-/")).toBe("a-b");
-  expect(await ex("Foo", "s/foo/x/i")).toBe("x");
+// [text before, ex command / search keys, text after] — generated from real
+// vim 9.1 with 'ignorecase' + 'smartcase' (-u NONE, set ic scs)
+const EX_CASES = [
+  ["|foo foo\nfoo",":s/foo/bar/","|bar foo\nfoo"],
+  ["|foo foo\nfoo",":%s/foo/bar/g","bar bar\n|bar"],
+  ["|foo foo\nfoo",":%s/foo/bar/","bar foo\n|bar"],
+  ["|foo",":s/\\(o\\+\\)/[\\1]/","|f[oo]"],
+  ["|a/b",":s/\\//-/","|a-b"],
+  ["|Foo",":s/foo/x/i","|x"],
+  ["|foo bar",":s/\\<bar\\>/X/","|foo X"],
+  ["|foobar bar",":s/\\<bar/X/g","|foobar X"],
+  ["|a1b22c333",":s/\\d\\+/<&>/g","|a<1>b<22>c<333>"],
+  ["|hello world",":s/\\w\\+/\\u&/g","|Hello World"],
+  ["|hello world",":s/.*/\\U&/","|HELLO WORLD"],
+  ["|a,b,c",":s/,/\\r/g","a\nb\n|c"],
+  ["|x\ny\nz",":2,3s/^/# /","x\n# y\n|# z"],
+  ["|aaa",":s/a\\{2}/b/","|ba"],
+  ["|aaa",":s/a\\{-1,}/b/","|baa"],
+  ["|foo(bar)",":s/(bar)/[x]/","|foo[x]"],
+  ["|foo bar",":s/\\v(foo) (bar)/\\2 \\1/","|bar foo"],
+  ["|a.b.c",":s/\\V./-/g","|a-b-c"],
+  ["|abc",":s/b\\|c/X/g","|aXX"],
+  ["|tab\there",":s/\\s/_/","|tab_here"],
+  ["|one two",":s#o#0#g","|0ne tw0"],
+  ["|a\nb\nc\nd",":.,+1s/$/!/","a!\n|b!\nc\nd"],
+  ["|a\nb\nc",":$s/c/C/","a\nb\n|C"],
+  ["|AbC abc",":s/abc/x/g","|x x"],
+  ["|AbC abc",":s/Abc/x/g","|AbC abc"],
+  ["|AbC abc",":s/abc\\C/x/g","|AbC x"],
+  ["|x",":s/y/z/","|x"],
+  ["|ab",":s/\\(a\\)\\(b\\)/\\2\\1/","|ba"],
+  ["|a b",":s/ /\\t/","|a\tb"],
+  ["|price 5",":s/\\d/$&/","|price $5"],
+  ["|abc",":s/[[:alpha:]]/X/g","|XXX"],
+  ["|a\n\nb",":%s/^$/EMPTY/","a\n|EMPTY\nb"],
+  ["|a-b",":s/-/\\&/","|a&b"],
+  ["|ab",":s/a/x/|","|xb"],
+  ["|aXbXc",":s/x/-/g","|a-b-c"],
+  ["|foo foo",":s/foo/bar/n","|foo foo"],
+  ["|a\nb\nc\nd\ne",":2;+1s/^/>/","a\n>b\n|>c\nd\ne"],
+  ["|one two three",":s/\\v(\\w+) (\\w+)/\\2 \\1/","|two one three"],
+  ["|x  y",":s/ \\+/ /","|x y"],
+  ["|a\nb\nc","Vj:s/$/!/","a!\n|b!\nc"],
+  ["|a foo b foo","/foo","a |foo b foo"],
+  ["|foo a foo","/foo","foo a |foo"],
+  ["|ab abc","/\\<abc\\>","ab |abc"],
+  ["|x Foo foo","/foo","x |Foo foo"],
+  ["|x Foo foo","/Foo","x |Foo foo"],
+  ["|x foo Foo","/Foo","x foo |Foo"],
+  ["|a1 b22","/\\d\\+","a|1 b22"],
+  ["|one\ntwo three","/t\\w\\+e","one\ntwo |three"],
+  ["foo |x foo","?foo","|foo x foo"],
+  ["|foo x foo","*","foo x |foo"],
+  ["|foobar foo","*","|foobar foo"],
+  ["|a x b x c x","/xn","a x b |x c x"],
+  ["x a |x b","#","|x a x b"],
+];
 
-  // Only whole words match: "a" occurs once, so * stays put
-  expect(await runVim(page, "|a foo b foo", "*")).toBe("|a foo b foo");
-  const search = await page.evaluate(() => {
-    editor.value = "foo a foo b foo";
-    vimSetCursor(0);
-    vimState.searchDirection = 1;
-    vimSearch("foo", 1);
-    const first = editor.selectionStart;
-    vimExecNormal("n");
-    const second = editor.selectionStart;
-    vimExecNormal("N");
-    return [first, second, editor.selectionStart];
-  });
-  expect(search).toEqual([6, 12, 6]);
-  expect(await runVim(page, "|foo x foo", "*")).toBe("foo x |foo");
+test(":s and search match real vim", async ({ page }) => {
+  await setup(page);
+  const failures = [];
+  for (const [before, cmd, after] of EX_CASES) {
+    const got = await page.evaluate(
+      ([before, cmd]) => {
+        const cur = before.indexOf("|");
+        editor.value = before.replace("|", "");
+        getActiveNote().content = editor.value;
+        vimState.lastSearch = null;
+        vimSetMode("normal");
+        vimSetCursor(cur);
+        if (cmd.startsWith(":")) vimExecCommand(cmd.slice(1));
+        else if (/^[/?]/.test(cmd)) {
+          const n = cmd.length > 2 && cmd.endsWith("n");
+          vimState.searchDirection = cmd[0] === "/" ? 1 : -1;
+          vimSearch(n ? cmd.slice(1, -1) : cmd.slice(1), vimState.searchDirection);
+          if (n) vimExecNormal("n");
+        } else if (cmd.includes(":")) {
+          // visual keys, then ":" prefills '<,'>
+          const [keys, ex] = cmd.split(":");
+          for (const k of keys) vimState.mode === "visual" ? vimExecVisual(k) : vimExecNormal(k);
+          vimExecVisual(":");
+          const range = vimCommandInput.value;
+          vimCloseCommandBar();
+          vimExecCommand(range + ex);
+        } else for (const k of cmd) vimExecNormal(k);
+        vimCloseCommandBar();
+        const p = editor.selectionStart;
+        return editor.value.slice(0, p) + "|" + editor.value.slice(p);
+      },
+      [before, cmd],
+    );
+    if (got !== after) failures.push({ before, cmd, expected: after, got });
+  }
+  expect(failures).toEqual([]);
 });
 
 test("error bar does not swallow the next command", async ({ page }) => {
