@@ -107,7 +107,9 @@ Ordered by risk × effort. Each phase is independently shippable.
 
 **Status:** Phase 1 done (9f4816e, JS moved to `app.js`, strict CSP). Phase 2 done
 (merge-on-write replaces tab leadership for local saves; leadership now only gates
-Drive sync). Browser tests in `tests/` (`npm test`).
+Drive sync). Phase 3 done (single serialized download→merge→upload sync,
+three-way merge with conflict copies, no popups outside clicks; see
+`docs/google-drive-flow.md`). Browser tests in `tests/` (`npm test`).
 
 ### Phase 1 — security & crash fixes (½ day)
 1. **S1**: in the link handler, run the scheme check on the *fully restored* URL (restore `\x00ES` placeholders first) and use an allowlist parse: `new URL(url, location.href)` → permit only `http:`, `https:`, `mailto:` or same-origin relative. In the preview click handler, `preventDefault()` for anything not allowlisted. Add regression strings to a test page.

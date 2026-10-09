@@ -1,10 +1,13 @@
-# Google Drive Sync — User Flows
+# Google Drive Sync
+
+Notes sync through a single JSON file (`note-app-data.json`) in the user's
+hidden `appDataFolder`. Scope: `drive.appdata` only.
 
 ## UI States
 
 | State            | Dot                    | Animation    | Label         | Menu                       |
 | ---------------- | ---------------------- | ------------ | ------------- | -------------------------- |
-| Disconnected     | —                      | —            | _(hidden)_    | "sync google drive" button |
+| Disconnected     | —                      | —            | _(hidden)_    | "enable google drive"      |
 | Connected (idle) | Green                  | None         | `sync`        | sync now · disconnect      |
 | Syncing          | Green                  | Blinking LED | `syncing`     | —                          |
 | Sync success     | Green ✔ → Green ● (2s) | None         | `sync`        | sync now · disconnect      |
@@ -12,219 +15,101 @@
 
 ---
 
-## 1. First-Time Connection
+## One sync operation
 
-**Trigger:** User clicks "sync google drive" button.
+Every sync — first connect, autosave, Ctrl+S, `:w`, tab resume, page load — runs
+the same `runSync()`:
 
 ```
-driveSync()
-  → closeAllMenus()
-  → setSyncDotSyncing(true)          label = "syncing", dot blinks
-  → gdriveAuth()                     interactive OAuth popup
-    → persistToken()                 store token + expiry in localStorage
-    → scheduleTokenRefresh()         timer 5 min before expiry
-    → showSyncConnected()
-  → fetch remote state from Drive
-  → merge local ↔ remote (timestamp wins)
-  → gdriveUploadState()              push merged state
-  → gdriveConnected = true
-  → localStorage("notepad_gdrive_connected", "true")
-  → setSyncResult(true)              dot = ✔ (2s → ●)
+syncNow()                          coalesces: a call during a running sync
+  → navigator.locks "note-drive-sync"   schedules exactly one follow-up run;
+    → runSync()                         the Web Lock serializes tabs
+        list files (oldest first)
+        download all of them        duplicates from racing devices are combined
+        merge other tabs' localStorage writes
+        three-way merge with Drive  (see below)
+        save + render
+        if Drive lacks something:
+          re-check file version     changed since download → merge again (≤3×)
+          upload to oldest file
+          delete duplicate files
+        store sync base             fingerprints of what was uploaded
 ```
 
-**Merge strategy:** newer `updatedAt` wins. Same content → keep local. Remote-only notes added unless their ID is in `deletedIds`.
+There is no blind upload: autosave is a full download → merge → upload.
+Drive v3 has no conditional writes, so the version re-check narrows (but cannot
+close) the window for a concurrent write between check and upload.
+
+### Merge rules
+
+Each device stores a **sync base** (`notepad_gdrive_base`): a fingerprint of
+every note (name + content + pinned) as of its last successful sync. That is
+the common ancestor that tells which side changed a note.
+
+| Situation                                   | Result                                         |
+| ------------------------------------------- | ---------------------------------------------- |
+| Same on both sides                          | unchanged                                      |
+| Only one side changed since the base        | that side wins                                 |
+| Both changed                                | newer kept, other added as `name (conflict).ext` |
+| Deleted on one side, unchanged on the other | deleted                                        |
+| Deleted on one side, edited on the other    | edit survives (as a new note id)               |
+| No sync history (first sync after upgrade)  | newest `updatedAt` wins (previous behaviour)   |
+
+When the remote version wins, the local note is updated in place and gets an
+`updatedAt` strictly newer than before, so other tabs' merge-on-write adopt it
+even if the other device's clock is behind.
+
+Remote data is validated (`parseDrivePayload`): notes without string
+`id`/`name`/`content` are dropped.
 
 ---
 
-## 2. Autosave (typing in editor)
+## Triggers
 
-**Trigger:** Editor `input` event (non-vim mode).
+| Trigger                      | Call                          | May open popup |
+| ---------------------------- | ----------------------------- | -------------- |
+| "enable google drive" / "reconnect" / "sync now" / Ctrl+S | `driveSync()` | yes (user gesture) |
+| Typing (after 300ms save)    | `scheduleDriveUpload(false)` → 30s debounce | no |
+| Create/delete/rename/`:w`    | `scheduleDriveUpload(true)`   | no             |
+| Tab hidden with pending edits | `syncNow()`                  | no             |
+| Tab visible / focus (5s debounce) | `onTabResume()` → `syncNow()` | no         |
+| Page load (connected)        | `syncNow()`                   | no             |
 
-```
-scheduleSave()                       300ms debounce
-  → saveState()                      write to localStorage
-  → scheduleDriveUpload(false)       30s debounce
-    → drivePushQuiet()               upload to Drive
-      → setSyncDotSyncing(true)      dot blinks
-      → gdriveUploadState()
-      → setSyncResult(true)          dot = ✔ (2s → ●)
-```
-
-**Note:** 30s defensive wait batches rapid keystrokes into one upload.
-
----
-
-## 3. Ctrl+S
-
-**Trigger:** Ctrl/Cmd+S keydown.
-
-| Context                        | Action                                              |
-| ------------------------------ | --------------------------------------------------- |
-| Edit mode, non-vim, `.md` file | Format markdown → save → update URL → `driveSync()` |
-| Edit mode, non-vim, other file | Save → update URL → `driveSync()`                   |
-| View tab (markdown preview)    | Save → update URL → `driveSync()` (no formatting)   |
-| Vim mode (any file)            | Nothing — suppresses browser save only. Use `:w`    |
-| Zen mode                       | Nothing — suppresses browser save only              |
-
-`driveSync()` performs a full sync (same as first-time connection, minus auth if token is valid).
+Only the **leader tab** (the last focused/visible one) syncs; a tab opened in
+the background does not claim leadership until it is focused. Local saves are
+not tied to leadership — every tab writes localStorage (merge-on-write).
 
 ---
 
-## 4. Vim `:w` / `:wq`
+## Auth
 
-**Trigger:** User types `:w` or `:wq` in vim command bar.
-
-```
-vimWriteBuffer()
-  → note.content = editor.value
-  → saveState()
-  → scheduleDriveUpload(true)        immediate push (no 30s wait)
-    → drivePushQuiet()
-  → vimState.bufferDirty = false
-
-:wq also calls toggleVim() to exit vim mode.
-```
+- `gdriveAuth()` — interactive popup. Only called from `driveSync()`, i.e.
+  from a click or key handler. Has `error_callback`, so a closed or blocked
+  popup rejects instead of hanging.
+- `silentTokenRefresh()` — `prompt: ""`, never shows UI, 10s timeout. Used by
+  `gdriveFetch()` when the token is missing/expired, on 401 (one retry), and by
+  the refresh timer 5 min before expiry.
+- If silent refresh fails, the sync fails and the UI shows "sync failed".
+  Recovery is always user-initiated (reconnect, Ctrl+S).
+- GIS is preloaded on page load when the user is connected, so a reconnect
+  click can open the popup immediately.
 
 ---
 
-## 5. File Switching
-
-**Trigger:** User clicks a different note in the sidebar.
-
-- **Vim mode:** blocks switch if buffer is dirty ("No write since last change")
-- **Non-vim:** previous note's autosave debounce timer still runs; upload happens via the 30s `scheduleDriveUpload` timer
-
-No immediate drive push on file switch in non-vim mode.
-
----
-
-## 6. Token Refresh (background timer)
-
-**Trigger:** Timer fires 5 minutes before token expiry.
-
-```
-scheduleTokenRefresh()
-  → setTimeout(async () => {
-      silentTokenRefresh()           requestAccessToken({ prompt: "" })
-        → persistToken()             update token + expiry
-        → scheduleTokenRefresh()     re-schedule for next expiry
-    }, tokenExpiry - 5min)
-
-On failure:
-  → clearToken()
-  → showSyncFailed()                red dot, "sync failed", "reconnect" menu
-```
-
-Silent refresh uses `prompt: ""` — no popup. If Google's session cookie is still valid, it works transparently. If not, it fails and shows the red dot. Recovery happens on next tab resume (see below).
-
----
-
-## 7. Tab Resume (returning to backgrounded tab)
-
-**Trigger:** `visibilitychange` (tab visible) or `focus` event.
-
-```
-onTabResume()
-  → debounce (5s minimum between checks)
-  → reset stuck blinking state (syncDotCount = 0)
-
-  if token expired:
-    → try silentTokenRefresh()       no popup
-    → catch: try gdriveAuth()        interactive popup (user is back, ok to prompt)
-    → catch: showSyncFailed()        red dot
-    → on success: showSyncConnected() + driveSyncQuiet()
-
-  if token valid:
-    → driveSyncQuiet()               pull remote changes
-```
-
-This is the main recovery path. Browsers throttle/freeze timers in background tabs, so the scheduled token refresh may never fire. Tab resume detects this and re-authenticates.
-
----
-
-## 8. Page Load — Valid Token
-
-**Trigger:** Page load, `restoreToken()` returns `"ok"`.
-
-```
-gdriveConnected = true
-showSyncConnected()                  green dot, "sync"
-scheduleTokenRefresh()               schedule next refresh
-...
-if (gdriveConnected && gdriveToken)
-  → driveSyncQuiet()                 pull remote changes
-```
-
----
-
-## 9. Page Load — Expired Token
-
-**Trigger:** Page load, `restoreToken()` returns `"expired"`.
-
-Token can be expired because:
-
-- Token in localStorage has passed its expiry
-- Token was cleared, but `notepad_gdrive_connected` flag is still `"true"`
-
-```
-gdriveConnected = true
-showSyncFailed()                     red dot immediately (don't block init)
-
-Background (non-blocking):
-  → try silentTokenRefresh()
-  → on success: showSyncConnected() + driveSyncQuiet()
-  → on failure: stay in sync failed (no interactive popup)
-
-User must re-auth manually via Ctrl+S or sync menu.
-This avoids competing auth popups if the user initiates
-sync themselves while a background popup is pending.
-```
-
----
-
-## 10. Sign Out
-
-**Trigger:** User clicks "disconnect" in sync menu.
+## Sign out
 
 ```
 driveSignOut()
-  → google.accounts.oauth2.revoke()  revoke token on Google's servers
-  → clearToken()                     delete from localStorage
-  → gdriveConnected = false
-  → localStorage.removeItem("notepad_gdrive_connected")
-  → clear all timers
-  → hideSyncConnected()              hide sync UI, show "sync google drive" button
+  → syncEpoch++                      in-flight syncs abort at their next step
+                                     and cannot re-mark the app as connected
+  → revoke token (loads GIS if needed)
+  → clear token and connected flag     (sync base is kept for reconnects)
+  → hide sync UI
 ```
 
-Local notes are **not** deleted — they remain in the browser.
-
----
-
-## Error Recovery Paths
-
-### gdriveFetch() — 401 handling
-
-Every Drive API call goes through `gdriveFetch()` which:
-
-1. Checks if token is expired before the request → calls `gdriveAuth()` if so
-2. On 401 response → clears token, calls `gdriveAuth()`, retries once
-3. If retry fails → throws error to caller
-
-### Stuck blinking dot
-
-`onTabResume()` always resets `syncDotCount = 0` and removes the `syncing` class, preventing stuck blinks from backgrounded tabs.
-
-### Multiple concurrent syncs
-
-`syncDotCount` tracks nested sync operations. The dot only stops blinking when all syncs complete, with a 900ms minimum visible time.
-
-`gdriveUploading` flag prevents concurrent uploads — calls to `drivePushQuiet()` while an upload is in flight are silently dropped.
-
-### No competing auth popups
-
-Init and tab resume only attempt `silentTokenRefresh()` (no popup). If silent refresh fails, the app stays in "sync failed" — it does **not** open an interactive auth popup in the background. This prevents a race where a background popup's `clearToken()` wipes a token that the user just obtained via Ctrl+S or the sync menu.
-
-Recovery from "sync failed" is always user-initiated: Ctrl+S (edit or view mode, non-vim), sync menu → "reconnect", or `:w` (vim mode).
+Other tabs see `notepad_gdrive_connected` removed (storage event) and sign out
+locally. Likewise, a connect or token refresh in one tab is adopted by the
+others. Local notes are **not** deleted.
 
 ---
 
@@ -239,59 +124,34 @@ Recovery from "sync failed" is always user-initiated: Ctrl+S (edit or view mode,
 | Blink minimum time     | 900ms               | One full animation cycle      |
 | Tab resume debounce    | 5s                  | Prevent double-fire           |
 | Checkmark duration     | 2s                  | ✔ shown before reverting to ● |
-| Blink animation cycle  | 0.9s                | LED effect                    |
+| Version-check retries  | 3                   | Concurrent writers            |
 
 ---
 
 ## Storage Keys
 
-| Key                        | Content           | Lifecycle                                        |
-| -------------------------- | ----------------- | ------------------------------------------------ |
-| `notepad_gdrive_token`     | `{token, expiry}` | Set on auth, cleared on expiry/signout           |
-| `notepad_gdrive_connected` | `"true"`          | Set on first successful sync, cleared on signout |
-
-`notepad_gdrive_connected` survives token expiry — ensures the app remembers the user opted into sync even if the token is gone.
+| Key                        | Content                        | Lifecycle                                |
+| -------------------------- | ------------------------------ | ---------------------------------------- |
+| `notepad_gdrive_token`     | `{token, expiry}`              | Set on auth, cleared on expiry/sign-out  |
+| `notepad_gdrive_connected` | `"true"`                       | Set on connect, cleared on sign-out      |
+| `notepad_gdrive_base`      | `{notes: {id: crc32}, syncedAt}` | Per device; written after each sync    |
 
 ---
 
 ## Data Synced to Drive
 
-Single JSON file (`note-app-data.json`) in `appDataFolder`:
-
 ```json
 {
-  "notes": [...],
-  "deletedIds": ["id1", "id2", ...],
-  "settings": {
-    "wrap": "true/false",
-    "vim": "true/false",
-    "sidebarWidth": "number"
-  }
+  "notes": [{ "id", "name", "content", "updatedAt", "pinned"? }],
+  "activeId": "…",
+  "deletedIds": ["id1", "id2"],
+  "deletedAt": { "id1": 1760000000000 },
+  "settings": { "wrap": "true", "vim": "false", "sidebarWidth": "350" }
 }
 ```
 
-Settings: Google Drive is the source of truth (remote overwrites local on pull).
-Notes: timestamp-based merge (newer wins per note).
-Deletions: `deletedIds` is a union of both local and remote deleted IDs. Notes whose ID appears in `deletedIds` are never re-added from the other side.
+Settings are per device: remote settings are applied only when this device has
+none yet (first connect).
 
----
-
-## 11. Note Deletion & Sync
-
-**Trigger:** User deletes a note via sidebar or Ctrl+Shift+D.
-
-```
-confirmDelete(id)
-  → state.deletedIds.push(id)           record deletion
-  → state.notes.splice(idx, 1)          remove from local
-  → saveState()                          persist to localStorage
-  → scheduleDriveUpload(true)            immediate push to Drive
-```
-
-The `deletedIds` array is included in the Drive payload. During merge (both `driveSync` and `driveSyncQuiet`):
-
-1. Remote `deletedIds` and local `deletedIds` are unioned
-2. Local notes whose ID is in remote `deletedIds` are removed
-3. Remote notes whose ID is in local `deletedIds` are skipped
-
-This prevents deleted notes from reappearing when syncing across devices or after a race between deletion and sync.
+`deletedIds` only grows. Tombstones from older app versions have no
+`deletedAt`; for those, deletion wins when there is no sync history.

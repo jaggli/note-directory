@@ -297,7 +297,7 @@ const WRAP_KEY = "notepad_wrap";
 const VIM_KEY = "notepad_vim";
 const SWAP_PREFIX = "notepad_swap_";
 const TAB_LEADER_KEY = "notepad_tab_leader";
-let state = { notes: [], activeId: null, deletedIds: [] };
+let state = { notes: [], activeId: null, deletedIds: [], deletedAt: {} };
 let saveTimeout = null;
 const tabId =
   Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -340,6 +340,8 @@ function mergeStoredState(stored) {
   }
   state.notes = notes.filter((n) => !deleted.has(n.id));
   state.deletedIds = [...deleted];
+  for (const [id, t] of Object.entries(stored.deletedAt || {}))
+    state.deletedAt[id] = Math.max(state.deletedAt[id] || 0, t);
   if (!getActiveNote()) state.activeId = state.notes[0]?.id ?? null;
   return changed;
 }
@@ -381,6 +383,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) state = JSON.parse(raw);
     if (!state.deletedIds) state.deletedIds = [];
+    if (!state.deletedAt) state.deletedAt = {};
   } catch {}
 }
 
@@ -3267,8 +3270,8 @@ async function confirmDelete(id) {
   if (idx === -1) return;
   deleteSwap(id);
   delete histories[id];
-  if (!state.deletedIds) state.deletedIds = [];
   state.deletedIds.push(id);
+  state.deletedAt[id] = Date.now();
   state.notes.splice(idx, 1);
   if (state.activeId === id) {
     state.activeId = state.notes.length ? state.notes[0].id : null;
@@ -6414,6 +6417,19 @@ window.addEventListener("storage", (e) => {
       else renderNoteList();
     } catch {}
   }
+  // Drive connect / token refresh / sign-out in another tab
+  if (e.key === GDRIVE_CONNECTED_KEY || e.key === GDRIVE_TOKEN_KEY) {
+    if (e.key === GDRIVE_CONNECTED_KEY && !e.newValue) {
+      if (gdriveConnected) driveSignOut(false);
+    } else if (
+      localStorage.getItem(GDRIVE_CONNECTED_KEY) === "true" &&
+      restoreToken() === "ok"
+    ) {
+      gdriveConnected = true;
+      showSyncConnected();
+      scheduleTokenRefresh();
+    }
+  }
   if (e.key === SIDEBAR_WIDTH_KEY && e.newValue) {
     sidebar.style.setProperty("--sidebar-width", e.newValue + "px");
   }
@@ -6450,8 +6466,6 @@ function reclaimLeadership() {
   const before = activeNoteVersion();
   if (mergeFromStorage() && activeNoteVersion() !== before) render();
   claimLeadership();
-  // Resume Drive sync if connected
-  if (gdriveConnected) driveSyncQuiet();
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -6956,26 +6970,28 @@ function loadGIS() {
 
 let gdriveRefreshTimer = null;
 
+// Never opens a popup: only succeeds if Google still has a session
 async function silentTokenRefresh() {
   await loadGIS();
   await new Promise((resolve, reject) => {
     let settled = false;
-    const timeout = setTimeout(() => {
+    const done = (fn) => (arg) => {
+      if (settled) return;
       settled = true;
-      reject(new Error("timeout"));
-    }, 10000);
+      clearTimeout(timeout);
+      fn(arg);
+    };
+    const timeout = setTimeout(done(reject), 10000, new Error("timeout"));
     const client = google.accounts.oauth2.initTokenClient({
       client_id: GDRIVE_CLIENT_ID,
       scope: GDRIVE_SCOPES,
-      callback: (resp) => {
-        clearTimeout(timeout);
-        if (settled) return;
-        settled = true;
+      callback: done((resp) => {
         if (resp.error) return reject(new Error(resp.error));
         persistToken(resp.access_token, resp.expires_in);
         scheduleTokenRefresh();
         resolve();
-      },
+      }),
+      error_callback: done((err) => reject(new Error(err?.type || "auth"))),
     });
     client.requestAccessToken({ prompt: "" });
   });
@@ -6997,6 +7013,8 @@ function scheduleTokenRefresh() {
   }, refreshIn);
 }
 
+// Interactive sign-in — only call from a click/key handler, or the
+// browser blocks the popup
 function gdriveAuth() {
   if (gdriveToken && Date.now() < gdriveTokenExpiry)
     return Promise.resolve();
@@ -7014,6 +7032,8 @@ function gdriveAuth() {
             showSyncConnected();
             resolve();
           },
+          // Popup closed or blocked — without this the promise never settles
+          error_callback: (err) => reject(new Error(err?.type || "auth")),
         });
         client.requestAccessToken();
       }),
@@ -7021,43 +7041,120 @@ function gdriveAuth() {
 }
 
 async function gdriveFetch(url, opts = {}) {
-  // If token is already expired, try to re-auth first
   if (!gdriveToken || Date.now() >= gdriveTokenExpiry) {
-    await gdriveAuth();
+    await silentTokenRefresh();
   }
-  const res = await fetch(url, {
-    ...opts,
-    headers: {
-      Authorization: "Bearer " + gdriveToken,
-      ...opts.headers,
-    },
-  });
-  if (res.status === 401) {
-    // Token rejected — clear and re-auth once
-    clearToken();
-    await gdriveAuth();
-    const retry = await fetch(url, {
+  const send = () =>
+    fetch(url, {
       ...opts,
-      headers: {
-        Authorization: "Bearer " + gdriveToken,
-        ...opts.headers,
-      },
+      headers: { Authorization: "Bearer " + gdriveToken, ...opts.headers },
     });
-    if (!retry.ok) throw new Error("Drive error: " + retry.status);
-    return retry;
+  let res = await send();
+  if (res.status === 401) {
+    // Token rejected — refresh silently and retry once
+    clearToken();
+    await silentTokenRefresh();
+    res = await send();
   }
   if (!res.ok) throw new Error("Drive error: " + res.status);
   return res;
 }
 
-async function gdriveFindFile() {
+const GDRIVE_API = "https://www.googleapis.com/drive/v3/files";
+const GDRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files";
+
+// Oldest first — if devices raced to create the file, the oldest is canonical
+async function gdriveListFiles() {
   const res = await gdriveFetch(
-    "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D'" +
-      GDRIVE_FILE_NAME +
-      "'&fields=files(id,modifiedTime)",
+    GDRIVE_API +
+      "?spaces=appDataFolder&orderBy=createdTime&fields=files(id,version)&q=" +
+      encodeURIComponent(`name='${GDRIVE_FILE_NAME}'`),
   );
-  const data = await res.json();
-  return data.files?.[0] || null;
+  return (await res.json()).files || [];
+}
+
+async function gdriveVersion(id) {
+  const res = await gdriveFetch(GDRIVE_API + "/" + id + "?fields=version");
+  return (await res.json()).version;
+}
+
+async function gdriveDownload(id) {
+  const res = await gdriveFetch(GDRIVE_API + "/" + id + "?alt=media");
+  return parseDrivePayload(await res.json().catch(() => null));
+}
+
+async function gdriveUpload(fileId, payload) {
+  if (fileId) {
+    await gdriveFetch(GDRIVE_UPLOAD + "/" + fileId + "?uploadType=media", {
+      method: "PATCH",
+      body: payload,
+      headers: { "Content-Type": "application/json" },
+    });
+    return;
+  }
+  const metadata = JSON.stringify({
+    name: GDRIVE_FILE_NAME,
+    parents: ["appDataFolder"],
+  });
+  const boundary = "---noteapp" + Date.now();
+  const body =
+    "--" +
+    boundary +
+    "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" +
+    metadata +
+    "\r\n--" +
+    boundary +
+    "\r\nContent-Type: application/json\r\n\r\n" +
+    payload +
+    "\r\n--" +
+    boundary +
+    "--";
+  await gdriveFetch(GDRIVE_UPLOAD + "?uploadType=multipart", {
+    method: "POST",
+    headers: { "Content-Type": "multipart/related; boundary=" + boundary },
+    body,
+  });
+}
+
+// Remote data is untrusted: drop anything that would break the editor
+function parseDrivePayload(data) {
+  const isNote = (n) =>
+    n &&
+    typeof n.id === "string" &&
+    typeof n.name === "string" &&
+    typeof n.content === "string";
+  const notes = Array.isArray(data?.notes) ? data.notes.filter(isNote) : [];
+  for (const n of notes) if (typeof n.updatedAt !== "number") n.updatedAt = 0;
+  const deletedAt = {};
+  if (data?.deletedAt && typeof data.deletedAt === "object")
+    for (const [id, t] of Object.entries(data.deletedAt))
+      if (typeof t === "number") deletedAt[id] = t;
+  return {
+    notes,
+    deletedIds: Array.isArray(data?.deletedIds)
+      ? data.deletedIds.filter((id) => typeof id === "string")
+      : [],
+    deletedAt,
+    settings: data?.settings || null,
+  };
+}
+
+// Several files (devices raced to create one): newest note version wins
+function combineDrivePayloads(payloads) {
+  const out = parseDrivePayload({});
+  const byId = new Map();
+  for (const p of payloads) {
+    for (const n of p.notes) {
+      const prev = byId.get(n.id);
+      if (!prev || n.updatedAt > prev.updatedAt) byId.set(n.id, n);
+    }
+    out.deletedIds.push(...p.deletedIds);
+    Object.assign(out.deletedAt, p.deletedAt);
+    out.settings ||= p.settings;
+  }
+  out.notes = [...byId.values()];
+  out.deletedIds = [...new Set(out.deletedIds)];
+  return out;
 }
 
 function gatherDrivePayload() {
@@ -7098,7 +7195,7 @@ function applyDriveSettings(settings) {
     }
     updateCursorPos();
   }
-  if (settings.sidebarWidth) {
+  if (/^\d+$/.test(settings.sidebarWidth || "")) {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, settings.sidebarWidth);
     sidebar.style.setProperty(
       "--sidebar-width",
@@ -7107,49 +7204,257 @@ function applyDriveSettings(settings) {
   }
 }
 
-async function gdriveUploadState() {
-  const payload = gatherDrivePayload();
-  const existing = await gdriveFindFile();
-  if (existing) {
-    await gdriveFetch(
-      "https://www.googleapis.com/upload/drive/v3/files/" +
-        existing.id +
-        "?uploadType=media",
-      {
-        method: "PATCH",
-        body: payload,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
-  } else {
-    const metadata = JSON.stringify({
-      name: GDRIVE_FILE_NAME,
-      parents: ["appDataFolder"],
-    });
-    const boundary = "---noteapp" + Date.now();
-    const body =
-      "--" +
-      boundary +
-      "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" +
-      metadata +
-      "\r\n--" +
-      boundary +
-      "\r\nContent-Type: application/json\r\n\r\n" +
-      payload +
-      "\r\n--" +
-      boundary +
-      "--";
-    await gdriveFetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "multipart/related; boundary=" + boundary,
-        },
-        body,
-      },
-    );
+// ── Merge ───────────────────────────────────────────
+
+// Per device: fingerprint of every note as of the last successful sync.
+// This is the common ancestor that tells which side changed a note.
+const GDRIVE_BASE_KEY = "notepad_gdrive_base";
+
+function noteFingerprint(n) {
+  return crc32(
+    new TextEncoder().encode(
+      n.name + "\0" + n.content + "\0" + (n.pinned ? 1 : 0),
+    ),
+  );
+}
+
+function loadSyncBase() {
+  try {
+    const b = JSON.parse(localStorage.getItem(GDRIVE_BASE_KEY));
+    if (b && b.notes) return b;
+  } catch {}
+  return { notes: {}, syncedAt: 0 };
+}
+
+function conflictName(name) {
+  const dot = name.lastIndexOf(".");
+  const copy =
+    dot > 0
+      ? name.slice(0, dot) + " (conflict)" + name.slice(dot)
+      : name + " (conflict)";
+  return state.notes.some((n) => n.name === copy) ? uniqueName(copy) : copy;
+}
+
+// Three-way merge of local state with `remote`. A side that didn't change a
+// note since the last sync yields to the other; if both changed it, both
+// versions are kept. Edits made after a deletion win over the deletion.
+// Mutates `state`; returns true if remote lacks something we have.
+function mergeDriveState(remote, base) {
+  const now = Date.now();
+  // true/false, or null when this device has no sync history for the note
+  const changed = (n) => {
+    const fp = base.notes[n.id];
+    if (fp !== undefined) return fp !== noteFingerprint(n);
+    return base.syncedAt ? n.updatedAt > base.syncedAt : null;
+  };
+  const freshCopy = (n, name) => ({
+    ...n,
+    id: crypto.randomUUID(),
+    name: name ?? n.name,
+    updatedAt: now,
+  });
+
+  const deletedAt = { ...remote.deletedAt };
+  for (const [id, t] of Object.entries(state.deletedAt || {}))
+    deletedAt[id] = Math.max(deletedAt[id] || 0, t);
+  const localDeleted = new Set(state.deletedIds);
+  const remoteDeleted = new Set(remote.deletedIds);
+  // Edit-after-delete check; legacy tombstones have no timestamp → delete
+  const editedAfterDelete = (n) =>
+    changed(n) ?? n.updatedAt > (deletedAt[n.id] ?? Infinity);
+
+  const remoteById = new Map(remote.notes.map((n) => [n.id, n]));
+  const localIds = new Set(state.notes.map((n) => n.id));
+  const merged = [];
+  const added = [];
+
+  for (const local of state.notes) {
+    const r = remoteById.get(local.id);
+    if (!r) {
+      if (!remoteDeleted.has(local.id)) merged.push(local);
+      else if (editedAfterDelete(local)) added.push(freshCopy(local));
+      continue;
+    }
+    if (noteFingerprint(local) === noteFingerprint(r)) {
+      merged.push(local);
+      continue;
+    }
+    const lc = changed(local);
+    const rc = changed(r);
+    let take = local;
+    if (lc === null || rc === null) {
+      // No sync history on this device — fall back to newest wins
+      if (r.updatedAt > local.updatedAt) take = r;
+    } else if (!lc) {
+      take = r;
+    } else if (rc) {
+      // Both sides changed it: keep the newer, add the other as a copy
+      const [winner, loser] =
+        r.updatedAt > local.updatedAt ? [r, local] : [local, r];
+      take = winner;
+      if (winner.content !== loser.content)
+        added.push(freshCopy(loser, conflictName(loser.name)));
+    }
+    if (take !== local) {
+      // In place — UI closures hold references to note objects. The bump
+      // makes other tabs' merge-on-write adopt it despite clock skew.
+      const updatedAt = Math.max(take.updatedAt, local.updatedAt + 1);
+      for (const k of Object.keys(local)) delete local[k];
+      Object.assign(local, take, { updatedAt });
+    }
+    merged.push(local);
   }
+
+  for (const r of remote.notes) {
+    if (localIds.has(r.id)) continue;
+    if (!localDeleted.has(r.id)) added.push(r);
+    else if (editedAfterDelete(r)) added.push(freshCopy(r));
+  }
+
+  const deleted = new Set([...localDeleted, ...remoteDeleted]);
+  state.notes = [...added, ...merged];
+  state.deletedIds = [...deleted];
+  state.deletedAt = deletedAt;
+  if (!getActiveNote()) state.activeId = state.notes[0]?.id ?? null;
+  sortNotes();
+
+  const remoteFp = new Map(remote.notes.map((n) => [n.id, noteFingerprint(n)]));
+  return (
+    state.notes.length !== remote.notes.length ||
+    state.notes.some((n) => remoteFp.get(n.id) !== noteFingerprint(n)) ||
+    deleted.size !== remoteDeleted.size
+  );
+}
+
+// ── Sync ────────────────────────────────────────────
+
+let gdriveConnected = false;
+let gdriveSyncTimeout = null;
+let driveGen = 0; // bumped on every local change that should reach Drive
+let driveSyncedGen = 0;
+let syncEpoch = 0; // bumped on sign-out to abort in-flight syncs
+let syncRunning = null;
+let syncAgain = false;
+
+function scheduleDriveUpload(immediate) {
+  if (!gdriveConnected || !isTabLeader) return;
+  driveGen++;
+  clearTimeout(gdriveSyncTimeout);
+  if (immediate) syncNow();
+  // Batch typing: wait 30s after the last change
+  else gdriveSyncTimeout = setTimeout(syncNow, 30000);
+}
+
+// One sync at a time: concurrent calls coalesce into one follow-up run.
+// The Web Lock also keeps two tabs from syncing at once.
+function syncNow() {
+  if (!gdriveConnected || !isTabLeader) return Promise.resolve();
+  if (syncRunning) {
+    syncAgain = true;
+    return syncRunning;
+  }
+  syncRunning = (async () => {
+    try {
+      do {
+        syncAgain = false;
+        await navigator.locks.request("note-drive-sync", runSync);
+      } while (syncAgain && gdriveConnected);
+    } finally {
+      syncRunning = null;
+    }
+  })();
+  return syncRunning;
+}
+
+async function runSync() {
+  const epoch = syncEpoch;
+  const alive = () => {
+    if (epoch !== syncEpoch) throw new Error("signed out");
+  };
+  setSyncDotSyncing(true);
+  try {
+    let base = loadSyncBase();
+    for (let attempt = 0; ; attempt++) {
+      const gen = driveGen;
+      const files = await gdriveListFiles();
+      alive();
+      const remote = combineDrivePayloads(
+        await Promise.all(files.map((f) => gdriveDownload(f.id))),
+      );
+      alive();
+
+      // Pick up edits other tabs saved, then merge with Drive
+      mergeFromStorage();
+      const before = activeNoteVersion();
+      const needsUpload = mergeDriveState(remote, base);
+      saveState();
+      if (activeNoteVersion() !== before) render();
+      else renderNoteList();
+      if (
+        remote.settings &&
+        !localStorage.getItem(VIM_KEY) &&
+        !localStorage.getItem(WRAP_KEY)
+      )
+        applyDriveSettings(remote.settings);
+
+      const payload = gatherDrivePayload();
+      if (needsUpload || files.length !== 1) {
+        // Another device wrote since we downloaded → merge again
+        if (files[0] && (await gdriveVersion(files[0].id)) !== files[0].version) {
+          if (attempt >= 3) throw new Error("Drive file keeps changing");
+          // We now contain `remote` — it is the ancestor for the next merge
+          base = {
+            notes: Object.fromEntries(
+              remote.notes.map((n) => [n.id, noteFingerprint(n)]),
+            ),
+            syncedAt: Date.now(),
+          };
+          continue;
+        }
+        alive();
+        await gdriveUpload(files[0]?.id, payload);
+        alive();
+        for (const extra of files.slice(1))
+          await gdriveFetch(GDRIVE_API + "/" + extra.id, { method: "DELETE" });
+      }
+
+      const uploaded = JSON.parse(payload).notes;
+      localStorage.setItem(
+        GDRIVE_BASE_KEY,
+        JSON.stringify({
+          notes: Object.fromEntries(
+            uploaded.map((n) => [n.id, noteFingerprint(n)]),
+          ),
+          syncedAt: Date.now(),
+        }),
+      );
+      driveSyncedGen = gen;
+      // Edits that arrived during the sync go out with the next run
+      if (driveGen !== gen) syncAgain = true;
+      setSyncResult(true);
+      return;
+    }
+  } catch (e) {
+    if (epoch === syncEpoch) setSyncResult(false);
+  } finally {
+    setSyncDotSyncing(false);
+  }
+}
+
+// User-initiated (menu, Ctrl+S): may open the sign-in popup
+async function driveSync() {
+  closeAllMenus();
+  try {
+    await gdriveAuth();
+  } catch {
+    setSyncResult(false);
+    return;
+  }
+  gdriveConnected = true;
+  localStorage.setItem(GDRIVE_CONNECTED_KEY, "true");
+  claimLeadership();
+  showSyncConnected();
+  await syncNow();
 }
 
 let syncDotCount = 0;
@@ -7184,9 +7489,9 @@ function setSyncResult(success) {
     const dot = document.querySelector(".sync-dot");
     if (dot) {
       dot.classList.remove("syncing");
-      dot.textContent = "\u2714";
+      dot.textContent = "✔";
       syncOkTimer = setTimeout(() => {
-        dot.textContent = "\u25CF";
+        dot.textContent = "●";
       }, 2000);
     }
   } else {
@@ -7194,233 +7499,23 @@ function setSyncResult(success) {
   }
 }
 
-async function driveSync() {
-  closeAllMenus();
-  setSyncDotSyncing(true);
-
-  try {
-    await gdriveAuth();
-
-    // Load remote state
-    const file = await gdriveFindFile();
-    let remoteNotes = [];
-    let remoteSettings = null;
-    let remoteDeletedIds = [];
-    if (file) {
-      const res = await gdriveFetch(
-        "https://www.googleapis.com/drive/v3/files/" +
-          file.id +
-          "?alt=media",
-      );
-      const data = await res.json();
-      if (data.notes) remoteNotes = data.notes;
-      if (data.settings) remoteSettings = data.settings;
-      if (data.deletedIds) remoteDeletedIds = data.deletedIds;
-    }
-
-    // Merge deleted IDs from both sides
-    const remoteDeleted = new Set(remoteDeletedIds);
-    const localDeleted = new Set(state.deletedIds || []);
-    const allDeleted = new Set([...localDeleted, ...remoteDeleted]);
-    state.deletedIds = [...allDeleted];
-
-    const localById = new Map(state.notes.map((n) => [n.id, n]));
-    const remoteById = new Map(remoteNotes.map((n) => [n.id, n]));
-    const merged = [];
-
-    // Process local notes
-    for (const local of state.notes) {
-      // Skip notes deleted on remote
-      if (remoteDeleted.has(local.id)) continue;
-      const remote = remoteById.get(local.id);
-      if (!remote) {
-        // Only local — keep it
-        merged.push(local);
-      } else if (
-        local.content === remote.content &&
-        local.name === remote.name
-      ) {
-        // Same — keep local (preserve any local-only fields), use latest timestamp
-        merged.push({
-          ...local,
-          updatedAt: Math.max(
-            local.updatedAt || 0,
-            remote.updatedAt || 0,
-          ),
-        });
-      } else {
-        // Different content or name — newer wins
-        const localTime = local.updatedAt || 0;
-        const remoteTime = remote.updatedAt || 0;
-        merged.push(remoteTime > localTime ? remote : local);
-      }
-    }
-
-    // Add remote-only notes (skip locally deleted ones)
-    const deletedSet = new Set(state.deletedIds || []);
-    for (const remote of remoteNotes) {
-      if (!localById.has(remote.id) && !deletedSet.has(remote.id)) {
-        merged.push(remote);
-      }
-    }
-
-    state.notes = merged;
-    sortNotes();
-    saveState();
-
-    // Settings: local settings are authoritative (per-device)
-    // Remote settings only apply on first connect (no local settings yet)
-    if (
-      remoteSettings &&
-      !localStorage.getItem(VIM_KEY) &&
-      !localStorage.getItem(WRAP_KEY)
-    ) {
-      applyDriveSettings(remoteSettings);
-    }
-
-    render();
-
-    // Upload merged state to Drive (includes deletedIds)
-    await gdriveUploadState();
-
-    gdriveConnected = true;
-    gdriveDirty = false;
-    localStorage.setItem(GDRIVE_CONNECTED_KEY, "true");
-    showSyncConnected();
-
-    setSyncDotSyncing(false);
-    setSyncResult(true);
-  } catch (e) {
-    setSyncDotSyncing(false);
-    setSyncResult(false);
-  }
-}
-
-let gdriveConnected = false;
-let gdriveDirty = false;
-let gdriveSyncTimeout = null;
-let gdriveUploading = false;
-
-function scheduleDriveUpload(immediate) {
-  if (!gdriveConnected || !isTabLeader) return;
-  gdriveDirty = true;
-  clearTimeout(gdriveSyncTimeout);
-  if (immediate) {
-    drivePushQuiet();
-  } else {
-    // Defensive: wait 30s after last change
-    gdriveSyncTimeout = setTimeout(drivePushQuiet, 30000);
-  }
-}
-
-async function driveSyncQuiet() {
-  if (!gdriveConnected || !isTabLeader) return;
-  setSyncDotSyncing(true);
-  try {
-    const file = await gdriveFindFile();
-    if (!file) return;
-    const res = await gdriveFetch(
-      "https://www.googleapis.com/drive/v3/files/" +
-        file.id +
-        "?alt=media",
-    );
-    const data = await res.json();
-    if (!data.notes) return;
-    const remoteNotes = data.notes;
-    const remoteSettings = data.settings || null;
-    const remoteDeleted = new Set(data.deletedIds || []);
-
-    // Merge deleted IDs from both sides
-    const localDeleted = new Set(state.deletedIds || []);
-    const allDeleted = new Set([...localDeleted, ...remoteDeleted]);
-    state.deletedIds = [...allDeleted];
-
-    const localById = new Map(state.notes.map((n) => [n.id, n]));
-    const remoteById = new Map(remoteNotes.map((n) => [n.id, n]));
-    const merged = [];
-    let changed = false;
-    let localNewer = false;
-
-    for (const local of state.notes) {
-      // Skip notes deleted on remote
-      if (remoteDeleted.has(local.id)) {
-        changed = true;
-        continue;
-      }
-      const remote = remoteById.get(local.id);
-      if (!remote) {
-        merged.push(local);
-      } else if (
-        local.content === remote.content &&
-        local.name === remote.name
-      ) {
-        merged.push(local);
-      } else {
-        const remoteTime = remote.updatedAt || 0;
-        const localTime = local.updatedAt || 0;
-        if (remoteTime > localTime) {
-          merged.push(remote);
-          changed = true;
-        } else {
-          merged.push(local);
-          if (localTime > remoteTime) localNewer = true;
-        }
-      }
-    }
-
-    // Add remote-only notes (skip locally deleted ones)
-    const deletedSet = new Set(state.deletedIds || []);
-    for (const remote of remoteNotes) {
-      if (!localById.has(remote.id) && !deletedSet.has(remote.id)) {
-        merged.push(remote);
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      state.notes = merged;
-      sortNotes();
-      saveState();
-      render();
-    }
-
-    // Push to Drive if any local notes were newer
-    if (localNewer) drivePushQuiet();
-    else {
-      setSyncDotSyncing(false);
-      setSyncResult(true);
-    }
-  } catch {
-    setSyncDotSyncing(false);
-    setSyncResult(false);
-  }
-}
-
-async function drivePushQuiet() {
-  if (!gdriveDirty || gdriveUploading || !isTabLeader) return;
-  gdriveUploading = true;
-  setSyncDotSyncing(true);
-  try {
-    await gdriveUploadState();
-    gdriveDirty = false;
-    setSyncResult(true);
-  } catch {
-    setSyncResult(false);
-  } finally {
-    gdriveUploading = false;
-    setSyncDotSyncing(false);
-  }
-}
-
-function driveSignOut() {
+// `broadcast` is false when reacting to a sign-out in another tab
+function driveSignOut(broadcast = true) {
   closeSyncMenu();
-  if (gdriveToken && gisLoaded) {
-    google.accounts.oauth2.revoke(gdriveToken);
-  }
-  clearToken();
+  syncEpoch++;
+  const token = gdriveToken;
+  if (broadcast && token)
+    loadGIS()
+      .then(() => google.accounts.oauth2.revoke(token))
+      .catch(() => {});
+  gdriveToken = null;
+  gdriveTokenExpiry = 0;
   gdriveConnected = false;
-  gdriveDirty = false;
-  localStorage.removeItem(GDRIVE_CONNECTED_KEY);
+  if (broadcast) {
+    clearToken();
+    // The sync base is kept: on reconnect it still tells which side changed
+    localStorage.removeItem(GDRIVE_CONNECTED_KEY);
+  }
   clearTimeout(gdriveSyncTimeout);
   clearTimeout(gdriveRefreshTimer);
   hideSyncConnected();
@@ -7732,26 +7827,17 @@ async function init() {
   if (document.visibilityState === "visible") claimLeadership();
 
   // Restore Google Drive session
+  // Expired tokens are refreshed silently by the first sync; if that
+  // fails the user reconnects via the sync menu (never a surprise popup)
   const tokenState = restoreToken();
-  if (tokenState === "ok") {
+  if (tokenState !== "none") {
     gdriveConnected = true;
-    showSyncConnected();
-    scheduleTokenRefresh();
-  } else if (tokenState === "expired") {
-    gdriveConnected = true;
-    showSyncFailed();
-    // Attempt silent refresh in background (don't block init)
-    // If silent refresh fails, stay in failed state — user can
-    // re-auth via Ctrl+S or sync menu (no competing popup)
-    silentTokenRefresh()
-      .then(() => {
-        showSyncConnected();
-        driveSyncQuiet();
-      })
-      .catch(() => {
-        // Stay in sync failed — don't open interactive popup on init
-        // to avoid competing with user-initiated auth (Ctrl+S, sync menu)
-      });
+    if (tokenState === "ok") {
+      showSyncConnected();
+      scheduleTokenRefresh();
+    } else showSyncFailed();
+    // Preload so a later reconnect click can open the popup immediately
+    loadGIS().catch(() => {});
   }
   const loaded = await loadFromUrl();
   if (!loaded && state.notes.length === 0 && isFirstVisit) {
@@ -7781,8 +7867,7 @@ async function init() {
     });
   }
 
-  // Auto-sync from Google Drive on load (only if token is valid)
-  if (gdriveConnected && gdriveToken) driveSyncQuiet();
+  if (gdriveConnected) syncNow();
 }
 
 // Button clicks — CSP forbids inline onclick handlers
@@ -7805,7 +7890,7 @@ const clickActions = {
   "close-search": closeSearch,
   help: openHelp,
   "drive-sync": driveSync,
-  "drive-sign-out": driveSignOut,
+  "drive-sign-out": () => driveSignOut(),
   "tab-edit": () => switchMdTab("edit", true),
   "tab-view": () => switchMdTab("view", true),
   "tab-zen": () => switchMdTab("zen", true),
@@ -7831,33 +7916,12 @@ async function onTabResume() {
   const now = Date.now();
   if (now - lastSyncCheck < 5000) return;
   lastSyncCheck = now;
-
-  // Reset stuck blinking state
-  syncDotCount = 0;
-  clearTimeout(syncDotTimer);
-  document.querySelector(".sync-dot")?.classList.remove("syncing");
-
-  if (!gdriveToken || Date.now() >= gdriveTokenExpiry) {
-    // Token expired — try silent refresh, fall back to interactive auth
-    try {
-      await silentTokenRefresh();
-    } catch {
-      try {
-        await gdriveAuth();
-      } catch {
-        showSyncFailed();
-        return;
-      }
-    }
-    showSyncConnected();
-    driveSyncQuiet();
-  } else {
-    // Token still valid — catch up
-    driveSyncQuiet();
-  }
+  syncNow();
 }
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) onTabResume();
+  // Leaving the tab: push pending edits now instead of in 30s
+  else if (gdriveConnected && driveGen !== driveSyncedGen) syncNow();
 });
 window.addEventListener("focus", onTabResume);
 
