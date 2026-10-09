@@ -7,16 +7,16 @@ your browser. No data is collected, transmitted, or stored
 on any server. No signup, no backend, no dependencies, no BS.
 Just open the page and start typing.
 
-Built as a single `index.html` file with vanilla JS and
-CSS (~9900 lines). Your notes are stored in `localStorage`
+Built as `index.html` + `app.js` with vanilla JS and
+CSS (~10k lines). Your notes are stored in `localStorage`
 by default. Optionally, sign in with Google to sync notes
 across devices via Google Drive.
 
 ## How it works
 
-- **Single file**: The entire app is one self-contained
-  HTML file (~9900 lines). No build step, no bundler,
-  no framework.
+- **Two files**: `index.html` (markup + CSS) and `app.js`.
+  No build step, no bundler, no framework. The script is
+  external so the CSP can forbid inline scripts.
 - **Local storage**: Notes are persisted in your
   browser's `localStorage` (5MB limit). A storage meter
   appears when usage exceeds 200kB.
