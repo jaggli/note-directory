@@ -141,3 +141,25 @@ test("Alt+Up/Down moves lines in vim normal mode too", async ({ page }) => {
   });
   expect(r).toBe("two\none\nthree");
 });
+
+for (const tab of ["view", "zen"]) {
+  test(`unsaved vim edits survive switching to ${tab} and back`, async ({ page }) => {
+    await openApp(page);
+    await page.evaluate(() => {
+      createNote();
+      getActiveNote().name = "notes.md";
+      getActiveNote().content = "";
+      render();
+      if (!vimState.enabled) toggleVim();
+    });
+    await page.click("#editor");
+    await page.keyboard.type("ihello world");
+    await page.keyboard.press("Escape");
+    expect(await page.evaluate(() => vimState.bufferDirty)).toBe(true);
+    await page.click(tab === "zen" ? "#mdTabZen" : "#mdTabView");
+    expect(await page.locator("#mdPreview").textContent()).toContain("hello world");
+    await page.click(tab === "zen" ? ".zen-close-btn" : "#mdTabEdit");
+    expect(await page.evaluate(() => editor.value)).toBe("hello world");
+    expect(await page.evaluate(() => getActiveNote().content)).toBe("hello world");
+  });
+}

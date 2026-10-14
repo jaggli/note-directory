@@ -2720,6 +2720,11 @@ function switchMdTab(tab, pushHistory) {
       location.href,
     );
   }
+  // Preview renders note.content and edit reloads it — save the vim buffer
+  // first or unsaved edits vanish
+  if (tab !== "edit" && vimState.enabled && vimState.bufferDirty) {
+    vimWriteBuffer();
+  }
   zenModeActive = tab === "zen";
   mdViewActive = tab === "view" || tab === "zen";
   mdTabEdit.classList.toggle("active", tab === "edit");
