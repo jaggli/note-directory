@@ -1,22 +1,28 @@
-# note — minimal text editor
+# note — minimal editor
 
 [https://note.directory](https://note.directory)
 
-A private, local-first text editor that runs entirely in
-your browser. No data is collected, transmitted, or stored
+A private, local-first editor for text and drawings that
+runs entirely in your browser. No data is collected, transmitted, or stored
 on any server. No signup, no backend, no dependencies, no BS.
 Just open the page and start typing.
 
-Built as `index.html` + `app.js` with vanilla JS and
-CSS (~10k lines). Your notes are stored in `localStorage`
+Built as `index.html` + `app.js` (+ `draw.js` for
+drawings) with vanilla JS and CSS (~12k lines). Your notes are stored in `localStorage`
 by default. Optionally, sign in with Google to sync notes
 across devices via Google Drive.
 
 ## How it works
 
-- **Two files**: `index.html` (markup + CSS) and `app.js`.
-  No build step, no bundler, no framework. The script is
-  external so the CSP can forbid inline scripts.
+- **Three files**: `index.html` (markup + CSS), `app.js`
+  and `draw.js` (the drawing canvas, loaded only when a
+  drawing is opened). No build step, no bundler, no
+  framework. Scripts are external so the CSP can forbid
+  inline scripts.
+- **Drawings are text**: a `.draw` note is one line per
+  shape, so it saves, syncs, shares by URL, searches and
+  exports exactly like any other note (see
+  [docs/drawing-format.md](docs/drawing-format.md)).
 - **Local storage**: Notes are persisted in your
   browser's `localStorage` (5MB limit). A storage meter
   appears when usage exceeds 200kB.
@@ -83,6 +89,58 @@ across devices via Google Drive.
 - Delete confirmation dialog
 - Built-in help page (accessible from file menu)
 - Mobile-optimized UI with touch-friendly controls
+
+</details>
+
+<details>
+<summary><strong>Drawings</strong></summary>
+
+Pick **drawing** from the ▾ next to + (or `:draw` in vim).
+Drawings open on a canvas; **file → source** shows the
+text behind them and **zen** shows them read-only.
+
+- Tools: select, hand, pen (pressure-sensitive with a
+  stylus), highlighter, eraser, rectangle, ellipse,
+  diamond, line, arrow, text
+- Move, resize and rotate (shift: keep proportions, 15°
+  steps); marquee and shift-click selection
+- Arrows attach to shapes and follow them; drag the middle
+  handle to curve them; labels on arrows
+- Text inside shapes (double-click), free text anywhere
+- 12 colours, 4 sizes, fill (none / light / solid), solid /
+  dashed / dotted lines, label alignment in boxes (left /
+  center / right, top / middle / bottom), arrowheads per
+  end (open, triangle, dot, diamond, bar), bold / italic /
+  underline for any text
+- Group / ungroup, duplicate, copy & paste (as drawing
+  text), bring forward / backward / to front / to back
+  (keys, right-click menu, style panel), nudge with arrows
+- Toggleable grid with snapping, stored in the drawing
+- Pan and zoom with mouse, trackpad, keyboard or two
+  fingers; zoom to fit
+- Undo/redo per gesture, shared with the note history
+- Copy as PNG, download as SVG; "export all" adds an SVG
+  of every drawing
+- Embed in markdown: `![label](sketch.draw)` or a fenced
+  ` ```draw ` block (travels with a shared link)
+- Search finds the text in drawings
+
+| Key                   | Action                              |
+| --------------------- | ----------------------------------- |
+| v h d e               | select, hand, draw, eraser          |
+| Shift+D               | highlighter                         |
+| r o m l a t           | rectangle, ellipse, diamond, line, arrow, text |
+| Enter / double-click  | write in the selected shape         |
+| Delete                | delete selection                    |
+| Ctrl+D / Ctrl+G       | duplicate / group (Shift: ungroup)  |
+| Alt+↓ / Alt+↑ or [ / ] | backward / forward (Shift: to back / front) |
+| Right-click           | menu: stacking, duplicate, group, delete |
+| Arrows                | nudge (Shift: 10)                   |
+| Space+drag / scroll   | pan                                 |
+| Ctrl+scroll / + / -   | zoom                                |
+| Shift+1 / Shift+0     | zoom to fit / 100%                  |
+| Ctrl+'                | toggle grid                         |
+| Ctrl+B / I / U        | bold / italic / underline (also while typing) |
 
 </details>
 
@@ -161,6 +219,9 @@ See [skills/README.md](skills/README.md) for usage and install instructions.
   `victor-mono/OFL.txt`)
 - **Compression**: deflate-raw via `CompressionStream` /
   `DecompressionStream` APIs for URL sharing
+- **Drawing**: hand-written SVG canvas (no libraries);
+  pressure strokes are filled outlines, input is smoothed
+  and simplified (Ramer–Douglas–Peucker) before saving
 - **Zip**: Custom minimal zip builder (no library)
   for multi-note download
 - **Google Drive**: OAuth 2.0 via Google Identity

@@ -6,19 +6,19 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"
     />
-    <title>note — minimal text editor</title>
+    <title>note — minimal editor</title>
     <meta
       name="description"
-      content="A minimal, local-first text editor in the browser. No signup — your data stays local, unless you say otherwise."
+      content="A minimal, local-first editor for text and drawings in the browser. No signup — your data stays local, unless you say otherwise."
     />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self' https://accounts.google.com; font-src 'self'; img-src 'self' data:; connect-src https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; manifest-src 'self';"
     />
-    <meta property="og:title" content="note — minimal text editor" />
+    <meta property="og:title" content="note — minimal editor" />
     <meta
       property="og:description"
-      content="A minimal, local-first text editor in the browser. No signup — your data stays local, unless you say otherwise."
+      content="A minimal, local-first editor for text and drawings in the browser. No signup — your data stays local, unless you say otherwise."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://note.directory/" />
@@ -699,6 +699,94 @@
 
       .md-preview.visible {
         display: block;
+      }
+
+      /* New-note split button: + creates text, ▾ picks the kind */
+      .new-split {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      .btn-new.btn-new-more {
+        width: 20px;
+        font-size: 11px;
+      }
+
+      .status-hint.btn-new-more {
+        padding: 2px 4px;
+        font-size: 11px;
+      }
+
+      .new-split .new-menu {
+        min-width: 140px;
+        left: 0;
+        right: auto;
+      }
+
+      .sidebar-header .new-menu {
+        top: 100%;
+        bottom: auto;
+        left: auto;
+        right: 0;
+        margin: 4px 0 0;
+      }
+
+      .new-menu kbd {
+        color: var(--gutter);
+        font-size: 12px;
+        margin-left: 8px;
+      }
+
+      .file-menu .draw-only {
+        display: none;
+      }
+
+      .file-menu.is-draw .draw-only {
+        display: block;
+      }
+
+      /* Drawing canvas (UI styles come with draw.js) */
+      .draw-host {
+        display: none;
+        flex: 1;
+        position: relative;
+        container-type: inline-size;
+        overflow: hidden;
+        background: var(--bg);
+        outline: none;
+      }
+
+      .draw-host.visible {
+        display: block;
+      }
+
+      .zen-mode .draw-host.visible {
+        margin-top: 37px;
+      }
+
+      .draw-embed {
+        display: block;
+        margin: 1em 0;
+        max-width: 100%;
+        overflow-x: auto;
+      }
+
+      .draw-embed svg {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        margin: 0 auto;
+      }
+
+      .draw-embed[data-ref] {
+        cursor: pointer;
+      }
+
+      .draw-embed.missing {
+        color: var(--yellow);
+        font-size: 13px;
+        cursor: default;
       }
 
       /* Zen mode */
@@ -2032,14 +2120,33 @@
         <div class="sidebar-header">
           <span>note</span>
           <span style="margin-left: auto; display: flex; gap: 8px">
-            <button
-              class="btn-new"
-              data-action="new-note-rename"
-              title="New note"
-              aria-label="New note"
-            >
-              +
-            </button>
+            <span class="new-split">
+              <button
+                class="btn-new"
+                data-action="new-note-rename"
+                title="New note"
+                aria-label="New note"
+              >
+                +
+              </button>
+              <button
+                class="btn-new btn-new-more"
+                data-action="toggle-new-menu"
+                title="New text note or drawing"
+                aria-label="Choose what to create"
+                aria-haspopup="menu"
+              >
+                &#9662;
+              </button>
+              <div class="file-menu new-menu" role="menu" aria-label="New">
+                <button class="file-menu-item" role="menuitem" data-action="new-note-rename" data-close-menu>
+                  text
+                </button>
+                <button class="file-menu-item" role="menuitem" data-action="new-drawing-rename" data-close-menu>
+                  drawing
+                </button>
+              </div>
+            </span>
             <button
               class="sidebar-close"
               data-action="toggle-sidebar"
@@ -2115,6 +2222,13 @@
                 <button
                   class="file-menu-item mobile-only"
                   role="menuitem"
+                  data-action="new-drawing" data-close-menu
+                >
+                  new drawing
+                </button>
+                <button
+                  class="file-menu-item mobile-only"
+                  role="menuitem"
                   data-action="find-replace" data-close-menu
                 >
                   find &amp; replace
@@ -2133,6 +2247,27 @@
                   data-action="download" data-close-menu
                 >
                   download
+                </button>
+                <button
+                  class="file-menu-item draw-only"
+                  role="menuitem"
+                  data-action="draw-source" data-close-menu
+                >
+                  source
+                </button>
+                <button
+                  class="file-menu-item draw-only"
+                  role="menuitem"
+                  data-action="draw-copy-png" data-close-menu
+                >
+                  copy as png
+                </button>
+                <button
+                  class="file-menu-item draw-only"
+                  role="menuitem"
+                  data-action="draw-download-svg" data-close-menu
+                >
+                  download svg
                 </button>
                 <hr class="file-menu-separator mobile-only" />
                 <button
@@ -2241,6 +2376,7 @@
             aria-hidden="true"
           ></div>
           <div class="md-preview" id="mdPreview"></div>
+          <div class="draw-host" id="drawHost" aria-label="Drawing canvas"></div>
           <div class="zen-bar" id="zenBar" style="display: none">
             <div class="zen-bar-left">
               <img
@@ -2282,6 +2418,9 @@
             <button class="empty-state-mobile btn-wrap" data-action="new-note">
               new file
             </button>
+            <button class="empty-state-mobile btn-wrap" data-action="new-drawing">
+              new drawing
+            </button>
           </div>
         </div>
         <div class="vim-command-bar" id="vimCommandBar">
@@ -2299,9 +2438,27 @@
       <button class="btn-files" id="btnFiles" data-action="toggle-sidebar">
         notes
       </button>
-      <button class="status-hint" data-action="new-note">
-        new <kbd>ctrl+n</kbd>
-      </button>
+      <span class="new-split">
+        <button class="status-hint" data-action="new-note">
+          new <kbd>ctrl+n</kbd></button
+        ><button
+          class="status-hint btn-new-more"
+          data-action="toggle-new-menu"
+          title="New text note or drawing"
+          aria-label="Choose what to create"
+          aria-haspopup="menu"
+        >
+          &#9662;
+        </button>
+        <div class="file-menu new-menu" role="menu" aria-label="New">
+          <button class="file-menu-item" role="menuitem" data-action="new-note" data-close-menu>
+            text <kbd>ctrl+n</kbd>
+          </button>
+          <button class="file-menu-item" role="menuitem" data-action="new-drawing" data-close-menu>
+            drawing
+          </button>
+        </div>
+      </span>
       <button class="status-hint" data-action="search">
         search <kbd>ctrl+p</kbd>
       </button>

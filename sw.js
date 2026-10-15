@@ -4,6 +4,7 @@ const CACHE = "note-v1";
 const SHELL = [
   "./",
   "app.js",
+  "draw.js",
   "manifest.json",
   "victor-mono/VictorMono-Regular.woff2",
   "img/favicon.ico",

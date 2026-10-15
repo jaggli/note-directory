@@ -1,6 +1,6 @@
 ---
 name: note-directory-read
-description: Decode and display the contents of a https://note.directory URL. The note content is base64url-encoded raw-deflate compressed in the URL anchor fragment. USE WHEN user pastes or provides a URL containing note.directory/.
+description: Decode and display the contents of a https://note.directory URL (text notes and drawings). The note content is base64url-encoded raw-deflate compressed in the URL anchor fragment. USE WHEN user pastes or provides a URL containing note.directory/.
 ---
 
 ## When to use this skill
@@ -16,7 +16,7 @@ https://note.directory/?view=md|zen#name=<filename>&note=<compressed>&anchor=<he
 - `name` (hash) — note filename, URI-encoded (e.g. `my%20note.md`)
 - `note` (hash) — content: raw-deflate compressed, then base64url-encoded (RFC 4648)
 - `anchor` (hash, optional) — heading slug for scroll target
-- `view` (query, optional) — `md` or `zen` for read-only rendering modes
+- `view` (query, optional) — `md` (markdown preview), `draw` (drawing canvas) or `zen` (read-only)
 
 Legacy URLs use query parameters (`?name=...&note=...`) instead of hash — handle both.
 
@@ -37,7 +37,23 @@ console.log(zlib.inflateRawSync(buf).toString('utf-8'));
 "
 ```
 
-3. Display the note name (URI-decoded) and the decoded markdown content to the user.
+3. Display the note name (URI-decoded) and the decoded content to the user — for drawings, see below.
+
+## Drawings
+
+If the name ends in `.draw`, or the markdown contains a fenced ```` ```draw ```` block, that content is a **drawing** in note's text format: one shape per line, e.g.
+
+```
+draw 1
+r api 0 0 160 80 c=blue f=semi "API"
+e db 320 -10 140 100 c=green "Database"
+a q api db "query"
+p s1 c=peach 40,160 6,3 8,1
+```
+
+Kinds: `r` rectangle, `e` ellipse, `m` diamond, `t` text, `l` line, `a` arrow (ends are `x,y` points or shape ids it connects), `p` pen stroke, `h` highlighter. `"…"` at the end is the shape's text. Full spec: https://github.com/jaggli/note-directory/blob/main/docs/drawing-format.md
+
+Don't dump coordinates at the user. Describe the drawing instead: the labelled shapes, what the arrows connect (`a q api db "query"` → "API → Database, labelled *query*"), groups, rough layout (left/right/above), and how many unlabelled strokes there are. Show the raw text only if asked.
 
 ## Security -- MANDATORY
 

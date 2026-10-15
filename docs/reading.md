@@ -14,23 +14,25 @@ Transformations are applied in this sequence:
 
 ````
 1.  Fenced code blocks        ```lang ... ```       → <pre><code>...</code></pre>
+    (```draw blocks become <span class="draw-embed" data-draw="…">)
 2.  Inline code               `code`                → <code>code</code>
 3.  Headings (H6→H1)          ## Title              → <h2 id="slug">...</h2>
 4.  Horizontal rules           ---                   → <hr>
 5.  Blockquotes               > text                → <blockquote>text</blockquote>
 6.  Lists (ul/ol/nested)      - item / 1. item      → <ul><li>...</li></ul>
 7.  Tables                    | col | col |          → <table>...</table>
-8.  Links                     [text](url)            → <a href="url">text</a>
-9.  Bold + Italic combos      ***text***             → <strong><em>text</em></strong>
-10. Bold                      **text** / __text__    → <strong>text</strong>
-11. Italic                    *text* / _text_        → <em>text</em>
-12. Strikethrough             ~~text~~               → <del>text</del>
-13. Paragraphs                loose text             → <p>text</p>
+8.  Drawing embeds            ![alt](name.draw)      → <span class="draw-embed" data-ref="name.draw">
+9.  Links                     [text](url)            → <a href="url">text</a>
+10. Bold + Italic combos      ***text***             → <strong><em>text</em></strong>
+11. Bold                      **text** / __text__    → <strong>text</strong>
+12. Italic                    *text* / _text_        → <em>text</em>
+13. Strikethrough             ~~text~~               → <del>text</del>
+14. Paragraphs                loose text             → <p>text</p>
 ````
 
 ### Step 3: Restore Placeholders
 
-Code blocks and inline code are extracted early (replaced with `\x00CB`/`\x00IC` placeholders) to protect their contents from further parsing. After all transformations, placeholders are restored with the rendered HTML.
+Code blocks and inline code are extracted early (replaced with `\x00CB`/`\x00IC` placeholders) to protect their contents from further parsing. After all transformations, placeholders are restored with the rendered HTML. Drawing embeds use the code block placeholders too, so emphasis rules can't reach into file names. The empty embed spans are filled with SVG after the HTML is in the page (`hydrateDrawEmbeds()`, see [drawing.md](drawing.md)).
 
 ### Step 4: Re-enable Safe HTML
 
@@ -218,7 +220,7 @@ switchMdTab("view")
 
 ### Tab Bar
 
-The tab bar (`edit | view | zen`) is only visible for markdown files (`.md` extension) or ephemeral zen notes. `updateMdTabBar()` auto-switches to edit if a non-markdown file is selected while view is active.
+The tab bar (`edit | view | zen`) is only visible for markdown files (`.md` extension), drawings (`.draw`, labelled `draw | zen`, source via the file menu) or ephemeral zen notes. `updateMdTabBar()` auto-switches to edit if a file without a second tab is selected while view is active. For drawings, the view and zen tabs show the drawing canvas instead of the preview — see [drawing.md](drawing.md).
 
 ### Scroll Position Sync
 
@@ -229,7 +231,7 @@ When switching between edit and view:
 
 ### URL Parameter
 
-View mode sets `?view=md` in the URL via `history.replaceState()`. On page load, `checkMdViewParam()` reads this parameter and automatically enters view mode if present.
+View mode sets `?view=md` (`?view=draw` for drawings) in the URL via `history.replaceState()`. On page load, `checkMdViewParam()` reads this parameter and automatically enters view mode if present.
 
 ---
 
