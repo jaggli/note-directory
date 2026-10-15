@@ -577,8 +577,7 @@ async function updateUrl() {
     const compressed = await compress(note.content);
     if (seq !== urlSeq) return;
     const queryParams = new URLSearchParams();
-    if (zenModeActive) queryParams.set("view", "zen");
-    else if (mdViewActive) queryParams.set("view", "md");
+    if (viewQuery()) queryParams.set("view", viewQuery());
     const queryStr = queryParams.toString();
     const query = queryStr ? "?" + queryStr : "";
 
@@ -935,7 +934,8 @@ function undo() {
     diffPos,
     entry.content.length,
   );
-  if (vimState.enabled) {
+  // The canvas edits note.content directly, so vim's buffer is not involved
+  if (vimState.enabled && !drawActive()) {
     vimState.bufferDirty = entry.content !== note.content;
     // Otherwise a reload would restore the undone edit from the swap
     if (vimState.bufferDirty) saveSwap(note.id, entry.content);
@@ -946,6 +946,7 @@ function undo() {
     saveState();
   }
   refreshEditor();
+  if (drawActive()) window.Draw?.update(note.content);
 }
 
 function redo() {
@@ -964,7 +965,8 @@ function redo() {
     diffPos,
     entry.content.length,
   );
-  if (vimState.enabled) {
+  // The canvas edits note.content directly, so vim's buffer is not involved
+  if (vimState.enabled && !drawActive()) {
     vimState.bufferDirty = entry.content !== note.content;
     // Otherwise a reload would restore the undone edit from the swap
     if (vimState.bufferDirty) saveSwap(note.id, entry.content);
@@ -975,6 +977,7 @@ function redo() {
     saveState();
   }
   refreshEditor();
+  if (drawActive()) window.Draw?.update(note.content);
 }
 
 // ═══════════════════════════════════════════════════
@@ -1223,9 +1226,18 @@ const tomlRules = [
   [/\b\d+(?:\.\d+)?\b/g, "hl-num"],
 ];
 
+const drawRules = [
+  [/^[ \t]*#[^\n]*/gm, "hl-cmt"],
+  [/"(?:[^"\\\n]|\\.)*"/g, "hl-str"],
+  [/^[ \t]*(?:draw|grid|[remtlaph])(?= )/gm, "hl-kw"],
+  [/\b[a-z]+(?==)/g, "hl-key"],
+  [/-?\b\d+\b/g, "hl-num"],
+];
+
 // --- Extension → rules mapping ---
 
 const langRules = {
+  draw: drawRules,
   js: jsRules,
   jsx: jsRules,
   ts: jsRules,
@@ -1897,9 +1909,11 @@ function startTimestampRefresh() {
 function updateTitle() {
   const note = getActiveNote();
   document.title = note
-    ? note.name + " \u00b7 note \u2014 minimal text editor"
-    : "note \u2014 minimal text editor";
+    ? note.name + " \u00b7 note \u2014 minimal editor"
+    : "note \u2014 minimal editor";
 }
+
+let lastRenderedId = null;
 
 function render() {
   renderNoteList();
@@ -1909,6 +1923,14 @@ function render() {
   updateTitle();
   updateStorageUsage();
   updateMdTabBar();
+  // Drawings open on the canvas; an open canvas follows outside changes
+  const note = getActiveNote();
+  if ((note?.id ?? null) !== lastRenderedId) {
+    lastRenderedId = note?.id ?? null;
+    if (note && isDrawFile(note.name) && !zenModeActive) switchMdTab("view");
+  } else if (drawActive()) {
+    window.Draw?.update(note.content);
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -1924,6 +1946,130 @@ function isMarkdownFile(name) {
   if (!name) return false;
   const ext = getExtension(name);
   return ext === "md" || ext === "markdown";
+}
+
+// ═══════════════════════════════════════════════════
+//  Drawings (.draw — editor lives in draw.js, loaded on demand)
+// ═══════════════════════════════════════════════════
+
+const drawHost = document.getElementById("drawHost");
+
+function isDrawFile(name) {
+  return !!name && getExtension(name) === "draw";
+}
+
+// Notes with a second tab: markdown preview or drawing canvas
+function hasViewTab(name) {
+  return isMarkdownFile(name) || isDrawFile(name);
+}
+
+// The canvas is showing an editable drawing
+function drawActive() {
+  return mdViewActive && !zenModeActive && isDrawFile(getActiveNote()?.name);
+}
+
+let drawLoading = null;
+function loadDraw() {
+  return (drawLoading ??= new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "draw.js";
+    s.onload = resolve;
+    s.onerror = () => {
+      drawLoading = null;
+      reject(new Error("draw.js failed to load"));
+    };
+    document.head.appendChild(s);
+  }));
+}
+
+let drawMountSeq = 0;
+function showDraw(note, readonly) {
+  drawHost.classList.add("visible");
+  const seq = ++drawMountSeq;
+  loadDraw()
+    .then(() => {
+      // The tab or note may have changed while the script loaded
+      if (seq !== drawMountSeq) return;
+      Draw.mount(drawHost, {
+        key: note.id || "zen:" + note.name,
+        content: note.content,
+        readonly,
+        onCommit: (content) => drawCommit(note.id, content),
+        onUndo: undo,
+        onRedo: redo,
+        onSource: (line) => {
+          switchMdTab("edit", true);
+          const lines = editor.value.split("\n").slice(0, line - 1);
+          editor.selectionStart = editor.selectionEnd = lines.join("\n").length + (line > 1 ? 1 : 0);
+          updateCursorPos();
+          ensureCursorScrolloff();
+        },
+      });
+    })
+    .catch(() => showMdToast("could not load the drawing editor"));
+}
+
+function hideDraw() {
+  drawMountSeq++;
+  drawHost.classList.remove("visible");
+  if (window.Draw) Draw.unmount();
+}
+
+// A finished canvas gesture: one undo step, then the usual save path
+function drawCommit(id, content) {
+  const note = state.notes.find((n) => n.id === id);
+  if (!note || note.content === content) return;
+  pushHistory(note.id, note.content);
+  note.content = content;
+  note.updatedAt = Date.now();
+  if (note.id === state.activeId) editor.value = content;
+  scheduleSave();
+  scheduleUrlUpdate();
+}
+
+// Search drawings by their text only, not by coordinates
+function drawSearchLines(content) {
+  return content.split("\n").map((line) => {
+    const m = line.match(/"((?:[^"\\]|\\.)*)"\s*$/);
+    return m ? m[1].replace(/\\(.)/g, (_, c) => (c === "n" ? " " : c)) : "";
+  });
+}
+
+// Fill the .draw-embed placeholders renderMarkdown left in the preview
+function hydrateDrawEmbeds() {
+  const embeds = mdPreview.querySelectorAll(".draw-embed");
+  if (!embeds.length) return;
+  loadDraw()
+    .then(() => {
+      for (const el of embeds) {
+        if (!el.isConnected) continue;
+        const ref = el.dataset.ref;
+        const note = ref
+          ? state.notes.find((n) => n.name === ref) ||
+            state.notes.find((n) => n.name.toLowerCase() === ref.toLowerCase())
+          : null;
+        if (ref && !note) {
+          el.textContent = "drawing not found: " + ref;
+          el.classList.add("missing");
+          continue;
+        }
+        el.replaceChildren(Draw.renderStatic(note ? note.content : el.dataset.draw));
+        if (note) el.title = "open " + note.name;
+      }
+    })
+    .catch(() => {});
+}
+
+function setPreviewHtml(html) {
+  mdPreview.innerHTML = html;
+  hydrateDrawEmbeds();
+}
+
+// ?view= value for the current tab
+function viewQuery() {
+  if (zenModeActive) return "zen";
+  if (!mdViewActive) return "";
+  return isDrawFile(getActiveNote()?.name) ? "draw" : "md";
 }
 
 // Markdown source formatter — normalizes structure without touching code blocks.
@@ -2228,6 +2374,12 @@ function renderMarkdown(src) {
     function flushCodeBlock() {
       const code = codeLines.join("\n");
       const idx = codeBlocks.length;
+      // ```draw blocks render as drawings (code is already HTML-escaped)
+      if (lang === "draw") {
+        codeBlocks.push(`<span class="draw-embed" data-draw="${code}"></span>`);
+        result.push("\x00CB" + idx + "\x00");
+        return;
+      }
       const raw = code
         .replace(/&quot;/g, '"')
         .replace(/&gt;/g, ">")
@@ -2531,6 +2683,15 @@ function renderMarkdown(src) {
     },
   );
 
+  // Embedded drawings — ![alt](name.draw); held aside so emphasis
+  // rules can't reach into the file name
+  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+\.draw)\)/gi, (_, alt, name) => {
+    codeBlocks.push(
+      `<span class="draw-embed" data-ref="${name}" role="img" aria-label="${alt || name}"></span>`,
+    );
+    return "\x00CB" + (codeBlocks.length - 1) + "\x00";
+  });
+
   // Links — [text](url)
   text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
     const cleanUrl = url
@@ -2696,14 +2857,25 @@ function isSafeHref(href) {
   return !scheme || /^(https?|mailto)$/i.test(scheme[1]);
 }
 
+let mdTabsKind = "md";
+
 function updateMdTabBar() {
   const note = getActiveNote();
-  const isMd = note && isMarkdownFile(note.name);
+  const isMd = note && hasViewTab(note.name);
+  const isDraw = isDrawFile(note?.name);
   const zenEphemeral = zenModeActive && zenFromUrl && zenEphemeralNote;
   mdTabs.classList.toggle("visible", isMd || zenEphemeral);
+  // Drawings reach their source from the file menu
+  mdTabEdit.style.display = isDraw ? "none" : "";
+  mdTabView.textContent = isDraw ? "draw" : "view";
+  fileMenu.classList.toggle("is-draw", isDraw);
   if (!isMd && !zenEphemeral && mdViewActive) {
     switchMdTab("edit");
+  } else if (mdViewActive && !zenModeActive && mdTabsKind !== (isDraw ? "draw" : "md")) {
+    // Renamed between .md and .draw while in the second tab
+    switchMdTab("view");
   }
+  mdTabsKind = isDraw ? "draw" : "md";
 }
 
 function currentTab() {
@@ -2827,25 +2999,36 @@ function switchMdTab(tab, pushHistory) {
       updateUrl();
       scheduleDriveUpload(false);
       const rendered = renderMarkdown(note.content);
-      mdPreview.innerHTML = zenModeActive
-        ? `<div class="zen-wrap">${rendered}</div>`
-        : rendered;
+      setPreviewHtml(
+        zenModeActive ? `<div class="zen-wrap">${rendered}</div>` : rendered,
+      );
     };
   }
 
+  // Zen shows the shared note when opened from a link
+  const shownNote =
+    zenModeActive && zenFromUrl && zenEphemeralNote
+      ? zenEphemeralNote
+      : getActiveNote();
+  const showsDrawing = tab !== "edit" && isDrawFile(shownNote?.name);
+  if (!showsDrawing) hideDraw();
+
   if (zenModeActive) {
-    // Render preview from ephemeral note or active note
-    const content =
-      zenFromUrl && zenEphemeralNote
-        ? zenEphemeralNote.content
-        : getActiveNote()?.content || "";
-    mdPreview.innerHTML = `<div class="zen-wrap">${renderMarkdown(content)}</div>`;
-    attachCheckboxHandler();
-    // Hide editor elements, show preview
+    // Hide editor elements, show preview or canvas
     gutter.style.display = "none";
     editorArea.style.display = "none";
     emptyState.style.display = "none";
-    mdPreview.classList.add("visible");
+    if (showsDrawing) {
+      mdPreview.classList.remove("visible");
+      mdPreview.innerHTML = "";
+      showDraw(shownNote, true);
+    } else {
+      setPreviewHtml(
+        `<div class="zen-wrap">${renderMarkdown(shownNote?.content || "")}</div>`,
+      );
+      attachCheckboxHandler();
+      mdPreview.classList.add("visible");
+    }
     // Hide all chrome, show zen bar
     appEl.classList.add("zen-mode");
     const zenName =
@@ -2861,10 +3044,24 @@ function switchMdTab(tab, pushHistory) {
       zenName.slice(zenSplit);
     zenBar.style.display = "";
     document.getElementById("zenShareBtn").style.display = "";
+  } else if (tab === "view" && showsDrawing) {
+    gutter.style.display = "none";
+    editorArea.style.display = "none";
+    emptyState.style.display = "none";
+    mdPreview.classList.remove("visible");
+    mdPreview.innerHTML = "";
+    btnReplace.style.display = "none";
+    btnWrap.style.display = "none";
+    cursorPos.style.display = "none";
+    btnVim.style.display = "none";
+    appEl.classList.remove("zen-mode");
+    zenBar.style.display = "none";
+    document.getElementById("zenShareBtn").style.display = "none";
+    showDraw(shownNote, false);
   } else if (tab === "view") {
     const note = getActiveNote();
     if (note) {
-      mdPreview.innerHTML = renderMarkdown(note.content);
+      setPreviewHtml(renderMarkdown(note.content));
     }
     attachCheckboxHandler();
     // Remember cursor line ratio before hiding editor
@@ -2997,7 +3194,8 @@ function persistZenNote() {
 
 function exitZenMode() {
   persistZenNote();
-  switchMdTab("edit", true);
+  // Drawings go back to the canvas, markdown to the editor
+  switchMdTab(isDrawFile(getActiveNote()?.name) ? "view" : "edit", true);
   render();
   updateUrl();
 }
@@ -3019,8 +3217,7 @@ async function zenShare() {
 
 function updateMdViewUrl() {
   const params = new URLSearchParams();
-  if (zenModeActive) params.set("view", "zen");
-  else if (mdViewActive) params.set("view", "md");
+  if (viewQuery()) params.set("view", viewQuery());
   const queryStr = params.toString();
   const query = queryStr ? "?" + queryStr : "";
   const note = getActiveNote();
@@ -3039,7 +3236,7 @@ function checkMdViewParam() {
   if (viewParam === "zen") {
     if (
       zenEphemeralNote ||
-      (getActiveNote() && isMarkdownFile(getActiveNote().name))
+      (getActiveNote() && hasViewTab(getActiveNote().name))
     ) {
       switchMdTab("zen");
       if (anchor) {
@@ -3049,9 +3246,9 @@ function checkMdViewParam() {
         });
       }
     }
-  } else if (viewParam === "md") {
+  } else if (viewParam === "md" || viewParam === "draw") {
     const note = getActiveNote();
-    if (note && isMarkdownFile(note.name)) {
+    if (note && hasViewTab(note.name)) {
       switchMdTab("view");
       if (anchor) {
         requestAnimationFrame(() => {
@@ -3072,7 +3269,7 @@ function navigateToNote(id, viewMd, skipUrlUpdate) {
   render();
   if (viewMd) {
     switchMdTab("view");
-  } else if (mdViewActive) {
+  } else if (mdViewActive && !isDrawFile(getActiveNote()?.name)) {
     switchMdTab("edit");
   }
   if (!skipUrlUpdate) updateUrl();
@@ -3140,9 +3337,9 @@ mdPreview.addEventListener("click", (e) => {
 
 // Intercept clicks on local note links in preview
 mdPreview.addEventListener("click", (e) => {
-  const a = e.target.closest("a");
+  const a = e.target.closest("a, .draw-embed[data-ref]:not(.missing)");
   if (!a || a.classList.contains("heading-anchor")) return;
-  const href = a.getAttribute("href");
+  const href = a.getAttribute("href") || a.dataset.ref;
   if (!href) return;
   if (!isSafeHref(href)) return e.preventDefault();
   // Decode escaped HTML entities back to plain text
@@ -3181,7 +3378,7 @@ mdPreview.addEventListener("click", (e) => {
       "",
       location.href,
     );
-    const wantView = isMarkdownFile(target.name);
+    const wantView = hasViewTab(target.name);
     navigateToNote(target.id, wantView);
     // Replace the new entry's URL with the target note's URL
     history.replaceState(
@@ -3194,7 +3391,7 @@ mdPreview.addEventListener("click", (e) => {
 
 // Handle browser back/forward
 function restoreTab(tab, note) {
-  if (!note || !isMarkdownFile(note.name)) {
+  if (!note || !hasViewTab(note.name)) {
     if (mdViewActive || zenModeActive) switchMdTab("edit");
     return;
   }
@@ -3232,7 +3429,7 @@ window.addEventListener("popstate", async (e) => {
         const tab =
           viewParam === "zen"
             ? "zen"
-            : viewParam === "md"
+            : viewParam === "md" || viewParam === "draw"
               ? "view"
               : "edit";
         navigateToNote(note.id, false, true);
@@ -3260,10 +3457,11 @@ window.addEventListener("popstate", async (e) => {
 //  Notes CRUD
 // ═══════════════════════════════════════════════════
 
-function nextNoteName() {
+function nextNoteName(ext = "md") {
+  const base = ext === "draw" ? "drawing" : "note";
   let num = 1;
-  while (state.notes.some((n) => n.name === `note${num}.md`)) num++;
-  return `note${num}.md`;
+  while (state.notes.some((n) => n.name === `${base}${num}.${ext}`)) num++;
+  return `${base}${num}.${ext}`;
 }
 
 // "name.md" → "name1.md", "name2.md", … (first free)
@@ -3276,9 +3474,9 @@ function uniqueName(name) {
   return `${base}${num}${ext}`;
 }
 
-async function createNote(name, content, focusName) {
+async function createNote(name, content, focusName, ext) {
   if (!name && isMobile()) {
-    const result = await showPromptModal("Filename:", nextNoteName());
+    const result = await showPromptModal("Filename:", nextNoteName(ext));
     if (!result) return null;
     name = result;
   }
@@ -3295,7 +3493,7 @@ async function createNote(name, content, focusName) {
   }
   const note = {
     id: crypto.randomUUID(),
-    name: name || nextNoteName(),
+    name: name || nextNoteName(ext),
     content: contentStr,
     updatedAt: Date.now(),
   };
@@ -3370,9 +3568,10 @@ function switchNote(id) {
   // Stay in view tab if switching to another markdown file
   const targetNote = state.notes.find((n) => n.id === id);
   if (mdViewActive) {
-    if (targetNote && isMarkdownFile(targetNote.name)) {
-      mdPreview.innerHTML = renderMarkdown(targetNote.content);
-    } else {
+    const fromMd = isMarkdownFile(getActiveNote()?.name);
+    if (targetNote && isMarkdownFile(targetNote.name) && fromMd) {
+      setPreviewHtml(renderMarkdown(targetNote.content));
+    } else if (!isDrawFile(targetNote?.name)) {
       switchMdTab("edit");
     }
   }
@@ -3539,14 +3738,17 @@ function searchNotes(query) {
   const results = [];
   for (const note of state.notes) {
     const nameMatch = matchLine(note.name, query);
-    const lines = note.content.split("\n");
+    const raw = note.content.split("\n");
+    const lines = isDrawFile(note.name) ? drawSearchLines(note.content) : raw;
     const lineLimit = Math.min(lines.length, MAX_LINES_PER_NOTE);
     const lineMatches = [];
     for (let i = 0; i < lineLimit; i++) {
       const m = matchLine(lines[i], query);
       if (m) {
         let offset = 0;
-        for (let j = 0; j < i; j++) offset += lines[j].length + 1;
+        for (let j = 0; j < i; j++) offset += raw[j].length + 1;
+        // Drawing labels sit at the end of their line
+        if (lines !== raw) offset += raw[i].lastIndexOf('"', raw[i].length - 2) + 1;
         lineMatches.push({
           line: lines[i],
           lineNum: i + 1,
@@ -5738,6 +5940,16 @@ function vimExecCommand(cmd) {
     return;
   }
 
+  // :draw — create new drawing
+  if (trimmed === "draw") {
+    if (vimState.bufferDirty) {
+      vimShowError("No write since last change (add ! to override)");
+      return;
+    }
+    createNote(undefined, undefined, false, "draw");
+    return;
+  }
+
   // :help — open help
   if (trimmed === "help") {
     openHelp();
@@ -5754,11 +5966,11 @@ function vimExecCommand(cmd) {
   // :view — open markdown preview
   if (trimmed === "view") {
     const note = getActiveNote();
-    if (note && isMarkdownFile(note.name)) {
+    if (note && hasViewTab(note.name)) {
       if (vimState.bufferDirty) vimWriteBuffer();
       switchMdTab("view", true);
     } else {
-      vimShowError("Not a markdown file");
+      vimShowError("Not a markdown file or drawing");
     }
     return;
   }
@@ -5965,15 +6177,26 @@ function closeSyncMenu() {
   syncMenu.classList.remove("visible");
 }
 
+// The ▾ next to + / new: pick the kind of note
+function toggleNewMenu() {
+  const menu = actionEl.closest(".new-split").querySelector(".new-menu");
+  const open = !menu.classList.contains("visible");
+  closeAllMenus();
+  menu.classList.toggle("visible", open);
+}
+
 function closeAllMenus() {
   closeFileMenu();
   closeSyncMenu();
+  for (const m of document.querySelectorAll(".new-menu.visible"))
+    m.classList.remove("visible");
 }
 
 document.addEventListener("click", (e) => {
   if (
     !e.target.closest(".file-menu-container") &&
-    !e.target.closest("#syncMenuContainer")
+    !e.target.closest("#syncMenuContainer") &&
+    !e.target.closest(".new-split")
   ) {
     closeAllMenus();
   }
@@ -6005,18 +6228,63 @@ function downloadNote() {
   );
 }
 
+// Drawing as an image: the clipboard gets a PNG, the download an SVG
+function drawCopyPng() {
+  const note = getActiveNote();
+  if (!note || !isDrawFile(note.name)) return;
+  const png = loadDraw().then(() => Draw.pngBlob(note.content));
+  // Safari needs the clipboard write to start inside the click
+  navigator.clipboard
+    .write([new ClipboardItem({ "image/png": png })])
+    .then(() => showMdToast("copied as png"))
+    .catch(async () => {
+      try {
+        triggerDownload(await png, note.name.replace(/\.draw$/i, "") + ".png");
+      } catch {
+        showMdToast("png export failed");
+      }
+    });
+}
+
+async function drawDownloadSvg() {
+  const note = getActiveNote();
+  if (!note || !isDrawFile(note.name)) return;
+  await loadDraw();
+  triggerDownload(
+    new Blob([Draw.svgString(note.content)], { type: "image/svg+xml" }),
+    note.name.replace(/\.draw$/i, "") + ".svg",
+  );
+}
+
 async function downloadAll() {
   if (!state.notes.length) return;
   const files = state.notes.map((n) => ({
     name: n.name,
     content: n.content,
   }));
+  // Drawings also go in as images, readable without the app
+  const renders = [];
+  const drawings = state.notes.filter((n) => isDrawFile(n.name) && n.content);
+  if (drawings.length) {
+    try {
+      await loadDraw();
+      for (const n of drawings) {
+        // The importer flattens folders, so renders sit next to the notes
+        const name = n.name + ".svg";
+        if (state.notes.some((o) => o.name === name)) continue;
+        if (renders.includes(name)) continue;
+        renders.push(name);
+        files.push({ name, content: Draw.svgString(n.content) });
+      }
+    } catch {}
+  }
   const directory = {
     notes: state.notes.map((n) => ({
       id: n.id,
       name: n.name,
       updatedAt: n.updatedAt,
     })),
+    renders,
   };
   files.push({
     name: ".note.directory",
@@ -6032,7 +6300,7 @@ async function downloadAll() {
 // Share link for a note, built from its content (never from location,
 // which may still show the previous note). null if too long for a URL.
 async function shareUrlFor(note) {
-  const query = zenModeActive ? "?view=zen" : mdViewActive ? "?view=md" : "";
+  const query = viewQuery() ? "?view=" + viewQuery() : "";
   const hashMap = new Map([
     ["name", note.name],
     ["note", await compress(note.content)],
@@ -6141,7 +6409,7 @@ async function loadFromUrl() {
 // ═══════════════════════════════════════════════════
 
 const TEXT_EXTS = new Set(
-  "txt md markdown json jsonl json5 js jsx ts tsx mjs cjs mts cts css scss sass less html htm xml xsl xslt csv tsv yaml yml toml ini cfg conf sh bash zsh fish ps1 bat cmd py pyi pyw rb rake gemspec go rs java scala kt kts groovy gradle c h cpp hpp cc cxx hxx cs fs fsx swift m mm r jl lua pl pm php phtml ex exs erl hrl hs lhs clj cljs cljc edn lisp cl el rkt ml mli v sv vhd vhdl sql graphql gql proto thrift avsc tf hcl nix dhall dart zig nim cr d pas pp asm s wasm wat sol vy move cairo log env properties lock sum mod cmake make mk svg plist strings resx pot po rst adoc asciidoc tex bib sty cls org wiki textile diff patch gitignore gitattributes gitmodules dockerignore npmignore eslintignore prettierignore editorconfig prettierrc eslintrc babelrc browserslistrc stylelintrc huskyrc lintstagedrc nvmrc".split(
+  "txt md markdown draw json jsonl json5 js jsx ts tsx mjs cjs mts cts css scss sass less html htm xml xsl xslt csv tsv yaml yml toml ini cfg conf sh bash zsh fish ps1 bat cmd py pyi pyw rb rake gemspec go rs java scala kt kts groovy gradle c h cpp hpp cc cxx hxx cs fs fsx swift m mm r jl lua pl pm php phtml ex exs erl hrl hs lhs clj cljs cljc edn lisp cl el rkt ml mli v sv vhd vhdl sql graphql gql proto thrift avsc tf hcl nix dhall dart zig nim cr d pas pp asm s wasm wat sol vy move cairo log env properties lock sum mod cmake make mk svg plist strings resx pot po rst adoc asciidoc tex bib sty cls org wiki textile diff patch gitignore gitattributes gitmodules dockerignore npmignore eslintignore prettierignore editorconfig prettierrc eslintrc babelrc browserslistrc stylelintrc huskyrc lintstagedrc nvmrc".split(
     " ",
   ),
 );
@@ -6229,7 +6497,11 @@ async function importZip(file) {
     }
   }
 
-  const importable = entries.filter((e) => e.name !== ".note.directory");
+  // Images rendered from drawings at export are not notes
+  const renders = new Set(Array.isArray(metadata?.renders) ? metadata.renders : []);
+  const importable = entries.filter(
+    (e) => e.name !== ".note.directory" && !renders.has(e.name),
+  );
   const skipped = [];
 
   for (const entry of importable) {
@@ -6394,7 +6666,7 @@ document.addEventListener("drop", async (e) => {
       remaining--;
       if (remaining === 0 && wasInView) {
         const note = getActiveNote();
-        if (note && isMarkdownFile(note.name)) {
+        if (note && hasViewTab(note.name)) {
           switchMdTab("view");
         }
       }
@@ -6772,10 +7044,11 @@ document.addEventListener("keydown", (e) => {
     }
     return;
   }
-  // Switch from view to edit tab with "e"
+  // Switch from view to edit tab with "e" (on the canvas, e is the eraser)
   if (
     !inInput &&
     mdViewActive &&
+    !drawActive() &&
     e.key === "e" &&
     !e.metaKey &&
     !e.ctrlKey &&
@@ -7587,7 +7860,7 @@ function driveSignOut(broadcast = true) {
 const HELP_DESKTOP = [
   "# Welcome to note.",
   "",
-  "A private, local-first text editor.",
+  "A private, local-first editor for text and drawings.",
   "No data is collected, transmitted, or stored on any server.",
   "Your notes stay in your browser — always.",
   "",
@@ -7608,6 +7881,7 @@ const HELP_DESKTOP = [
   "- Drop files to import, download zip to backup",
   "- Word wrap and vim mode in the status bar",
   "- .md files get edit/view tabs for markdown preview",
+  "- .draw files open on a drawing canvas (▾ next to +)",
   "- Link between notes: [label](other.md)",
   "- Syncs across tabs automatically",
   "",
@@ -7641,6 +7915,27 @@ const HELP_DESKTOP = [
   "  All children checked auto-checks the parent.",
   "- **Inter-note links** — [label](other.md) navigates",
   "  to that note. Browser back button works.",
+  "- **Drawings** — ![label](sketch.draw) shows a drawing,",
+  "  or put one inline in a fenced \\`\\`\\`draw block.",
+  "",
+  "## Drawings",
+  "",
+  "Pick **drawing** from the ▾ next to + (or :draw in vim).",
+  "A drawing is text too: file → source shows one line per",
+  "shape, so it syncs, shares and searches like any note.",
+  "",
+  "- v select · h hand · d draw · shift+d highlighter · e eraser",
+  "- r rectangle · o ellipse · m diamond · l line · a arrow · t text",
+  "- Double-click a shape to write in it, empty space for text",
+  "- Arrow from one shape to another to connect them",
+  "- Shift: keep proportions, straight lines, 15° steps",
+  "- Ctrl+D duplicate · Ctrl+G group · Del delete",
+  "- Alt+↑/↓ forward/backward · Alt+Shift+↑/↓ to front/back",
+  "- Right-click a shape for stacking, grouping and more",
+  "- Space+drag or scroll to pan · Ctrl+scroll to zoom",
+  "- Shift+1 fit · Shift+0 100% · Ctrl+' grid",
+  "- Ctrl+B / Ctrl+I / Ctrl+U bold, italic, underline",
+  "- File menu: copy as png, download svg",
   "",
   "## Vim",
   "",
@@ -7704,7 +7999,7 @@ const HELP_DESKTOP = [
   "Press : to open the command bar.",
   "- :w — save, :q — exit vim",
   "- :set wrap / :set nowrap / :set wrap!",
-  "- :new — new note, :e name — open note",
+  "- :new — new note, :draw — new drawing, :e name — open note",
   "- :d — delete line, :42 — jump to line",
   "- :fmt — format markdown",
   "- :view — markdown preview",
@@ -7717,7 +8012,7 @@ const HELP_DESKTOP = [
 const HELP_MOBILE = [
   "# Welcome to note.",
   "",
-  "A private, local-first text editor.",
+  "A private, local-first editor for text and drawings.",
   "No data is collected, transmitted, or stored on any server.",
   "Your notes stay in your browser — always.",
   "",
@@ -7735,6 +8030,8 @@ const HELP_MOBILE = [
   "",
   "- Download zip to backup",
   "- .md files get edit/view tabs for markdown preview",
+  "- Tap ▾ next to + for a drawing: one finger draws,",
+  "  two fingers pan and zoom, a two-finger tap undoes",
   "- Link between notes: [label](other.md)",
   "- Syncs across tabs automatically",
   "",
@@ -7789,6 +8086,17 @@ const MD_DEMO = [
   "| Moss Fox    |   Curious   |       2 | Honey cakes   |",
   "| Thorn Owl   |   Grumpy    |       7 | Compliments   |",
   "| Root Troll  |   Sleepy    |       4 | Lullabies     |",
+  "",
+  "Her map of the way in, drawn right into the story:",
+  "",
+  "```draw",
+  "draw 1",
+  'r v 0 0 150 70 c=yellow f=semi "Village"',
+  'e f 280 -10 170 90 c=green f=semi "Forest"',
+  'm t 570 -15 170 100 c=mauve "Terminal"',
+  'a a1 v f "lantern"',
+  "a a2 f t c=mauve d=dash bend=-30",
+  "```",
   "",
   "---",
   "",
@@ -7939,6 +8247,12 @@ async function init() {
 const clickActions = {
   "new-note": () => createNote(),
   "new-note-rename": () => createNote(undefined, undefined, true),
+  "new-drawing": () => createNote(undefined, undefined, false, "draw"),
+  "new-drawing-rename": () => createNote(undefined, undefined, true, "draw"),
+  "toggle-new-menu": toggleNewMenu,
+  "draw-source": () => switchMdTab("edit", true),
+  "draw-copy-png": drawCopyPng,
+  "draw-download-svg": drawDownloadSvg,
   "toggle-sidebar": toggleSidebar,
   "find-next": findNext,
   "find-prev": findPrev,
@@ -7964,11 +8278,13 @@ const clickActions = {
   "toggle-vim": toggleVim,
   "toggle-wrap": toggleWrap,
 };
+let actionEl = null;
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-action]");
   if (!el) return;
+  actionEl = el;
   clickActions[el.dataset.action]();
-  if (el.hasAttribute("data-close-menu")) closeFileMenu();
+  if (el.hasAttribute("data-close-menu")) closeAllMenus();
 });
 
 init();

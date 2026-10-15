@@ -50,6 +50,7 @@ editor.scroll → gutter.scrollTop = editor.scrollTop
 | `notepad_tab_leader`       | Tab ID string          | Current leader tab                     |
 | `notepad_gdrive_token`     | `{token, expiry}`      | OAuth token (see google-drive-flow.md) |
 | `notepad_gdrive_connected` | `"true"`               | Drive sync opted in                    |
+| `notepad_draw_style`       | Style JSON             | Last drawing colour/size/fill/dash     |
 
 ### State Structure
 
@@ -146,7 +147,7 @@ Sensitive data (`name`, `note`) lives in the hash fragment, which is never sent 
 
 | Location | Parameter | Required | Values         | Purpose                                           |
 | -------- | --------- | -------- | -------------- | ------------------------------------------------- |
-| Query    | `view`    | No       | `md`, `zen`    | Markdown preview or zen mode                      |
+| Query    | `view`    | No       | `md`, `draw`, `zen` | Markdown preview, drawing canvas or zen mode |
 | Hash     | `name`    | Yes      | Note filename  | Identifies the note                               |
 | Hash     | `note`    | No       | Base64 deflate | Compressed content (dropped if URL > 60000 chars) |
 | Hash     | `anchor`  | No       | Heading slug   | Scroll target for heading anchors                 |

@@ -7,7 +7,10 @@
 Creates a standard ZIP file (DEFLATE-compressed) containing:
 
 1. **All note files** — one file per note, using the note's filename and content
-2. **`.note.directory`** — a JSON metadata file with note IDs and timestamps
+2. **Drawing renders** — for each non-empty `.draw` note an SVG image named
+   `<name>.draw.svg`, so drawings can be looked at without the app (skipped
+   if a note already has that name)
+3. **`.note.directory`** — a JSON metadata file with note IDs and timestamps
 
 The ZIP is a valid archive that can be opened by any zip tool (Finder, Explorer, 7-Zip, etc.). Users can unpack it to get their raw text files.
 
@@ -21,7 +24,8 @@ The ZIP is a valid archive that can be opened by any zip tool (Finder, Explorer,
       "name": "todo.md",
       "updatedAt": 1711234567890
     }
-  ]
+  ],
+  "renders": ["sketch.draw.svg"]
 }
 ```
 
@@ -30,6 +34,7 @@ The ZIP is a valid archive that can be opened by any zip tool (Finder, Explorer,
 | `id`        | string | Unique note identifier (base36)  |
 | `name`      | string | Filename including extension     |
 | `updatedAt` | number | Last modification timestamp (ms) |
+| `renders`   | array  | Drawing renders in the zip; import skips them |
 
 **Privacy:** Only `id`, `name`, and `updatedAt` are exported. The following are intentionally excluded:
 
@@ -71,7 +76,7 @@ Detected by `.zip` extension or `application/zip` MIME type. The ZIP reader hand
 
 ### Individual text files
 
-Any file with a text MIME type or a recognized text extension (~80 extensions supported: `.js`, `.py`, `.md`, `.json`, `.yaml`, `.toml`, `.rs`, `.go`, etc.) can be dropped directly.
+Any file with a text MIME type or a recognized text extension (~80 extensions supported: `.js`, `.py`, `.md`, `.draw`, `.json`, `.yaml`, `.toml`, `.rs`, `.go`, etc.) can be dropped directly. A dropped `.draw` file opens on the drawing canvas.
 
 | Scenario        | Behavior                      |
 | --------------- | ----------------------------- |
