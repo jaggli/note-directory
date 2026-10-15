@@ -7973,6 +7973,14 @@ document.addEventListener("click", (e) => {
 
 init();
 
+navigator.serviceWorker?.register("sw.js").catch(() => {});
+// Notes live only in localStorage; ask the browser not to evict it.
+// Firefox prompts for this, so wait until the user has written something.
+const requestPersist = () => navigator.storage?.persist?.().catch(() => {});
+if (navigator.userAgent.includes("Firefox"))
+  editor.addEventListener("input", requestPersist, { once: true });
+else requestPersist();
+
 // Re-sync when tab becomes visible again (handles backgrounded timers)
 let lastSyncCheck = 0;
 async function onTabResume() {

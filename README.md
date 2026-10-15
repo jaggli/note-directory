@@ -34,10 +34,9 @@ across devices via Google Drive.
   Google Drive's hidden app folder — no storage cost to
   the app. The Google library is lazy-loaded only when
   you initiate sync.
-- **No network needed while editing**: Once loaded,
-  editing never touches the network (Drive sync aside).
-  There is no service worker, so opening the page offline
-  only works while the browser still has it cached.
+- **Works offline**: After the first visit a service
+  worker caches the app, so it opens and edits without a
+  network (Drive sync aside). Installable as a PWA.
 
 <details>
 <summary><strong>Features</strong></summary>
