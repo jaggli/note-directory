@@ -16,6 +16,8 @@ test("toolbar and menu buttons work without inline handlers", async ({
   expect(await visible(page, "#fileMenu")).toBe(true);
   await page.click('#fileMenu button:has-text("help")');
   expect(await page.evaluate(() => getActiveNote().name)).toBe("help.md");
+  await expect(page.locator("#mdTabView")).toHaveClass(/active/);
+  await expect(page.locator("#mdPreview")).toBeVisible();
   expect(await visible(page, "#fileMenu")).toBe(false);
 
   await page.click("#mdTabView");

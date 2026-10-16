@@ -8481,6 +8481,8 @@ async function openBuiltinNote(name, content) {
       saveState();
     }
   }
+  // Built-in notes are for reading
+  switchMdTab("view");
 }
 
 async function openMdDemo() {
