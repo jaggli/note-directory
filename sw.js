@@ -1,5 +1,6 @@
 // Offline shell: serve same-origin files from cache, refresh them in the
-// background so the next load is current. Bump CACHE only to drop old files.
+// background so the next load is current. Shell files are refreshed together
+// so index.html and app.js never mix versions. Bump CACHE only to drop old files.
 const CACHE = "note-v1";
 const SHELL = [
   "./",
@@ -32,6 +33,16 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// Swap the shell only once every file downloaded
+async function refreshShell() {
+  const res = await Promise.all(SHELL.map((u) => fetch(u, { cache: "no-cache" })));
+  if (!res.every((r) => r.ok)) return;
+  const cache = await caches.open(CACHE);
+  await Promise.all(SHELL.map((u, i) => cache.put(u, res[i])));
+}
+
+const shellUrls = new Set(SHELL.map((u) => new URL(u, location).href));
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   const url = new URL(req.url);
@@ -41,17 +52,20 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(key, { ignoreSearch: true });
-      // no-cache: skip GitHub Pages' 10-minute HTTP cache when revalidating
-      const fresh = fetch(req.mode === "navigate" ? key : req, { cache: "no-cache" })
-        .then((res) => {
-          if (res.ok) cache.put(key, res.clone());
-          return res;
-        });
+      if (req.mode === "navigate") e.waitUntil(refreshShell().catch(() => {}));
       if (cached) {
-        e.waitUntil(fresh.catch(() => {}));
+        if (!shellUrls.has(url.origin + url.pathname)) e.waitUntil(update(cache, req).catch(() => {}));
         return cached;
       }
-      return fresh;
+      return update(cache, req.mode === "navigate" ? new Request(key) : req);
     }),
   );
 });
+
+// no-cache: skip GitHub Pages' 10-minute HTTP cache when revalidating
+function update(cache, req) {
+  return fetch(req, { cache: "no-cache" }).then((res) => {
+    if (res.ok) cache.put(req, res.clone());
+    return res;
+  });
+}
