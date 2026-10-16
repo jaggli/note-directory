@@ -2843,6 +2843,8 @@
     pngBlob,
     setTheme: () => {
       readTheme();
+      // Cached shapes carry the old colours
+      E.cache.clear();
       if (E.mounted) renderAll();
     },
     mount,

@@ -176,12 +176,16 @@ test("plain text= zen links stay ephemeral", async ({ page }) => {
 test("theme: picked from the submenu, persists, repaints drawings", async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => createNote("pic.draw", "draw 1\nr a 0 0 40 20 c=red\n"));
+  await expect(page.locator(".draw-svg [stroke='#f38ba8']").first()).toBeAttached();
   await page.click("#fileMenuContainer > button");
   await page.hover("[data-action=toggle-theme-menu]");
   await expect(page.locator("[data-value=mocha]")).toHaveAttribute("aria-checked", "true");
   await page.click("[data-value=latte]");
   await expect(page.locator("#fileMenu")).toBeHidden();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "latte");
+  // The open canvas repaints, not just new renders
+  await expect(page.locator(".draw-svg [stroke='#f38ba8']")).toHaveCount(0);
+  await expect(page.locator(".draw-svg [stroke='#d20f39']").first()).toBeAttached();
   const svg = await page.evaluate(async () => (await loadDraw(), Draw.svgString("draw 1\nr a 0 0 40 20 c=red\n")));
   expect(svg).toContain("#d20f39");
   await page.reload();
