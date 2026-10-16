@@ -2810,7 +2810,22 @@
     if (E.pending) update(E.pending);
   }
 
+  // Select a shape and bring it into view (search results)
+  function reveal(id) {
+    const s = E.mounted && E.model.byId.get(id);
+    if (!s) return;
+    const b = bounds(s, E.model);
+    const [vw, vh] = viewSize();
+    E.cam = { ...E.cam, x: b.x + b.w / 2 - vw / 2 / E.cam.z, y: b.y + b.h / 2 - vh / 2 / E.cam.z };
+    E.tool = "select";
+    E.focusGroup = null;
+    selectIds(groupIds(s));
+    applyCamera();
+    E.host.focus({ preventScroll: true });
+  }
+
   window.Draw = {
+    reveal,
     parse,
     serialize,
     renderStatic,
