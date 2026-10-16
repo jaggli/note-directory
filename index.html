@@ -63,6 +63,25 @@
       crossorigin
     />
     <link rel="manifest" href="manifest.json" />
+    <noscript>
+      <style>
+        html {
+          visibility: visible;
+        }
+        noscript p {
+          max-width: 40em;
+          margin: 2em auto;
+          padding: 0 1em;
+          line-height: 1.6;
+        }
+      </style>
+    </noscript>
+    <link
+      rel="alternate"
+      type="text/plain"
+      href="llms.txt"
+      title="For AI assistants: create notes and drawings as links"
+    />
     <style>
       /* Shown by app.js only when not inside a frame (clickjacking defense:
          GitHub Pages can't send frame-ancestors / X-Frame-Options) */
@@ -2187,6 +2206,19 @@
     </style>
   </head>
   <body>
+    <noscript>
+      <p>
+        note.directory is a private, local-first editor for text, markdown
+        and drawings. It needs JavaScript.
+      </p>
+      <p>
+        AI assistants: you don't need a browser or this page. To create a
+        note or a drawing, write its text and give the user a link:
+        https://note.directory/?view=draw#name=happy.draw&amp;text=&lt;URI-encoded
+        text&gt; (text last). How to write notes and drawings:
+        https://note.directory/llms.txt
+      </p>
+    </noscript>
     <div class="app">
       <div class="sidebar" role="complementary" aria-label="Note list">
         <div class="sidebar-resize" id="sidebarResize" aria-hidden="true"></div>

@@ -151,3 +151,22 @@ test("enter continues markdown lists", async ({ page }) => {
   await page.evaluate(() => createNote("l.txt", ""));
   expect(await type("- a", ["Enter"])).toBe("- a\n");
 });
+
+test("plain text= links open, even with & and # inside", async ({ page }) => {
+  const text = 'draw 1\nr a 0 0 200 80 "Q&A #1 &name=evil.md"\n';
+  // Lazy encoding as an LLM might write it: & and # left as they are
+  const lazy = text.replace(/ /g, "%20").replace(/\n/g, "%0A").replace(/"/g, "%22");
+  await page.goto("/?view=draw#name=plain.draw&text=" + lazy);
+  await page.waitForFunction(() => window.Draw?.isMounted());
+  expect(await page.evaluate(() => [getActiveNote().name, getActiveNote().content])).toEqual(["plain.draw", text]);
+  await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#name=plain\.draw&note=/);
+  expect(await page.evaluate(() => location.hash)).not.toContain("text=");
+});
+
+test("plain text= zen links stay ephemeral", async ({ page }) => {
+  await page.goto("/?view=zen#name=z.md&text=" + encodeURIComponent("# Hello\n\nworld"));
+  await page.waitForFunction(() => zenModeActive);
+  await expect(page.locator("#mdPreview h1")).toHaveText("Hello");
+  expect(await page.evaluate(() => state.notes.some((n) => n.name === "z.md"))).toBe(false);
+  expect(await page.evaluate(() => location.search)).toBe("?view=zen");
+});

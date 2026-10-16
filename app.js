@@ -581,7 +581,8 @@ async function updateUrl() {
     const queryStr = queryParams.toString();
     const query = queryStr ? "?" + queryStr : "";
 
-    const hashMap = parseHashParams(location.hash);
+    // A plain text= link is replaced by the compressed form
+    const hashMap = plainTextParam(location.hash)?.params ?? parseHashParams(location.hash);
     hashMap.set("name", note.name);
     hashMap.set("note", compressed);
     hashMap.set("ts", String(note.updatedAt));
@@ -3426,7 +3427,7 @@ window.addEventListener("popstate", async (e) => {
     // the content itself (a newly opened share link): that must be shown
     const hashMap = parseHashParams(location.hash);
     const name = hashMap.get("name");
-    if (name && !hashMap.get("note")) {
+    if (name && !hashMap.get("note") && plainTextParam(location.hash) === null) {
       const note = state.notes.find((n) => n.name === name);
       if (note) {
         const viewParam = new URLSearchParams(location.search).get(
@@ -6517,6 +6518,20 @@ async function shareNote() {
   }
 }
 
+// text= runs to the end of the link, so an unencoded & or # in the content
+// can't cut it short
+function plainTextParam(hash) {
+  const m = /(?:^#|&)text=/.exec(hash || "");
+  if (!m) return null;
+  const raw = hash.slice(m.index + m[0].length);
+  let text = raw;
+  try {
+    text = decodeURIComponent(raw);
+  } catch {}
+  // Other params only count before text=, not inside the content
+  return { text, params: parseHashParams(hash.slice(0, m.index)) };
+}
+
 async function loadFromUrl() {
   const queryParams = new URLSearchParams(location.search);
   const hashMap = parseHashParams(location.hash);
@@ -6534,9 +6549,18 @@ async function loadFromUrl() {
     fromOldFormat = !!noteData;
   }
 
-  if (!noteData) return false;
+  // Uncompressed links, easy to write by hand or by an LLM:
+  // #name=x.md&text=<URI-encoded content>, text last
+  const plain = noteData ? null : plainTextParam(location.hash);
+  if (plain !== null) {
+    name = plain.params.get("name") || "shared note";
+    // Saved notes get the usual compressed URL; zen views stay as opened
+    fromOldFormat = viewParam !== "zen";
+  }
+
+  if (!noteData && plain === null) return false;
   try {
-    const content = await decompress(noteData);
+    const content = plain ? plain.text : await decompress(noteData);
 
     // Zen mode from URL: don't persist, store ephemerally
     if (viewParam === "zen") {

@@ -1,27 +1,54 @@
 # note.directory
 
-> A private, local-first editor for text, markdown and drawings that runs entirely in the browser. A note can be shared as a link that contains the whole note: there is no server and no account. This file explains how to read and create such links.
+> A private, local-first editor for text, markdown and drawings that runs entirely in the browser. A note can be shared as a link that contains the whole note: there is no server and no account.
 
-## Links
+## Creating a note or drawing: just write a link
 
-A note link looks like this:
+**Do not open a browser and do not try to use the website's editor.** When someone asks you to write, draw or share something "with note.directory", write the note's text yourself and answer with a link that contains it. No code, tools or compression are needed:
+
+```
+https://note.directory/?view=<view>#name=<file name>&text=<URI-encoded text>
+```
+
+- `name`: the file name; the extension sets the type (`.md` markdown, `.draw` drawing, `.txt` …).
+- `text`: the content, URI-encoded (at least spaces `%20`, line breaks `%0A`, quotes `%22`, `%` → `%25`). It must be the **last** part of the link; it runs to the end.
+- `view`: `draw` to open a drawing, `md` for markdown preview, `zen` for a read-only view.
+
+Example: "draw a happy face" →
+
+```
+draw 1
+e face 0 0 200 200 c=yellow f=semi s=l
+e eye1 60 55 20 32 c=yellow f=solid
+e eye2 120 55 20 32 c=yellow f=solid
+a smile 50,125 150,125 c=yellow s=l he=none bend=35
+```
+
+https://note.directory/?view=draw#name=happy.draw&text=draw%201%0Ae%20face%200%200%20200%20200%20c%3Dyellow%20f%3Dsemi%20s%3Dl%0Ae%20eye1%2060%2055%2020%2032%20c%3Dyellow%20f%3Dsolid%0Ae%20eye2%20120%2055%2020%2032%20c%3Dyellow%20f%3Dsolid%0Aa%20smile%2050%2C125%20150%2C125%20c%3Dyellow%20s%3Dl%20he%3Dnone%20bend%3D35%0A
+
+Reply with the link (and, if useful, the text). The drawing format is described below.
+
+## Links in detail
+
+Links the app itself shares carry compressed content instead of `text`:
 
 ```
 https://note.directory/?view=<view>#name=<filename>&note=<content>&anchor=<heading>
 ```
 
-| Part     | Where | Required | Meaning |
-| -------- | ----- | -------- | ------- |
-| `name`   | hash  | yes      | File name, URI-encoded, e.g. `todo.md`, `plan%20v2.md`, `arch.draw`. The extension decides the type. |
-| `note`   | hash  | yes      | The content: UTF-8 text, raw DEFLATE compressed (no zlib header), base64url-encoded (`-` `_`, no `=` padding), then URI-encoded. |
-| `anchor` | hash  | no       | Heading slug to scroll to (markdown). |
-| `view`   | query | no       | `md` (markdown preview), `draw` (drawing canvas), `zen` (read-only, distraction-free). |
-| `ts`     | hash  | no       | Last-modified time in ms; the app sets it, links you create can leave it out. |
+| Part     | Where | Meaning |
+| -------- | ----- | ------- |
+| `name`   | hash  | File name, URI-encoded, e.g. `todo.md`, `plan%20v2.md`, `arch.draw`. The extension decides the type. |
+| `text`   | hash  | Plain content, URI-encoded, last in the link (see above). |
+| `note`   | hash  | Compressed content: UTF-8 text, raw DEFLATE (no zlib header), base64url (`-` `_`, no `=` padding), then URI-encoded. Use it when you can run code and want a shorter link. |
+| `anchor` | hash  | Heading slug to scroll to (markdown). |
+| `view`   | query | `md` (markdown preview), `draw` (drawing canvas), `zen` (read-only, distraction-free). |
+| `ts`     | hash  | Last-modified time in ms; the app sets it, links you create can leave it out. |
 
 - Everything sensitive lives in the hash, so it is never sent to a server.
 - The whole link must stay under **60,000 characters**. Larger notes can't be shared this way.
 - Older links put `name` and `note` in the query string instead of the hash; read both.
-- Opening a link with `view=zen` shows the note without saving it; other links save it into the reader's local notes.
+- Opening a link with `view=zen` shows the note without saving it; other links save it into the reader's local notes (and the address switches to the compressed form).
 
 Decode (Node.js):
 

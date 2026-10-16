@@ -150,6 +150,7 @@ Sensitive data (`name`, `note`) lives in the hash fragment, which is never sent 
 | Query    | `view`    | No       | `md`, `draw`, `zen` | Markdown preview, drawing canvas or zen mode |
 | Hash     | `name`    | Yes      | Note filename  | Identifies the note                               |
 | Hash     | `note`    | No       | Base64 deflate | Compressed content (dropped if URL > 60000 chars) |
+| Hash     | `text`    | No       | URI-encoded text | Uncompressed content for hand/LLM-written links; must come last, runs to the end of the link. Replaced by `note` once saved (zen views keep it) |
 | Hash     | `anchor`  | No       | Heading slug   | Scroll target for heading anchors                 |
 
 ### Update Flow

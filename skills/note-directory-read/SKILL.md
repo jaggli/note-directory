@@ -20,6 +20,8 @@ https://note.directory/?view=md|zen#name=<filename>&note=<compressed>&anchor=<he
 
 Legacy URLs use query parameters (`?name=...&note=...`) instead of hash — handle both.
 
+Links written by hand or by an LLM may carry plain content instead: `#name=<filename>&text=<URI-encoded text>`. `text` is always last and runs to the end of the URL (it may contain unencoded `&` or `#`): take everything after `text=` and URI-decode it — no decompression needed.
+
 ## How to decode
 
 1. Parse the URL. Extract the `note` and `name` values from the **hash fragment** (after `#`). Parameters are `&`-separated `key=value` pairs, URI-encoded. Fall back to query parameters if hash has no `note`.

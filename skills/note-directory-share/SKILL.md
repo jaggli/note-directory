@@ -64,6 +64,8 @@ NOTE_EOF
 
 If the user supplies a file path, replace the heredoc with `< /path/to/file.md` instead.
 
+**Without a shell** (or for a quick, short note), skip compression and put the text in the link directly: `https://note.directory/?view=<VIEW>#name=<FILENAME>&text=<URI-encoded content>`. `text` must be the last part of the link. The app saves it and switches to the compressed form when opened. Never open a browser to create a note — the link is the result.
+
 
 ## Drawings
 
