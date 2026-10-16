@@ -96,6 +96,7 @@ test("html export looks like zen and runs nothing", async ({ page }) => {
   expect(text).not.toContain("code-copy-btn\">copy");
   expect(text).not.toMatch(/<input[^>]*disabled/);
   expect(text).toContain(":has(> input:checked)");
+  expect(text).toMatch(/<input[^>]*id="task-0"[^>]*><label for="task-0">done<\/label>/);
   expect(text).toContain(".hl-kw");
 });
 

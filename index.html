@@ -22,17 +22,18 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://note.directory/" />
+    <!-- Under 300px so WhatsApp shows a small thumbnail, not a banner -->
     <meta
       property="og:image"
-      content="https://note.directory/img/android-chrome-512x512.png"
+      content="https://note.directory/img/android-chrome-192x192.png"
     />
-    <meta property="og:image:width" content="512" />
-    <meta property="og:image:height" content="512" />
+    <meta property="og:image:width" content="192" />
+    <meta property="og:image:height" content="192" />
     <meta property="og:image:type" content="image/png" />
     <meta name="twitter:card" content="summary" />
     <meta
       name="twitter:image"
-      content="https://note.directory/img/android-chrome-512x512.png"
+      content="https://note.directory/img/android-chrome-192x192.png"
     />
     <link rel="canonical" href="https://note.directory/" />
     <meta name="referrer" content="no-referrer" />
@@ -222,6 +223,11 @@
         background: var(--surface);
       }
 
+      /* Focus shows as the background; an outline gets clipped by the box */
+      .search-input:focus-visible {
+        outline: none;
+      }
+
       .search-results {
         display: none;
         position: fixed;
@@ -274,8 +280,30 @@
       }
 
       .search-scope input {
-        accent-color: var(--blue);
+        appearance: none;
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        margin: 0;
+        border: 2px solid var(--blue);
+        border-radius: 3px;
+        position: relative;
         cursor: pointer;
+      }
+
+      .search-scope input:checked {
+        background: var(--blue);
+      }
+
+      .search-scope input:checked::after {
+        content: "\2714";
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: 10px;
+        color: var(--bg);
+        font-weight: bold;
       }
 
       .search-backdrop {
@@ -1318,7 +1346,7 @@
         flex-shrink: 0;
       }
 
-      .md-preview li.task-item > span {
+      .md-preview li.task-item > :is(span, label) {
         flex: 1;
       }
 
@@ -1338,7 +1366,7 @@
         font-weight: bold;
       }
 
-      .md-preview li.task-item:has(> input:checked) > span {
+      .md-preview li.task-item:has(> input:checked) > :is(span, label) {
         text-decoration: line-through;
         opacity: 0.5;
       }
@@ -2722,7 +2750,7 @@
         />
         <label class="search-scope" title="ctrl+f: this note · ctrl+p: all notes">
           <input type="checkbox" id="searchAll" />
-          all notes
+          all
         </label>
         <span
           class="search-results-count"

@@ -3662,6 +3662,8 @@ searchAll.addEventListener("change", () => {
   setSearchScope(searchAll.checked ? "all" : "note");
   searchInput.focus();
 });
+// Keep focus in the input while clicking the toggle
+searchAll.parentElement.addEventListener("mousedown", (e) => e.preventDefault());
 
 function openSearch(scope = "all") {
   searchPreviousFocus = document.activeElement;
@@ -6368,6 +6370,15 @@ async function noteHtml(note) {
     el.removeAttribute("data-ref");
   }
   for (const btn of doc.querySelectorAll(".code-copy-btn")) btn.remove();
+  // Without the app's click handler, a label makes the whole line toggle
+  doc.querySelectorAll("li.task-item > input").forEach((box, i) => {
+    const span = box.nextElementSibling;
+    if (span?.tagName !== "SPAN") return;
+    const label = document.createElement("label");
+    label.htmlFor = box.id = "task-" + i;
+    label.append(...span.childNodes);
+    span.replaceWith(label);
+  });
   // Links to other notes have nowhere to go outside the app
   for (const a of doc.querySelectorAll("a[href]")) {
     const href = a.getAttribute("href");
