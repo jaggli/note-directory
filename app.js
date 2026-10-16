@@ -1503,6 +1503,8 @@ function highlightNodeAt(pos) {
 
 // First/last highlight rows intersecting the viewport (binary search)
 function visibleRows() {
+  // The layer follows the editor in its (async) scroll event: catch up first
+  highlightLayer.scrollTop = editor.scrollTop;
   const rows = highlightLayer.children;
   const view = highlightLayer.getBoundingClientRect();
   const find = (y) => {
