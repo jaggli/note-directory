@@ -1,3 +1,11 @@
+// Theme before the page is revealed (per browser, synced via Drive settings)
+const THEME_KEY = "notepad_theme";
+const THEMES = ["mocha", "macchiato", "frappe", "latte", "espresso"];
+try {
+  const t = localStorage.getItem(THEME_KEY);
+  if (THEMES.includes(t)) document.documentElement.dataset.theme = t;
+} catch {}
+
 // Clickjacking defense: the page stays hidden (index.html) when framed.
 // Hidden elements can't be clicked, so an overlay attack has nothing to hit.
 if (window.top === window.self) {
@@ -4240,6 +4248,29 @@ function loadWrap() {
   }
 }
 
+function currentTheme() {
+  return document.documentElement.dataset.theme || THEMES[0];
+}
+
+function applyTheme(name) {
+  if (!THEMES.includes(name)) name = THEMES[0];
+  document.documentElement.dataset.theme = name;
+  document.querySelector('meta[name="theme-color"]').content =
+    getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+  for (const b of document.querySelectorAll("[data-action=set-theme]"))
+    b.setAttribute("aria-checked", b.dataset.value === name);
+  // Drawings are painted with hex colours, so repaint them
+  if (window.Draw) {
+    Draw.setTheme();
+    hydrateDrawEmbeds();
+  }
+}
+
+function setTheme() {
+  localStorage.setItem(THEME_KEY, actionEl.dataset.value);
+  applyTheme(actionEl.dataset.value);
+}
+
 function toggleWrap() {
   const isWrap = editorArea.classList.toggle("wrap");
   btnWrap.classList.toggle("active", isWrap);
@@ -6251,6 +6282,7 @@ function vimHandleKeydown(e) {
 
 const fileMenu = document.getElementById("fileMenu");
 const syncMenu = document.getElementById("syncMenu");
+const themeMenu = document.getElementById("themeMenu");
 
 function toggleFileMenu() {
   syncMenu.classList.remove("visible");
@@ -6259,6 +6291,7 @@ function toggleFileMenu() {
 
 function closeFileMenu() {
   fileMenu.classList.remove("visible");
+  themeMenu.classList.remove("visible");
 }
 
 function toggleSyncMenu() {
@@ -6401,14 +6434,14 @@ async function noteHtml(note) {
   }
   const title = escapeHtml(note.name);
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-theme="${currentTheme()}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
 <title>${title}</title>
 <style>
-body { margin: 0; background: #1e1e2e; color: #cdd6f4; }
+body { margin: 0; background: var(--bg); color: var(--text); }
 ${css.join("\n")}
 .md-preview { overflow: visible; }
 </style>
@@ -7766,6 +7799,7 @@ function gatherDrivePayload() {
       wrap: localStorage.getItem(WRAP_KEY),
       vim: localStorage.getItem(VIM_KEY),
       sidebarWidth: localStorage.getItem(SIDEBAR_WIDTH_KEY),
+      theme: localStorage.getItem(THEME_KEY),
     },
   });
 }
@@ -7796,6 +7830,10 @@ function applyDriveSettings(settings) {
       vimState.mode = "normal";
     }
     updateCursorPos();
+  }
+  if (THEMES.includes(settings.theme)) {
+    localStorage.setItem(THEME_KEY, settings.theme);
+    applyTheme(settings.theme);
   }
   if (/^\d+$/.test(settings.sidebarWidth || "")) {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, settings.sidebarWidth);
@@ -8465,6 +8503,7 @@ async function init() {
   const isFirstVisit = !localStorage.getItem(STORAGE_KEY);
   loadState();
   loadWrap();
+  applyTheme(currentTheme());
   loadVim();
 
   // Tabs opened in the background must not take Drive sync from the
@@ -8551,6 +8590,8 @@ const clickActions = {
   "zen-share": zenShare,
   "toggle-vim": toggleVim,
   "toggle-wrap": toggleWrap,
+  "set-theme": setTheme,
+  "toggle-theme-menu": () => themeMenu.classList.toggle("visible"),
 };
 let actionEl = null;
 document.addEventListener("click", (e) => {

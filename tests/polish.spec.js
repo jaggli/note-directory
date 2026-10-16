@@ -172,3 +172,18 @@ test("plain text= zen links stay ephemeral", async ({ page }) => {
   expect(await page.evaluate(() => state.notes.some((n) => n.name === "z.md"))).toBe(false);
   expect(await page.evaluate(() => location.search)).toBe("?view=zen");
 });
+
+test("theme: picked from the submenu, persists, repaints drawings", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => createNote("pic.draw", "draw 1\nr a 0 0 40 20 c=red\n"));
+  await page.click("#fileMenuContainer > button");
+  await page.hover("[data-action=toggle-theme-menu]");
+  await expect(page.locator("[data-value=mocha]")).toHaveAttribute("aria-checked", "true");
+  await page.click("[data-value=latte]");
+  await expect(page.locator("#fileMenu")).toBeHidden();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "latte");
+  const svg = await page.evaluate(async () => (await loadDraw(), Draw.svgString("draw 1\nr a 0 0 40 20 c=red\n")));
+  expect(svg).toContain("#d20f39");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "latte");
+});

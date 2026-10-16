@@ -9,27 +9,37 @@
   // ═══════════════════════════════════════════════════
 
   const VERSION = 1;
-  const COLORS = {
-    text: "#cdd6f4",
-    grey: "#9399b2",
-    red: "#f38ba8",
-    peach: "#fab387",
-    yellow: "#f9e2af",
-    green: "#a6e3a1",
-    teal: "#94e2d5",
-    sky: "#89dceb",
-    blue: "#89b4fa",
-    lavender: "#b4befe",
-    mauve: "#cba6f7",
-    pink: "#f5c2e7",
+  // Palette names → the page's theme variables; hex values are read per theme
+  const COLOR_VARS = {
+    text: "text",
+    grey: "overlay2",
+    red: "red",
+    peach: "peach",
+    yellow: "yellow",
+    green: "green",
+    teal: "teal",
+    sky: "sky",
+    blue: "blue",
+    lavender: "lavender",
+    mauve: "mauve",
+    pink: "pink",
   };
-  const BG = "#1e1e2e";
-  const ACCENT = "#89b4fa";
+  const COLORS = {};
+  let BG, ACCENT;
+  function readTheme() {
+    const css = getComputedStyle(document.documentElement);
+    const v = (name) => css.getPropertyValue("--" + name).trim();
+    // A theme can set --draw-<colour> to differ from its UI colour
+    for (const [c, name] of Object.entries(COLOR_VARS)) COLORS[c] = v("draw-" + c) || v(name);
+    BG = v("bg");
+    ACCENT = v("blue");
+  }
+  readTheme();
   const STROKE = { s: 2, m: 3.5, l: 5, xl: 8 };
   const FONT_SIZE = { s: 16, m: 22, l: 30, xl: 44 };
   const HEADS = ["none", "open", "triangle", "dot", "diamond", "bar"];
   const ENUMS = {
-    c: Object.keys(COLORS),
+    c: Object.keys(COLOR_VARS),
     s: Object.keys(STROKE),
     f: ["none", "semi", "solid"],
     d: ["solid", "dash", "dot"],
@@ -1109,7 +1119,7 @@
     const svg = el("svg", { class: "draw-svg" }, host);
     const defs = el("defs", {}, svg);
     E.pattern = el("pattern", { id: "drawGridPattern", patternUnits: "userSpaceOnUse", width: GRID, height: GRID }, defs);
-    E.patternDot = el("circle", { cx: 1, cy: 1, r: 1, fill: "#45475a" }, E.pattern);
+    E.patternDot = el("circle", { cx: 1, cy: 1, r: 1, style: "fill: var(--surface1)" }, E.pattern);
     E.gridRect = el("rect", { width: "100%", height: "100%", fill: "url(#drawGridPattern)" }, svg);
     E.world = el("g", {}, svg);
     E.shapesG = el("g", {}, E.world);
@@ -1159,7 +1169,7 @@
       b.dataset.draw = "style:c:" + c;
       b.title = c;
       b.setAttribute("aria-label", "color " + c);
-      h("span", "", b).style.background = COLORS[c];
+      h("span", "", b).style.background = `var(--draw-${c}, var(--${COLOR_VARS[c]}))`;
     }
     const seg = (key, items) => {
       const row = h("div", "draw-seg", E.styleEl);
@@ -2831,6 +2841,10 @@
     renderStatic,
     svgString,
     pngBlob,
+    setTheme: () => {
+      readTheme();
+      if (E.mounted) renderAll();
+    },
     mount,
     unmount,
     update,
