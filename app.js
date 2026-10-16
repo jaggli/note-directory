@@ -1792,6 +1792,7 @@ function renderNoteList() {
     input.name = "filename";
     input.value = note.name;
     input.spellcheck = false;
+    input.autocomplete = "off";
     input.addEventListener("input", () => {
       note.name = input.value.trim() || "untitled";
       note.updatedAt = Date.now();
@@ -2426,8 +2427,10 @@ function renderMarkdown(src) {
             "</span></span>",
         )
         .join("");
+      const plain = ["plain", "text", "txt"].includes(lang.toLowerCase());
       codeBlocks.push(
-        '<pre><button class="code-copy-btn">copy</button><code>' +
+        (plain ? '<pre class="no-ln">' : "<pre>") +
+          '<button class="code-copy-btn">copy</button><code>' +
           wrapped +
           "</code></pre>",
       );
@@ -2871,6 +2874,7 @@ function updateMdTabBar() {
   mdTabEdit.style.display = isDraw ? "none" : "";
   mdTabView.textContent = isDraw ? "draw" : "view";
   fileMenu.classList.toggle("is-draw", isDraw);
+  fileMenu.classList.toggle("is-md", isMarkdownFile(note?.name));
   if (!isMd && !zenEphemeral && mdViewActive) {
     switchMdTab("edit");
   } else if (mdViewActive && !zenModeActive && mdTabsKind !== (isDraw ? "draw" : "md")) {
@@ -3045,7 +3049,7 @@ function switchMdTab(tab, pushHistory) {
     zenEl.querySelector(".zen-bar-filename-end").textContent =
       zenName.slice(zenSplit);
     zenBar.style.display = "";
-    document.getElementById("zenShareBtn").style.display = "";
+    document.getElementById("zenActions").style.display = "";
   } else if (tab === "view" && showsDrawing) {
     gutter.style.display = "none";
     editorArea.style.display = "none";
@@ -3058,7 +3062,7 @@ function switchMdTab(tab, pushHistory) {
     btnVim.style.display = "none";
     appEl.classList.remove("zen-mode");
     zenBar.style.display = "none";
-    document.getElementById("zenShareBtn").style.display = "none";
+    document.getElementById("zenActions").style.display = "none";
     showDraw(shownNote, false);
   } else if (tab === "view") {
     const note = getActiveNote();
@@ -3084,7 +3088,7 @@ function switchMdTab(tab, pushHistory) {
     btnVim.style.display = "none";
     appEl.classList.remove("zen-mode");
     zenBar.style.display = "none";
-    document.getElementById("zenShareBtn").style.display = "none";
+    document.getElementById("zenActions").style.display = "none";
     // Scroll preview so cursor area is centered
     requestAnimationFrame(() => {
       const scrollMax = mdPreview.scrollHeight - mdPreview.clientHeight;
@@ -3114,7 +3118,7 @@ function switchMdTab(tab, pushHistory) {
     btnVim.style.display = "";
     appEl.classList.remove("zen-mode");
     zenBar.style.display = "none";
-    document.getElementById("zenShareBtn").style.display = "none";
+    document.getElementById("zenActions").style.display = "none";
     // Sync editor with in-memory content (e.g. after checkbox toggle)
     const activeNote = getActiveNote();
     if (activeNote) editor.value = activeNote.content;
@@ -3645,8 +3649,27 @@ let searchDebounce = null;
 let searchPreviousFocus = null;
 let searchRemoveTrap = null;
 
-function openSearch() {
+// Two scopes: "note" (Ctrl+F, one row per matching line) and "all" (Ctrl+P)
+let searchScope = "all";
+const searchAll = document.getElementById("searchAll");
+const NOTE_RESULTS_MAX = 200;
+
+function setSearchScope(scope) {
+  searchScope = scope === "note" && getActiveNote() ? "note" : "all";
+  searchAll.checked = searchScope === "all";
+  searchInput.placeholder = searchScope === "all" ? "search all notes..." : "search this note...";
+  searchInput.setAttribute("aria-label", searchInput.placeholder.slice(0, -3));
+  if (searchInput.value.trim()) searchNotes(searchInput.value);
+}
+
+searchAll.addEventListener("change", () => {
+  setSearchScope(searchAll.checked ? "all" : "note");
+  searchInput.focus();
+});
+
+function openSearch(scope = "all") {
   searchPreviousFocus = document.activeElement;
+  setSearchScope(scope);
   searchResults.classList.add("visible");
   searchBackdrop.classList.add("visible");
   searchInput.value = "";
@@ -3737,6 +3760,7 @@ function searchNotes(query) {
     searchSelectedIdx = -1;
     return;
   }
+  if (searchScope === "note") return searchActiveNote(query);
   const results = [];
   for (const note of state.notes) {
     const nameMatch = matchLine(note.name, query);
@@ -3782,6 +3806,108 @@ function searchNotes(query) {
   showSearchResults(results);
 }
 
+// Exact matches only: fuzzy matching on single lines of one file is noise
+function searchActiveNote(query) {
+  const note = getActiveNote();
+  if (!note) return showSearchResults([]);
+  const raw = note.content.split("\n");
+  const lines = isDrawFile(note.name) ? drawSearchLines(note.content) : raw;
+  const hits = [];
+  let offset = 0;
+  for (let i = 0; i < lines.length && hits.length < NOTE_RESULTS_MAX; i++) {
+    const matches = findAll(lines[i], query.trim());
+    if (matches.length) {
+      const indices = matches.flatMap((m) =>
+        Array.from({ length: m.end - m.start }, (_, k) => m.start + k),
+      );
+      const labelAt = lines === raw ? 0 : raw[i].lastIndexOf('"', raw[i].length - 2) + 1;
+      hits.push({ line: lines[i], lineNum: i + 1, lineIndices: indices, charOffset: offset + labelAt + matches[0].start, raw: raw[i] });
+    }
+    offset += raw[i].length + 1;
+  }
+  showNoteResults(note, hits);
+}
+
+function searchSnippet(lm) {
+  const snippetDiv = document.createElement("div");
+  snippetDiv.className = "search-result-snippet";
+  const prefix = lm.lineNum + ": ";
+  const maxLen = 120;
+  let snippetText = lm.line;
+  let indices = lm.lineIndices;
+  if (snippetText.length > maxLen && indices.length) {
+    // Center snippet around the first match index
+    const firstIdx = indices[0];
+    let start = Math.max(0, firstIdx - 30);
+    // Snap to a word boundary
+    if (start > 0) {
+      const sp = snippetText.lastIndexOf(" ", start);
+      if (sp > start - 15) start = sp + 1;
+    }
+    let end = Math.min(snippetText.length, start + maxLen);
+    snippetText =
+      (start > 0 ? "\u2026" : "") +
+      snippetText.slice(start, end) +
+      (end < lm.line.length ? "\u2026" : "");
+    // Shift indices to match the sliced text
+    indices = indices
+      .map((i) => i - start + (start > 0 ? 1 : 0))
+      .filter((i) => i >= 0 && i < snippetText.length);
+  }
+  snippetDiv.innerHTML =
+    '<span style="color:var(--gutter)">' +
+    escapeHtml(prefix) +
+    "</span>" +
+    highlightFuzzy(snippetText, indices);
+  return snippetDiv;
+}
+
+// After jumping to a result: n/N, the find bar and vim search continue from it
+function adoptSearchQuery(query) {
+  if (!query) return;
+  findInput.value = query;
+  vimState.searchDirection = 1;
+  vimState.lastSearch = { pattern: "\\V" + query.replace(/\\/g, "\\\\"), ignoreCase: true };
+  updateFindMatches();
+  if (findMatches.length) selectFindMatch(true);
+  updateCursorPos();
+}
+
+function showNoteResults(note, hits) {
+  searchCount.textContent =
+    hits.length + (hits.length >= NOTE_RESULTS_MAX ? "+" : "") + " line" + (hits.length !== 1 ? "s" : "");
+  searchResultsList.innerHTML = "";
+  searchSelectedIdx = -1;
+  if (!hits.length) {
+    searchResultsList.innerHTML = '<div class="search-no-results">no matches</div>';
+    return;
+  }
+  hits.forEach((hit, i) => {
+    const div = document.createElement("div");
+    div.className = "search-result-item search-result-line";
+    div.dataset.idx = i;
+    div.appendChild(searchSnippet(hit));
+    div.addEventListener("click", () => {
+      const query = searchInput.value.trim();
+      closeSearch();
+      searchInput.value = "";
+      // On the canvas: show the shape instead of the source line
+      if (drawActive() && window.Draw) {
+        Draw.reveal(hit.raw.trim().split(/\s+/)[1]);
+        return;
+      }
+      if (mdViewActive) switchMdTab("edit", true);
+      editor.focus();
+      editor.setSelectionRange(hit.charOffset, hit.charOffset);
+      adoptSearchQuery(query);
+      ensureCursorScrolloff();
+    });
+    searchResultsList.appendChild(div);
+  });
+  searchSelectedIdx = 0;
+  updateSearchSelection();
+}
+
 function showSearchResults(results) {
   searchResults.classList.add("visible");
   searchBackdrop.classList.add("visible");
@@ -3810,39 +3936,7 @@ function showSearchResults(results) {
       nameDiv.textContent = r.note.name;
     }
     div.appendChild(nameDiv);
-    for (const lm of r.lines) {
-      const snippetDiv = document.createElement("div");
-      snippetDiv.className = "search-result-snippet";
-      const prefix = lm.lineNum + ": ";
-      const maxLen = 120;
-      let snippetText = lm.line;
-      let indices = lm.lineIndices;
-      if (snippetText.length > maxLen && indices.length) {
-        // Center snippet around the first match index
-        const firstIdx = indices[0];
-        let start = Math.max(0, firstIdx - 30);
-        // Snap to a word boundary
-        if (start > 0) {
-          const sp = snippetText.lastIndexOf(" ", start);
-          if (sp > start - 15) start = sp + 1;
-        }
-        let end = Math.min(snippetText.length, start + maxLen);
-        snippetText =
-          (start > 0 ? "\u2026" : "") +
-          snippetText.slice(start, end) +
-          (end < lm.line.length ? "\u2026" : "");
-        // Shift indices to match the sliced text
-        indices = indices
-          .map((i) => i - start + (start > 0 ? 1 : 0))
-          .filter((i) => i >= 0 && i < snippetText.length);
-      }
-      snippetDiv.innerHTML =
-        '<span style="color:var(--gutter)">' +
-        escapeHtml(prefix) +
-        "</span>" +
-        highlightFuzzy(snippetText, indices);
-      div.appendChild(snippetDiv);
-    }
+    for (const lm of r.lines) div.appendChild(searchSnippet(lm));
     const target = r.lines[0] || null;
     div.addEventListener("click", () => {
       const query = searchInput.value.trim();
@@ -3856,14 +3950,7 @@ function showSearchResults(results) {
         editor.setSelectionRange(target.charOffset, target.charOffset);
       }
       // Populate find state like vim / search so n/N work
-      if (query) {
-        findInput.value = query;
-        vimState.searchDirection = 1;
-        vimState.lastSearch = { pattern: "\\V" + query.replace(/\\/g, "\\\\"), ignoreCase: true };
-        updateFindMatches();
-        if (findMatches.length) selectFindMatch(true);
-        updateCursorPos();
-      }
+      adoptSearchQuery(query);
     });
     searchResultsList.appendChild(div);
   }
@@ -3893,6 +3980,12 @@ searchInput.addEventListener("input", () => {
 
 searchInput.addEventListener("keydown", (e) => {
   const items = searchResultsList.querySelectorAll(".search-result-item");
+  // Ctrl+F / Ctrl+P switch scope while the dialog is open
+  if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "p")) {
+    e.preventDefault();
+    setSearchScope(e.key === "f" ? "note" : "all");
+    return;
+  }
   if (e.key === "ArrowDown") {
     e.preventDefault();
     if (items.length) {
@@ -6258,6 +6351,95 @@ async function drawDownloadSvg() {
   );
 }
 
+// Standalone HTML of a markdown note as zen shows it. No scripts: a strict
+// CSP inside the file keeps it inert wherever it is opened.
+async function noteHtml(note) {
+  const doc = document.createElement("div");
+  doc.innerHTML = renderMarkdown(note.content);
+  const embeds = doc.querySelectorAll(".draw-embed");
+  if (embeds.length) {
+    try {
+      await loadDraw();
+      for (const el of embeds) {
+        const ref = el.dataset.ref && state.notes.find((n) => n.name === el.dataset.ref);
+        if (el.dataset.ref && !ref) continue;
+        el.replaceChildren(Draw.renderStatic(ref ? ref.content : el.dataset.draw));
+      }
+    } catch {}
+  }
+  for (const el of doc.querySelectorAll(".draw-embed")) {
+    el.removeAttribute("data-draw");
+    el.removeAttribute("data-ref");
+  }
+  for (const btn of doc.querySelectorAll(".code-copy-btn")) btn.remove();
+  for (const box of doc.querySelectorAll("input[type=checkbox]")) box.setAttribute("disabled", "");
+  // Links to other notes have nowhere to go outside the app
+  for (const a of doc.querySelectorAll("a[href]")) {
+    const href = a.getAttribute("href");
+    if (/^(https?:|mailto:|#)/i.test(href)) continue;
+    const span = document.createElement("span");
+    span.append(...a.childNodes);
+    a.replaceWith(span);
+  }
+  // The page's own rules for the preview, so the file looks like zen
+  const wanted = /md-preview|zen-wrap|zen-mode|draw-embed|\.hl-|:root/;
+  const css = [];
+  for (const sheet of document.styleSheets) {
+    let rules;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    for (const rule of rules) if (wanted.test(rule.cssText)) css.push(rule.cssText);
+  }
+  const title = escapeHtml(note.name);
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+<title>${title}</title>
+<style>
+body { margin: 0; background: #1e1e2e; color: #cdd6f4; }
+${css.join("\n")}
+.md-preview { overflow: visible; }
+</style>
+</head>
+<body>
+<div class="zen-mode"><div class="md-preview visible"><div class="zen-wrap">
+${doc.innerHTML}
+</div></div></div>
+</body>
+</html>
+`;
+}
+
+async function downloadHtml(note) {
+  if (!note || !isMarkdownFile(note.name)) return;
+  const html = await noteHtml(note);
+  triggerDownload(
+    new Blob([html], { type: "text/html" }),
+    note.name.replace(/\.(md|markdown)$/i, "") + ".html",
+  );
+}
+
+// Zen's download: the note as it is shown (HTML for markdown, SVG for drawings)
+async function zenDownload() {
+  const note = zenFromUrl && zenEphemeralNote ? zenEphemeralNote : getActiveNote();
+  if (!note) return;
+  if (isMarkdownFile(note.name)) return downloadHtml(note);
+  if (isDrawFile(note.name)) {
+    await loadDraw();
+    return triggerDownload(
+      new Blob([Draw.svgString(note.content)], { type: "image/svg+xml" }),
+      note.name.replace(/\.draw$/i, "") + ".svg",
+    );
+  }
+  downloadNote();
+}
+
 async function downloadAll() {
   if (!state.notes.length) return;
   const files = state.notes.map((n) => ({
@@ -6964,9 +7146,70 @@ function moveLines(dir) {
   editor.dispatchEvent(new Event("input"));
 }
 
+// Markdown lists: Enter continues the item's marker; on an empty item it
+// removes the marker instead, ending the list
+const LIST_RE = /^(\s*)(?:([-+*])|(\d+)([.)]))(\s+)(\[[ xX]?\]\s+)?/;
+
+function inCodeFence(text, upTo) {
+  let open = false;
+  for (const line of text.slice(0, upTo).split("\n"))
+    if (/^\s*(```|~~~)/.test(line)) open = !open;
+  return open;
+}
+
+function continueList() {
+  const note = getActiveNote();
+  if (!note || !isMarkdownFile(note.name)) return false;
+  const val = editor.value;
+  const pos = editor.selectionStart;
+  if (pos !== editor.selectionEnd) return false;
+  const start = val.lastIndexOf("\n", pos - 1) + 1;
+  const nl = val.indexOf("\n", pos);
+  const end = nl === -1 ? val.length : nl;
+  const line = val.slice(start, end);
+  const m = line.match(LIST_RE);
+  if (!m || pos < start + m[0].length || inCodeFence(val, start)) return false;
+  const [marker, indent, bullet, num, delim, gap, task] = m;
+  if (!line.slice(marker.length).trim()) {
+    editor.setRangeText("", start, end, "start");
+  } else {
+    const next = bullet || Number(num) + 1 + delim;
+    editor.setRangeText("\n" + indent + next + gap + (task ? "[ ] " : ""), pos, pos, "end");
+  }
+  editor.dispatchEvent(new Event("input"));
+  return true;
+}
+
+let lastKeydownKey = "";
+editor.addEventListener("keydown", (e) => (lastKeydownKey = e.key), true);
+// Mobile keyboards that don't report Enter on keydown still send this
+editor.addEventListener("beforeinput", (e) => {
+  if (
+    (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") &&
+    lastKeydownKey !== "Enter" &&
+    !e.isComposing &&
+    !(vimState.enabled && vimState.mode !== "insert") &&
+    continueList()
+  )
+    e.preventDefault();
+});
+
 editor.addEventListener("keydown", (e) => {
   // Skip in vim normal/visual mode
   if (vimState.enabled && vimState.mode !== "insert") return;
+
+  if (
+    e.key === "Enter" &&
+    !e.shiftKey &&
+    !e.altKey &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.isComposing &&
+    continueList()
+  ) {
+    e.preventDefault();
+    return;
+  }
 
   // Alt+Arrow Up/Down — move line(s) up/down
   if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
@@ -7071,14 +7314,14 @@ document.addEventListener("keydown", (e) => {
     openFindReplace();
     return;
   }
-  // Open search (skip if typing in an input)
+  // Search: Ctrl+F this note, Ctrl+P all notes (skip if typing in an input)
   if (
     !inInput &&
     (e.metaKey || e.ctrlKey) &&
     (e.key === "p" || e.key === "f")
   ) {
     e.preventDefault();
-    openSearch();
+    openSearch(e.key === "f" ? "note" : "all");
     searchInput.select();
     return;
   }
@@ -7890,11 +8133,12 @@ const HELP_DESKTOP = [
   "## Shortcuts",
   "",
   "- Ctrl+N — new note",
-  "- Ctrl+P — search notes",
+  "- Ctrl+F — search this note · Ctrl+P — search all notes",
   "- Ctrl+H — find & replace",
   "- Ctrl+Shift+D — delete note",
   "- Ctrl+Shift+F — format markdown",
   "- Tab / Shift+Tab — indent / dedent",
+  "- Enter in a list continues it, on an empty item ends it",
   "- Alt+↑ / Alt+↓ — move line up / down",
   "- e — switch from view to edit (in markdown preview)",
   "",
@@ -8253,6 +8497,8 @@ const clickActions = {
   "new-drawing-rename": () => createNote(undefined, undefined, true, "draw"),
   "toggle-new-menu": toggleNewMenu,
   "draw-source": () => switchMdTab("edit", true),
+  "download-html": () => downloadHtml(getActiveNote()),
+  "zen-download": zenDownload,
   "draw-copy-png": drawCopyPng,
   "draw-download-svg": drawDownloadSvg,
   "toggle-sidebar": toggleSidebar,

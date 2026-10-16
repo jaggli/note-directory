@@ -50,7 +50,9 @@ across devices via Google Drive.
 - Syntax highlighting for 12 languages
   (JS, TS, Python, Rust, Go, CSS/SCSS, HTML/XML,
   JSON, YAML, TOML, Markdown, Shell/Bash)
-- Fuzzy search across all notes
+- Search: Ctrl+F finds lines in the current note, Ctrl+P
+  fuzzy-searches all notes (switch with a checkbox or the
+  other shortcut)
 - Find & replace within a note
 - Drag-and-drop file import
 - Drag to reorder notes in sidebar
@@ -69,6 +71,13 @@ across devices via Google Drive.
 - Clickable anchor links (`[link](#heading)`) scroll
   to the target heading in preview
 - Code block copy button (hover to reveal, click to copy)
+- Line numbers in code blocks, except ` ```text `,
+  ` ```txt ` and ` ```plain `
+- Lists continue on Enter (`-`, `+`, `*`, `1.`, `- [ ]`);
+  Enter on an empty item ends the list
+- Download a markdown note as standalone HTML (file menu,
+  or the download button in zen), styled like zen and
+  free of scripts
 - Syntax-highlighted fenced code blocks in preview
   (when a language tag is specified)
 - Tables with column alignment (left, center, right)
@@ -180,7 +189,8 @@ Features include:
 | Shortcut        | Action                                         |
 | --------------- | ---------------------------------------------- |
 | Ctrl+N          | New note                                       |
-| Ctrl+P / Ctrl+F | Search all notes                               |
+| Ctrl+F          | Search the current note (line by line)         |
+| Ctrl+P          | Search all notes                               |
 | Ctrl+H          | Find & replace                                 |
 | Ctrl+S          | Format (`.md` only) + save + sync              |
 | Ctrl+Shift+D    | Delete note                                    |
@@ -199,6 +209,12 @@ precedence in the editor. The shortcuts above still work
 in input fields (search, find & replace).
 
 </details>
+
+## For LLMs
+
+[`llms.txt`](https://note.directory/llms.txt) explains the link
+format and the drawing format, so any LLM can read and
+create note.directory links.
 
 ## Claude Code skills
 

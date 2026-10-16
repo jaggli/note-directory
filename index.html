@@ -242,6 +242,23 @@
         display: flex;
       }
 
+      .search-scope {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 10px;
+        font-size: 12px;
+        color: var(--subtext);
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .search-scope input {
+        accent-color: var(--blue);
+        cursor: pointer;
+      }
+
       .search-backdrop {
         display: none;
         position: fixed;
@@ -639,6 +656,20 @@
         display: flex;
       }
 
+      /* Desktop: tabs centred in the top bar (mobile keeps them right) */
+      @media (min-width: 901px) {
+        .md-tab-bar {
+          position: relative;
+        }
+
+        .md-tabs {
+          position: absolute;
+          left: 50%;
+          bottom: 0;
+          transform: translateX(-50%);
+        }
+      }
+
       .md-tab-bar .file-menu {
         top: 100%;
         bottom: auto;
@@ -742,8 +773,13 @@
         display: none;
       }
 
-      .file-menu.is-draw .draw-only {
+      .file-menu.is-draw .draw-only,
+      .file-menu.is-md .md-only {
         display: block;
+      }
+
+      .file-menu .md-only {
+        display: none;
       }
 
       /* Drawing canvas (UI styles come with draw.js) */
@@ -908,25 +944,57 @@
         opacity: 1;
       }
 
-      .zen-share-btn {
+      .zen-actions {
         position: fixed;
         bottom: 24px;
         right: 24px;
         z-index: 1000;
+        display: flex;
+        gap: 2px;
+        padding: 3px;
         background: var(--sidebar);
         border: 1px solid var(--border);
-        border-radius: 4px;
-        color: var(--subtext);
-        font-family: var(--font);
-        font-size: 13px;
-        padding: 6px 14px;
-        cursor: pointer;
+        border-radius: 8px;
         opacity: 0.6;
         transition: opacity 0.2s;
       }
-      .zen-share-btn:hover {
+
+      .zen-actions:hover,
+      .zen-actions:focus-within {
         opacity: 1;
+      }
+
+      .zen-action-btn {
+        width: 36px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: none;
+        border: none;
+        border-radius: 6px;
+        color: var(--subtext);
+        cursor: pointer;
+      }
+
+      .zen-action-btn:hover {
+        background: var(--overlay);
         color: var(--text);
+      }
+
+      .zen-action-btn svg {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      @media (pointer: coarse) {
+        .zen-action-btn {
+          width: 44px;
+          height: 44px;
+        }
       }
 
       .zen-copied {
@@ -1056,6 +1124,11 @@
         color: var(--gutter);
         user-select: none;
         -webkit-user-select: none;
+      }
+
+      /* ```text / ```txt / ```plain: prose-like blocks without line numbers */
+      .md-preview pre.no-ln .code-line::before {
+        content: none;
       }
 
       .md-preview .code-ct {
@@ -2172,6 +2245,9 @@
           aria-label="Find and replace"
         >
           <input
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
             type="text"
             id="findInput"
             placeholder="find..."
@@ -2179,6 +2255,9 @@
             spellcheck="false"
           />
           <input
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
             type="text"
             id="replaceInput"
             placeholder="replace..."
@@ -2246,7 +2325,14 @@
                   role="menuitem"
                   data-action="download" data-close-menu
                 >
-                  download
+                  download as text
+                </button>
+                <button
+                  class="file-menu-item md-only"
+                  role="menuitem"
+                  data-action="download-html" data-close-menu
+                >
+                  download as html
                 </button>
                 <button
                   class="file-menu-item draw-only"
@@ -2400,15 +2486,24 @@
                 &times;
               </button>
             </div>
-            <button
-              class="zen-share-btn"
-              id="zenShareBtn"
-              data-action="zen-share"
-              style="display: none"
-              aria-label="Share note"
-            >
-              share
-            </button>
+            <div class="zen-actions" id="zenActions" style="display: none">
+              <button
+                class="zen-action-btn"
+                data-action="zen-share"
+                title="Copy share link"
+                aria-label="Copy share link"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+              </button>
+              <button
+                class="zen-action-btn"
+                data-action="zen-download"
+                title="Download as shown"
+                aria-label="Download as shown"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+              </button>
+            </div>
           </div>
           <div class="md-toast" id="mdToast"></div>
           <div class="empty-state" id="emptyState">
@@ -2426,6 +2521,9 @@
         <div class="vim-command-bar" id="vimCommandBar">
           <span class="vim-command-prefix">:</span>
           <input
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
             id="vimCommandInput"
             type="text"
             aria-label="Vim command"
@@ -2550,6 +2648,9 @@
       <div class="modal">
         <div class="modal-text" id="modalText"></div>
         <input
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
           class="modal-input"
           id="modalInput"
           type="text"
@@ -2575,6 +2676,9 @@
     >
       <div class="search-results-header">
         <input
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
           class="search-input"
           id="searchInput"
           name="search"
@@ -2583,6 +2687,10 @@
           aria-label="Search notes"
           spellcheck="false"
         />
+        <label class="search-scope" title="ctrl+f: this note · ctrl+p: all notes">
+          <input type="checkbox" id="searchAll" />
+          all notes
+        </label>
         <span
           class="search-results-count"
           id="searchCount"

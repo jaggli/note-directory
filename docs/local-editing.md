@@ -264,7 +264,8 @@ Each language defines rules as `[regex, cssClass]` pairs. `tokenize()` finds all
 | Shortcut        | Action                                            |
 | --------------- | ------------------------------------------------- |
 | Ctrl+N          | New note (Ctrl only, not Cmd — avoids new window) |
-| Ctrl+P / Ctrl+F | Open note search                                  |
+| Ctrl+F          | Search the current note (one row per line)        |
+| Ctrl+P          | Search all notes (inside the dialog: switch scope) |
 | Ctrl+H          | Open find & replace                               |
 | Ctrl+S          | See [Ctrl+S behavior](#ctrls-behavior) below      |
 | Ctrl+Shift+D    | Delete current note                               |

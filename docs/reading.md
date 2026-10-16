@@ -267,14 +267,30 @@ Zen mode strips all application chrome:
 | Bottom padding | None       | 40vh (scroll space via ::after) |
 | Menu           | None       | Floating === button (top-left)  |
 
-### Zen Menu
+### Zen Actions
 
-A floating menu button (`===`) appears at top-left with opacity 0.4, full opacity on hover:
+Two icon buttons at the bottom right (faded until hovered):
 
-- **share:** copies the current URL to clipboard (without `#fragment`)
-- **edit:** exits zen mode, switches to edit tab
+- **share** (link icon): copies a share link for the note
+- **download** (arrow): the note as shown — standalone HTML for markdown,
+  SVG for drawings
 
-The menu auto-closes on clicks outside the menu container.
+The × in the zen bar (or `e` / Escape) leaves zen: markdown returns to the
+editor, drawings to the canvas.
+
+### HTML Export
+
+`noteHtml()` builds a standalone file from `renderMarkdown()`: drawings are
+filled in as inline SVG, copy buttons removed, checkboxes disabled, links to
+other notes unwrapped (they have nowhere to go). The CSS is the page's own
+preview/zen rules, copied from the stylesheet, so the file matches zen. A
+CSP meta tag (`default-src 'none'`) keeps the file inert wherever it's
+opened. Also in the file menu as *download as html* for `.md` notes.
+
+### Code Block Line Numbers
+
+Fenced code blocks show line numbers, except for the language tags `text`,
+`txt` and `plain` (prose-like blocks).
 
 ---
 
