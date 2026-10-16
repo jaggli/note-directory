@@ -190,6 +190,28 @@ test("text: double-click writes, labels go into the file", async ({ page }) => {
   expect(s[1]).toMatchObject({ k: "t", label: "free" });
 });
 
+test("text: outline and box follow the label while typing", async ({ page }) => {
+  await openDrawing(page, "draw 1\nr a 0 0 40 40\nt b 0 200 rot=60 \"ab\"\n");
+  await page.mouse.dblclick(...(await at(page, 20, 20)));
+  await page.keyboard.type("a long label");
+  // The box grows before the edit is finished
+  expect(await page.evaluate(() => Draw._state.model.byId.get("a").w)).toBeGreaterThan(40);
+  await page.keyboard.press("Escape");
+  await page.mouse.dblclick(...(await at(page, 10, 210)));
+  const outline = () => page.locator(".draw-svg polygon").first().boundingBox();
+  const before = await outline();
+  // First outline point: the drawn top-left corner, which must stay put
+  const corner = () =>
+    page.locator(".draw-svg polygon").first().evaluate((p) => p.getAttribute("points").split(" ").slice(0, 2).map(Number));
+  const c0 = await corner();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and more");
+  expect((await outline()).height).toBeGreaterThan(before.height * 2);
+  const c1 = await corner();
+  expect(Math.hypot(c1[0] - c0[0], c1[1] - c0[1])).toBeLessThan(2);
+  await expect(page.locator(".draw-text")).toHaveCSS("transform-origin", /px/);
+});
+
 test("grid setting lives in the file", async ({ page }) => {
   await openDrawing(page, "draw 1\nr a 0 0 10 10\n");
   await page.click('[data-draw="nav:grid"]');
@@ -593,4 +615,20 @@ test("phones: + opens the other tools as a grid", async ({ page }) => {
   await expect(page.locator(".draw-toolgrid")).toBeHidden();
   expect(await page.evaluate(() => Draw._state.tool)).toBe("rect");
   await expect(page.locator('[data-draw="nav:tools"]')).toHaveClass(/active/);
+});
+
+test("a shared link replacing a drawing shows the new shapes", async ({ page }) => {
+  await openApp(page);
+  const url = await page.evaluate(async () => {
+    await createNote("pic.draw", "draw 1\nr old 3000 3000 40 40\n");
+    return shareUrlFor({ name: "pic.draw", content: "draw 1\nr new 0 0 100 50 c=red\n", updatedAt: 1 });
+  });
+  await page.goto(url.replace(/&ts=\d+/, ""));
+  // The old drawing is on the canvas while the update prompt is open
+  await page.waitForFunction(() => window.Draw?._state.text?.includes("old"));
+  await page.click("#modalConfirm");
+  const box = await page.locator(".draw-svg rect[stroke]").last().boundingBox();
+  const host = await page.locator("#drawHost").boundingBox();
+  expect(box.x).toBeGreaterThan(host.x);
+  expect(box.x + box.width).toBeLessThan(host.x + host.width);
 });

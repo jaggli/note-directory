@@ -1305,7 +1305,7 @@
     document.addEventListener("copy", (e) => onClipboard(e, "copy"));
     document.addEventListener("cut", (e) => onClipboard(e, "cut"));
     document.addEventListener("paste", (e) => onClipboard(e, "paste"));
-    E.ta.addEventListener("input", placeText);
+    E.ta.addEventListener("input", liveText);
     E.ta.addEventListener("keydown", (e) => {
       e.stopPropagation();
       if (e.key === "Escape" || (e.key === "Enter" && (e.metaKey || e.ctrlKey))) {
@@ -1341,7 +1341,7 @@
     // Read-only (zen) always shows the whole drawing
     const view = !E.readonly && E.views.get(E.key);
     if (view) E.cam = { ...view };
-    else fit(true);
+    if (!view || lost()) fit(true);
     applyCamera();
     renderAll();
     if (!opts.noFocus) host.focus({ preventScroll: true });
@@ -1376,6 +1376,8 @@
       return;
     }
     load(content);
+    // Replaced content (another tab, a shared link) may lie outside the old view
+    if (lost()) fit(true);
     renderAll();
   }
 
@@ -1484,6 +1486,15 @@
   function zoomBy(f) {
     const [w, h] = viewSize();
     zoomAt(w / 2, h / 2, E.cam.z * f);
+  }
+
+  // Nothing of the drawing is in view
+  function lost() {
+    const b = contentBounds(E.model);
+    if (!b) return false;
+    const [vw, vh] = viewSize();
+    const c = E.cam;
+    return b.x > c.x + vw / c.z || b.x + b.w < c.x || b.y > c.y + vh / c.z || b.y + b.h < c.y;
   }
 
   function fit(silent) {
@@ -2709,9 +2720,15 @@
     startTextEdit(s);
   }
 
+  // Where a rotated text's top-left corner is drawn
+  function textCorner(s) {
+    const t = textSize(s);
+    return rotPt(s.x, s.y, s.x + t.w / 2, s.y + t.h / 2, s.rot);
+  }
+
   function startTextEdit(s) {
     if (E.readonly) return;
-    E.editing = { id: s.id };
+    E.editing = { id: s.id, corner: s.k === "t" && s.rot ? textCorner(s) : null };
     E.sel = new Set([s.id]);
     const ta = E.ta;
     ta.value = s.label || "";
@@ -2740,13 +2757,15 @@
     let w;
     let hh;
     let rot = s.rot || 0;
+    let origin = "";
     if (s.k === "t") {
-      const lines = text.split("\n");
-      const tw = Math.max(size, ...lines.map((l) => measure(l, size, s.st)));
-      w = tw + size;
-      hh = lines.length * lineH;
+      // Extra width keeps the caret visible; turn around the text's own centre like the render
+      const t = textSize({ ...s, label: text });
+      w = t.w + size;
+      hh = t.h;
       cx = s.x + w / 2;
       cy = s.y + hh / 2;
+      origin = `${f1((t.w / 2) * z)}px ${f1((hh / 2) * z)}px`;
     } else if (s.k === "a") {
       const g = arrowGeom(s, E.model);
       const lines = wrap(text || " ", size, size * 14, s.st);
@@ -2775,11 +2794,51 @@
       textDecoration: s.st?.includes("u") ? "underline" : "",
       color: labelColor(s),
       transform: rot ? `rotate(${rot}deg)` : "",
+      transformOrigin: origin,
       textAlign: s.k === "t" ? "left" : BOX.has(s.k) ? s.ta || "center" : "center",
       // Arrow labels sit on the line: keep it out from under the text
       background: s.k === "a" ? BG : "",
       borderRadius: s.k === "a" ? "4px" : "",
     });
+  }
+
+  // Grow a box around its centre until its label fits
+  function fitLabel(n) {
+    if (!BOX.has(n.k) || !n.label) return n;
+    const size = fontSize(n);
+    const [aw, ah] = LABEL_AREA[n.k];
+    const word = Math.max(...n.label.split(/\s+/).map((w) => measure(w, size, n.st)));
+    const needW = R((word + labelPad(n) * 2) / aw);
+    if (needW > n.w) {
+      n.x = R(n.x - (needW - n.w) / 2);
+      n.w = needW;
+    }
+    const lines = wrap(n.label, size, labelWidth(n), n.st).length;
+    const needH = R((lines * size * LINE_H + labelPad(n) * 2) / ah);
+    if (needH > n.h) {
+      n.y = R(n.y - (needH - n.h) / 2);
+      n.h = needH;
+    }
+    return n;
+  }
+
+  // Typing updates the model (committed on finish) so outline and box follow
+  function liveText() {
+    const s = E.editing && E.model.byId.get(E.editing.id);
+    if (!s) return;
+    const n = fitLabel({ ...s, label: E.ta.value });
+    // Rotated text turns around its centre, which moves as it grows: keep the drawn corner in place
+    const corner = E.editing.corner;
+    if (corner) {
+      const t = textSize(n);
+      const [ox, oy] = rotPt(-t.w / 2, -t.h / 2, 0, 0, n.rot);
+      n.x = R(corner[0] - t.w / 2 - ox);
+      n.y = R(corner[1] - t.h / 2 - oy);
+    }
+    replaceShape(n);
+    renderShapes();
+    renderOverlay();
+    placeText();
   }
 
   function finishTextEdit() {
@@ -2795,24 +2854,7 @@
       else {
         const n = { ...s, label };
         if (!label) delete n.label;
-        if (BOX.has(s.k) && label) {
-          // Grow the shape around its centre until the label fits
-          const size = fontSize(n);
-          const [aw, ah] = LABEL_AREA[n.k];
-          const word = Math.max(...label.split(/\s+/).map((w) => measure(w, size, n.st)));
-          const needW = R((word + labelPad(n) * 2) / aw);
-          if (needW > n.w) {
-            n.x = R(n.x - (needW - n.w) / 2);
-            n.w = needW;
-          }
-          const lines = wrap(label, size, labelWidth(n), n.st).length;
-          const needH = R((lines * size * LINE_H + labelPad(n) * 2) / ah);
-          if (needH > n.h) {
-            n.y = R(n.y - (needH - n.h) / 2);
-            n.h = needH;
-          }
-        }
-        replaceShape(n);
+        replaceShape(fitLabel(n));
       }
     }
     renderAll();
