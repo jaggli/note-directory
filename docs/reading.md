@@ -220,7 +220,7 @@ switchMdTab("view")
 
 ### Tab Bar
 
-The tab bar (`edit | view | zen`) is only visible for markdown files (`.md` extension), drawings (`.draw`, labelled `draw | zen`, source via the file menu) or ephemeral zen notes. `updateMdTabBar()` auto-switches to edit if a file without a second tab is selected while view is active. For drawings, the view and zen tabs show the drawing canvas instead of the preview — see [drawing.md](drawing.md).
+The tab bar (`edit | view | zen`) is only visible for markdown files (`.md` extension), drawings (`.draw`, labelled `draw | zen`, source via "edit source" in the menu) or ephemeral zen notes. `updateMdTabBar()` auto-switches to edit if a file without a second tab is selected while view is active. For drawings, the view and zen tabs show the drawing canvas instead of the preview — see [drawing.md](drawing.md).
 
 ### Scroll Position Sync
 
@@ -285,7 +285,7 @@ filled in as inline SVG, copy buttons removed, checkboxes disabled, links to
 other notes unwrapped (they have nowhere to go). The CSS is the page's own
 preview/zen rules, copied from the stylesheet, so the file matches zen. A
 CSP meta tag (`default-src 'none'`) keeps the file inert wherever it's
-opened. Also in the file menu as *download as html* for `.md` notes.
+opened. Also in the menu as *download as html* for `.md` notes.
 
 ### Code Block Line Numbers
 

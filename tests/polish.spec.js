@@ -94,7 +94,8 @@ test("html export looks like zen and runs nothing", async ({ page }) => {
   expect(text).toContain('href="https://example.com"');
   expect(text).not.toContain('href="pic.draw"');
   expect(text).not.toContain("code-copy-btn\">copy");
-  expect(text).toMatch(/<input[^>]*disabled/);
+  expect(text).not.toMatch(/<input[^>]*disabled/);
+  expect(text).toContain(":has(> input:checked)");
   expect(text).toContain(".hl-kw");
 });
 
@@ -103,7 +104,7 @@ test("file menu: download as html only for markdown", async ({ page }) => {
   await page.evaluate(() => createNote("a.md", "# a"));
   await page.click("#fileMenuContainer > button");
   await expect(page.locator('[data-action="download-html"]')).toBeVisible();
-  await expect(page.locator('[data-action="download"]')).toHaveText("download as text");
+  await expect(page.locator('[data-action="download"]')).toHaveText("download file");
   await page.keyboard.press("Escape");
   await page.evaluate(() => createNote("a.txt", "x"));
   await page.click("#fileMenuContainer > button");

@@ -2579,13 +2579,11 @@ function renderMarkdown(src) {
         const content = lines[i].replace(listRe, "");
         let itemHtml = "";
         let isTask = false;
-        let isChecked = false;
         // Check for task list
         const taskChecked = content.match(/^\[x\]\s+(.*)/);
         const taskUnchecked = content.match(/^\[\s\]\s+(.*)/);
         if (taskChecked) {
           isTask = true;
-          isChecked = true;
           itemHtml =
             '<input type="checkbox" checked data-task="' +
             taskIdx +
@@ -2615,11 +2613,8 @@ function renderMarkdown(src) {
         }
         if (isTask) {
           itemHtml += "</span>";
-          const cls = "task-item" + (isChecked ? " checked" : "");
           html +=
-            '<li class="' +
-            cls +
-            '" data-task="' +
+            '<li class="task-item" data-task="' +
             (taskIdx - 1) +
             '">' +
             itemHtml +
@@ -6373,7 +6368,6 @@ async function noteHtml(note) {
     el.removeAttribute("data-ref");
   }
   for (const btn of doc.querySelectorAll(".code-copy-btn")) btn.remove();
-  for (const box of doc.querySelectorAll("input[type=checkbox]")) box.setAttribute("disabled", "");
   // Links to other notes have nowhere to go outside the app
   for (const a of doc.querySelectorAll("a[href]")) {
     const href = a.getAttribute("href");
@@ -7528,7 +7522,6 @@ function clearToken() {
 function showSyncConnected() {
   document.getElementById("syncMenuContainer").style.display = "";
   document.getElementById("btnDriveSync").style.display = "none";
-  document.getElementById("btnDriveSyncSeparator").style.display = "none";
   document.querySelector(".sync-dot").classList.remove("disconnected");
   document.getElementById("syncLabel").textContent = "sync";
   document.getElementById("syncMenuConnected").style.display = "";
@@ -7539,7 +7532,6 @@ function showSyncConnected() {
 function showSyncFailed() {
   document.getElementById("syncMenuContainer").style.display = "";
   document.getElementById("btnDriveSync").style.display = "none";
-  document.getElementById("btnDriveSyncSeparator").style.display = "none";
   document.querySelector(".sync-dot").classList.add("disconnected");
   document.getElementById("syncLabel").textContent = "sync failed";
   document.getElementById("syncMenuConnected").style.display = "none";
@@ -7550,7 +7542,6 @@ function showSyncFailed() {
 function hideSyncConnected() {
   document.getElementById("syncMenuContainer").style.display = "none";
   document.getElementById("btnDriveSync").style.display = "";
-  document.getElementById("btnDriveSyncSeparator").style.display = "";
   document.querySelector(".sync-dot").classList.remove("disconnected");
 }
 

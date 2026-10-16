@@ -36,7 +36,7 @@ for offline use. It injects its own UI styles. No libraries.
 | ----------------------------- | -------------------------- |
 | Sidebar `+` / status `new`    | text note (unchanged)      |
 | `▾` next to them              | menu: text / drawing       |
-| Mobile file menu, empty state | "new drawing"              |
+| Mobile menu, empty state      | "new drawing"              |
 | Vim                           | `:draw`                    |
 
 New drawings are named `drawingN.draw` and start empty (`""`): an empty

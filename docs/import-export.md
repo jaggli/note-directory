@@ -2,7 +2,7 @@
 
 ## Export
 
-**Trigger:** "export all" button in the file menu.
+**Trigger:** "export all notes" in the menu.
 
 Creates a standard ZIP file (DEFLATE-compressed) containing:
 

@@ -1338,7 +1338,7 @@
         font-weight: bold;
       }
 
-      .md-preview li.task-item.checked > span {
+      .md-preview li.task-item:has(> input:checked) > span {
         text-decoration: line-through;
         opacity: 0.5;
       }
@@ -2316,19 +2316,19 @@
         <div class="md-tab-bar" id="mdTabBar" aria-label="Editor top bar">
           <div class="md-tab-bar-left">
             <div class="file-menu-container" id="fileMenuContainer">
-              <button class="btn-share" data-action="toggle-file-menu">file</button>
+              <button class="btn-share" data-action="toggle-file-menu" aria-haspopup="menu">menu</button>
               <div
                 class="file-menu"
                 id="fileMenu"
                 role="menu"
-                aria-label="File menu"
+                aria-label="Menu"
               >
                 <button
                   class="file-menu-item mobile-only"
                   role="menuitem"
                   data-action="new-note" data-close-menu
                 >
-                  new
+                  new note
                 </button>
                 <button
                   class="file-menu-item mobile-only"
@@ -2345,33 +2345,20 @@
                   find &amp; replace
                 </button>
                 <button
+                  class="file-menu-item mobile-only"
+                  role="menuitem"
+                  data-action="search" data-close-menu
+                >
+                  search all
+                </button>
+                <hr class="file-menu-separator mobile-only" />
+                <button
                   class="file-menu-item"
                   role="menuitem"
                   id="btnShare"
                   data-action="share"
                 >
                   share
-                </button>
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  data-action="download" data-close-menu
-                >
-                  download as text
-                </button>
-                <button
-                  class="file-menu-item md-only"
-                  role="menuitem"
-                  data-action="download-html" data-close-menu
-                >
-                  download as html
-                </button>
-                <button
-                  class="file-menu-item draw-only"
-                  role="menuitem"
-                  data-action="draw-source" data-close-menu
-                >
-                  source
                 </button>
                 <button
                   class="file-menu-item draw-only"
@@ -2383,26 +2370,40 @@
                 <button
                   class="file-menu-item draw-only"
                   role="menuitem"
+                  data-action="draw-source" data-close-menu
+                >
+                  edit source
+                </button>
+                <hr class="file-menu-separator" />
+                <button
+                  class="file-menu-item"
+                  role="menuitem"
+                  data-action="download" data-close-menu
+                >
+                  download file
+                </button>
+                <button
+                  class="file-menu-item md-only"
+                  role="menuitem"
+                  data-action="download-html" data-close-menu
+                >
+                  download as html
+                </button>
+                <button
+                  class="file-menu-item draw-only"
+                  role="menuitem"
                   data-action="draw-download-svg" data-close-menu
                 >
-                  download svg
+                  download as svg
                 </button>
-                <hr class="file-menu-separator mobile-only" />
-                <button
-                  class="file-menu-item mobile-only"
-                  role="menuitem"
-                  data-action="search" data-close-menu
-                >
-                  search all
-                </button>
+                <hr class="file-menu-separator" />
                 <button
                   class="file-menu-item"
                   role="menuitem"
                   data-action="download-all" data-close-menu
                 >
-                  export all
+                  export all notes
                 </button>
-                <hr class="file-menu-separator" />
                 <button
                   class="file-menu-item"
                   role="menuitem"
@@ -2411,7 +2412,14 @@
                 >
                   enable google drive
                 </button>
-                <hr class="file-menu-separator" id="btnDriveSyncSeparator" />
+                <hr class="file-menu-separator" />
+                <button
+                  class="file-menu-item"
+                  role="menuitem"
+                  data-action="help" data-close-menu
+                >
+                  help
+                </button>
                 <a
                   class="file-menu-item file-menu-link"
                   role="menuitem"
@@ -2420,13 +2428,6 @@
                 >
                   privacy policy
                 </a>
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  data-action="help" data-close-menu
-                >
-                  help
-                </button>
               </div>
             </div>
           </div>

@@ -75,7 +75,7 @@ across devices via Google Drive.
   ` ```txt ` and ` ```plain `
 - Lists continue on Enter (`-`, `+`, `*`, `1.`, `- [ ]`);
   Enter on an empty item ends the list
-- Download a markdown note as standalone HTML (file menu,
+- Download a markdown note as standalone HTML (menu,
   or the download button in zen), styled like zen and
   free of scripts
 - Syntax-highlighted fenced code blocks in preview
@@ -96,7 +96,7 @@ across devices via Google Drive.
 - Undo/redo with per-note history
 - Browser back/forward for note and tab switches
 - Delete confirmation dialog
-- Built-in help page (accessible from file menu)
+- Built-in help page (accessible from the menu)
 - Mobile-optimized UI with touch-friendly controls
 
 </details>
