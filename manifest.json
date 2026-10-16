@@ -1,7 +1,7 @@
 {
   "id": "/",
   "name": "note — minimal editor",
-  "short_name": "note directory",
+  "short_name": "note minimal editor",
   "description": "A minimal, local-first editor for text and drawings in the browser with optional Google Drive sync.",
   "lang": "en",
   "start_url": ".",
