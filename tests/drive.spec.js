@@ -181,9 +181,21 @@ test("a revoked sign-in never leaves the page on its own", async ({ page, contex
 
   // Clicking reconnect is allowed to go to Google
   await page.click(".statusbar #syncMenuContainer > button");
+  await expect(page.locator("#syncSignedOutHint")).toBeVisible();
   await page.click('#syncMenuFailed button:has-text("reconnect")');
   await expect(page.locator("#syncLabel")).toHaveText("sync");
   expect(drive.auth.starts).toBe(1);
+});
+
+test("being offline fails the sync without the sign-in hint", async ({ page, context }) => {
+  await fakeGoogle(context);
+  await connectedSession(context, { expired: true });
+  await context.route("**/auth/token", (route) => route.abort("internetdisconnected"));
+  await openApp(page);
+  await expect(page.locator("#syncLabel")).toHaveText("sync failed");
+  await page.click(".statusbar #syncMenuContainer > button");
+  await expect(page.locator('#syncMenuFailed button:has-text("reconnect")')).toBeVisible();
+  await expect(page.locator("#syncSignedOutHint")).toBeHidden();
 });
 
 test("duplicate Drive files are merged into one", async ({ page, context }) => {

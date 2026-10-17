@@ -7601,6 +7601,8 @@ function showSyncFailed() {
   document.getElementById("syncMenuConnected").style.display = "none";
   document.getElementById("syncMenuFailed").style.display = "";
   document.getElementById("syncMenuDisconnected").style.display = "none";
+  // Offline needs no action; a missing or revoked sign-in does
+  document.getElementById("syncSignedOutHint").style.display = gdriveSignedOut ? "" : "none";
 }
 
 function hideSyncConnected() {
@@ -7610,6 +7612,7 @@ function hideSyncConnected() {
 }
 
 let gdriveRefreshTimer = null;
+let gdriveSignedOut = false; // last refresh said only a new sign-in helps
 
 // Never shows UI. Rejects with "signed_out" when only a new sign-in helps
 // (no cookie yet, or access revoked), with anything else when offline etc.
@@ -7618,7 +7621,8 @@ async function silentTokenRefresh() {
     method: "POST",
     signal: AbortSignal.timeout(10000),
   });
-  if (!res.ok) throw new Error(res.status === 401 ? "signed_out" : "auth");
+  gdriveSignedOut = res.status === 401;
+  if (!res.ok) throw new Error(gdriveSignedOut ? "signed_out" : "auth");
   const { access_token, expires_in } = await res.json();
   persistToken(access_token, expires_in);
   scheduleTokenRefresh();

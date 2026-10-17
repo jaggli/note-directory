@@ -1808,6 +1808,12 @@
         text-align: center;
       }
 
+      /* Wraps within the menu's minimum width instead of widening it */
+      .sync-hint {
+        max-width: 230px;
+        box-sizing: border-box;
+      }
+
       /* Flyout submenu: hover on desktop, tap toggles it on touch */
       .file-menu-sub {
         position: relative;
@@ -2861,6 +2867,9 @@
               </button>
             </div>
             <div id="syncMenuFailed" style="display: none">
+              <div class="file-menu-label sync-hint" id="syncSignedOutHint" style="display: none">
+                google sign-in needs renewing &mdash; reconnect once to keep syncing
+              </div>
               <button
                 class="file-menu-item"
                 role="menuitem"

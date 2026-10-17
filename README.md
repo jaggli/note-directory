@@ -4,7 +4,7 @@
 
 A private, local-first editor for text and drawings that
 runs entirely in your browser. No data is collected, transmitted, or stored
-on any server. No signup, no backend, no dependencies, no BS.
+on any server. No signup, no database, no dependencies, no BS.
 Just open the page and start typing.
 
 Built as `index.html` + `app.js` (+ `draw.js` for
