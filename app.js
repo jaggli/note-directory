@@ -3616,21 +3616,22 @@ function switchNote(id) {
   }
 }
 
-// On mobile Safari, tapping a button while the editor is focused
-// just blurs the editor on the first tap — the click never fires.
-// Blurring on touchstart ensures the click registers on the same tap.
+// Tapping the status bar must not move focus. Blurring the editor closes
+// the mobile keyboard, the page grows into its space, and the click then
+// lands on the editor (keyboard back up) instead of the button. Keeping
+// focus where it is leaves the keyboard as it was and the layout still.
 document
   .querySelector(".statusbar")
-  .addEventListener("touchstart", () => {
-    editor.blur();
-  });
+  .addEventListener("mousedown", (e) => e.preventDefault());
 
 function toggleSidebar() {
-  sidebar.classList.toggle("open");
-  document
-    .querySelector(".app")
-    .classList.toggle("sidebar-open", sidebar.classList.contains("open"));
-  if (!sidebar.classList.contains("open")) editor.focus();
+  const open = sidebar.classList.toggle("open");
+  document.querySelector(".app").classList.toggle("sidebar-open", open);
+  // On mobile the list covers the editor: close the keyboard so nothing is
+  // typed unseen, and don't pop it up again when the list closes
+  if (isMobile()) {
+    if (open) editor.blur();
+  } else if (!open) editor.focus();
 }
 
 function togglePin(id) {
