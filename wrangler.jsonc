@@ -17,5 +17,5 @@
   },
   // Secrets (wrangler secret put): GOOGLE_CLIENT_SECRET, COOKIE_KEY
   "routes": [{ "pattern": "note.directory", "custom_domain": true }],
-  "workers_dev": true
+  "workers_dev": false
 }
