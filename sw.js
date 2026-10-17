@@ -47,6 +47,8 @@ self.addEventListener("fetch", (e) => {
   const req = e.request;
   const url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin) return;
+  // Sign-in redirects (worker.js) must reach the network, never the shell
+  if (url.pathname.startsWith("/auth/")) return;
   // All navigations (?id=…) render the same page
   const key = req.mode === "navigate" ? new URL("./", location).href : req;
   e.respondWith(
@@ -62,7 +64,7 @@ self.addEventListener("fetch", (e) => {
   );
 });
 
-// no-cache: skip GitHub Pages' 10-minute HTTP cache when revalidating
+// no-cache: skip any HTTP cache when revalidating
 function update(cache, req) {
   return fetch(req, { cache: "no-cache" }).then((res) => {
     if (res.ok) cache.put(req, res.clone());

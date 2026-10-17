@@ -57,11 +57,12 @@ test("CSP blocks javascript: URLs and inline handlers", async ({ page }) => {
   expect(await page.evaluate(() => window.pwned)).toBe(0);
 });
 
-test("Google sign-in script is allowed by CSP", async ({ page }) => {
-  await openApp(page);
-  expect(await page.evaluate(() => loadGIS().then(() => "loaded"))).toBe(
-    "loaded",
+test("the sign-in token endpoint is allowed by CSP", async ({ page }) => {
+  await page.route("**/auth/token", (route) =>
+    route.fulfill({ contentType: "application/json", body: '{"access_token":"t","expires_in":3600}' }),
   );
+  await openApp(page);
+  expect(await page.evaluate(() => silentTokenRefresh().then(() => gdriveToken))).toBe("t");
 });
 
 test("malformed URL hash does not break startup", async ({ page }) => {

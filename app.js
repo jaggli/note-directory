@@ -7539,15 +7539,14 @@ document.addEventListener("keydown", (e) => {
 //  Google Drive Sync (lazy-loaded)
 // ═══════════════════════════════════════════════════
 
-const GDRIVE_CLIENT_ID =
-  "355563554662-02psj7te5k9m01j8qefegce60ubghdjp.apps.googleusercontent.com";
-const GDRIVE_SCOPES = "https://www.googleapis.com/auth/drive.appdata";
+// Sign-in runs in worker.js: it keeps Google's refresh token in an HttpOnly
+// cookie and hands out access tokens, so no popup is ever needed after the
+// first connect. The access token lives here; Drive is called directly.
 const GDRIVE_FILE_NAME = "note-app-data.json";
 const GDRIVE_TOKEN_KEY = "notepad_gdrive_token";
 const GDRIVE_CONNECTED_KEY = "notepad_gdrive_connected";
 let gdriveToken = null;
 let gdriveTokenExpiry = 0;
-let gisLoaded = false;
 
 function persistToken(token, expiresIn) {
   gdriveToken = token;
@@ -7610,47 +7609,19 @@ function hideSyncConnected() {
   document.querySelector(".sync-dot").classList.remove("disconnected");
 }
 
-function loadGIS() {
-  return new Promise((resolve, reject) => {
-    if (gisLoaded) return resolve();
-    const s = document.createElement("script");
-    s.src = "https://accounts.google.com/gsi/client";
-    s.onload = () => {
-      gisLoaded = true;
-      resolve();
-    };
-    s.onerror = () => reject(new Error("Failed to load Google sign-in"));
-    document.head.appendChild(s);
-  });
-}
-
 let gdriveRefreshTimer = null;
 
-// Never opens a popup: only succeeds if Google still has a session
+// Never shows UI. Rejects with "signed_out" when only a new sign-in helps
+// (no cookie yet, or access revoked), with anything else when offline etc.
 async function silentTokenRefresh() {
-  await loadGIS();
-  await new Promise((resolve, reject) => {
-    let settled = false;
-    const done = (fn) => (arg) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      fn(arg);
-    };
-    const timeout = setTimeout(done(reject), 10000, new Error("timeout"));
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: GDRIVE_CLIENT_ID,
-      scope: GDRIVE_SCOPES,
-      callback: done((resp) => {
-        if (resp.error) return reject(new Error(resp.error));
-        persistToken(resp.access_token, resp.expires_in);
-        scheduleTokenRefresh();
-        resolve();
-      }),
-      error_callback: done((err) => reject(new Error(err?.type || "auth"))),
-    });
-    client.requestAccessToken({ prompt: "" });
+  const res = await fetch("/auth/token", {
+    method: "POST",
+    signal: AbortSignal.timeout(10000),
   });
+  if (!res.ok) throw new Error(res.status === 401 ? "signed_out" : "auth");
+  const { access_token, expires_in } = await res.json();
+  persistToken(access_token, expires_in);
+  scheduleTokenRefresh();
 }
 
 function scheduleTokenRefresh() {
@@ -7669,31 +7640,18 @@ function scheduleTokenRefresh() {
   }, refreshIn);
 }
 
-// Interactive sign-in — only call from a click/key handler, or the
-// browser blocks the popup
-function gdriveAuth() {
-  if (gdriveToken && Date.now() < gdriveTokenExpiry)
-    return Promise.resolve();
+// User-initiated only: when no sign-in cookie is left, the page leaves for
+// Google and comes back with ?drive=connected (beforeunload saves edits)
+async function gdriveAuth() {
+  if (gdriveToken && Date.now() < gdriveTokenExpiry) return;
   clearToken();
-  return loadGIS().then(
-    () =>
-      new Promise((resolve, reject) => {
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: GDRIVE_CLIENT_ID,
-          scope: GDRIVE_SCOPES,
-          callback: (resp) => {
-            if (resp.error) return reject(new Error(resp.error));
-            persistToken(resp.access_token, resp.expires_in);
-            scheduleTokenRefresh();
-            showSyncConnected();
-            resolve();
-          },
-          // Popup closed or blocked — without this the promise never settles
-          error_callback: (err) => reject(new Error(err?.type || "auth")),
-        });
-        client.requestAccessToken();
-      }),
-  );
+  try {
+    await silentTokenRefresh();
+  } catch (e) {
+    if (e.message !== "signed_out") throw e;
+    location.assign("/auth/start");
+    await new Promise(() => {});
+  }
 }
 
 async function gdriveFetch(url, opts = {}) {
@@ -8103,7 +8061,7 @@ async function runSync() {
   }
 }
 
-// User-initiated (menu, Ctrl+S): may open the sign-in popup
+// User-initiated (menu, Ctrl+S): may go to Google's sign-in page
 async function driveSync() {
   closeAllMenus();
   try {
@@ -8165,11 +8123,8 @@ function setSyncResult(success) {
 function driveSignOut(broadcast = true) {
   closeSyncMenu();
   syncEpoch++;
-  const token = gdriveToken;
-  if (broadcast && token)
-    loadGIS()
-      .then(() => google.accounts.oauth2.revoke(token))
-      .catch(() => {});
+  // Revokes Google's grant and deletes the sign-in cookie
+  if (broadcast) fetch("/auth/logout", { method: "POST" }).catch(() => {});
   gdriveToken = null;
   gdriveTokenExpiry = 0;
   gdriveConnected = false;
@@ -8533,19 +8488,27 @@ async function init() {
   // tab the user is working in — they claim it on focus instead
   if (document.visibilityState === "visible") claimLeadership();
 
+  // Back from Google's sign-in page (worker.js)
+  const query = new URLSearchParams(location.search);
+  const driveReturn = query.get("drive");
+  if (driveReturn) {
+    query.delete("drive");
+    history.replaceState(null, "", location.pathname + (query.size ? "?" + query : ""));
+    if (driveReturn === "connected") {
+      localStorage.setItem(GDRIVE_CONNECTED_KEY, "true");
+      clearToken();
+    }
+  }
+
   // Restore Google Drive session
   // Expired tokens are refreshed silently by the first sync; if that
-  // fails the user reconnects via the sync menu (never a surprise popup)
+  // fails the user reconnects via the sync menu (never a surprise redirect)
   const tokenState = restoreToken();
   if (tokenState !== "none") {
     gdriveConnected = true;
-    if (tokenState === "ok") {
-      showSyncConnected();
-      scheduleTokenRefresh();
-    } else showSyncFailed();
-    // Preload so a later reconnect click can open the popup immediately
-    loadGIS().catch(() => {});
-  }
+    showSyncConnected();
+    if (tokenState === "ok") scheduleTokenRefresh();
+  } else if (driveReturn && driveReturn !== "connected") showSyncFailed();
   const loaded = await loadFromUrl();
   if (!loaded && state.notes.length === 0 && isFirstVisit) {
     await openBuiltinNote(

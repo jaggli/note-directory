@@ -38,8 +38,10 @@ across devices via Google Drive.
 - **Google Drive sync**: Optionally sign in with Google
   to sync notes across devices. Files are stored in your
   Google Drive's hidden app folder — no storage cost to
-  the app. The Google library is lazy-loaded only when
-  you initiate sync.
+  the app. Sign-in goes through a tiny Cloudflare Worker
+  (`worker.js`) that keeps Google's refresh token in an
+  encrypted HttpOnly cookie, so access tokens renew
+  without pop-ups. Notes never pass through it.
 - **Works offline**: After the first visit a service
   worker caches the app, so it opens and edits without a
   network (Drive sync aside). Installable as a PWA.

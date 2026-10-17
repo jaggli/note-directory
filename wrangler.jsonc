@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "note-directory",
+  "main": "worker.js",
+  "compatibility_date": "2025-09-01",
+  // The repo root is the site; .assetsignore keeps dev files out
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    // Only sign-in runs code; every other request is a static file
+    "run_worker_first": ["/auth/*"]
+  },
+  "vars": {
+    "GOOGLE_CLIENT_ID": "355563554662-02psj7te5k9m01j8qefegce60ubghdjp.apps.googleusercontent.com"
+  },
+  // Secrets (wrangler secret put): GOOGLE_CLIENT_SECRET, COOKIE_KEY
+  "workers_dev": true
+}

@@ -66,14 +66,14 @@ Remote data is validated (`parseDrivePayload`): notes without string
 
 ## Triggers
 
-| Trigger                      | Call                          | May open popup |
-| ---------------------------- | ----------------------------- | -------------- |
-| "enable google drive" / "reconnect" / "sync now" / Ctrl+S | `driveSync()` | yes (user gesture) |
+| Trigger                      | Call                          | May leave for Google |
+| ---------------------------- | ----------------------------- | -------------------- |
+| "enable google drive" / "reconnect" / "sync now" / Ctrl+S | `driveSync()` | yes, if signed out |
 | Typing (after 300ms save)    | `scheduleDriveUpload(false)` → 30s debounce | no |
-| Create/delete/rename/`:w`    | `scheduleDriveUpload(true)`   | no             |
-| Tab hidden with pending edits | `syncNow()`                  | no             |
-| Tab visible / focus (5s debounce) | `onTabResume()` → `syncNow()` | no         |
-| Page load (connected)        | `syncNow()`                   | no             |
+| Create/delete/rename/`:w`    | `scheduleDriveUpload(true)`   | no                   |
+| Tab hidden with pending edits | `syncNow()`                  | no                   |
+| Tab visible / focus (5s debounce) | `onTabResume()` → `syncNow()` | no              |
+| Page load (connected)        | `syncNow()`                   | no                   |
 
 Only the **leader tab** (the last focused/visible one) syncs; a tab opened in
 the background does not claim leadership until it is focused. Local saves are
@@ -83,16 +83,31 @@ not tied to leadership — every tab writes localStorage (merge-on-write).
 
 ## Auth
 
-- `gdriveAuth()` — interactive popup. Only called from `driveSync()`, i.e.
-  from a click or key handler. Has `error_callback`, so a closed or blocked
-  popup rejects instead of hanging.
-- `silentTokenRefresh()` — `prompt: ""`, never shows UI, 10s timeout. Used by
-  `gdriveFetch()` when the token is missing/expired, on 401 (one retry), and by
-  the refresh timer 5 min before expiry.
-- If silent refresh fails, the sync fails and the UI shows "sync failed".
+Google only gives refresh tokens to clients that can keep a secret, so
+sign-in runs in `worker.js` (Cloudflare Worker, same origin as the app):
+
+```
+GET  /auth/start      → Google consent (offline access, PKCE, state cookie)
+GET  /auth/callback   → code exchange; refresh token sealed (AES-GCM) into
+                        the __Host-note_rt cookie (HttpOnly, SameSite=Strict,
+                        400 days, renewed on use) → /?drive=connected
+POST /auth/token      → {access_token, expires_in}; 401 when signed out
+POST /auth/logout     → revoke at Google, delete the cookie
+```
+
+- `silentTokenRefresh()` — `POST /auth/token`, never shows UI, 10s timeout.
+  Used by `gdriveFetch()` when the token is missing/expired, on 401 (one
+  retry), and by the refresh timer 5 min before expiry. Rejects with
+  `signed_out` when only a new sign-in helps.
+- `gdriveAuth()` — only called from `driveSync()` (a click or key). Tries
+  the silent refresh first; only on `signed_out` does the page navigate to
+  `/auth/start`. `beforeunload` saves pending edits. On return, init sees
+  `?drive=connected`, marks the app connected and the load-time sync runs.
+- If the silent refresh fails, the sync fails and the UI shows "sync failed".
   Recovery is always user-initiated (reconnect, Ctrl+S).
-- GIS is preloaded on page load when the user is connected, so a reconnect
-  click can open the popup immediately.
+- The service worker ignores `/auth/*`, so the redirects reach the network.
+- Worker config: `wrangler.jsonc` (`GOOGLE_CLIENT_ID`); secrets
+  `GOOGLE_CLIENT_SECRET` and `COOKIE_KEY` (32 random bytes, base64).
 
 ---
 
@@ -102,7 +117,7 @@ not tied to leadership — every tab writes localStorage (merge-on-write).
 driveSignOut()
   → syncEpoch++                      in-flight syncs abort at their next step
                                      and cannot re-mark the app as connected
-  → revoke token (loads GIS if needed)
+  → POST /auth/logout               revokes the grant, deletes the cookie
   → clear token and connected flag     (sync base is kept for reconnects)
   → hide sync UI
 ```
@@ -120,7 +135,7 @@ others. Local notes are **not** deleted.
 | Token refresh offset   | 5 min before expiry | Pre-emptive silent refresh    |
 | Autosave debounce      | 300ms               | Batch rapid keystrokes        |
 | Drive upload debounce  | 30s                 | Batch multiple saves          |
-| Silent refresh timeout | 10s                 | Prevent hanging promise       |
+| Silent refresh timeout | 10s                 | Prevent hanging request       |
 | Blink minimum time     | 900ms               | One full animation cycle      |
 | Tab resume debounce    | 5s                  | Prevent double-fire           |
 | Checkmark duration     | 2s                  | ✔ shown before reverting to ● |

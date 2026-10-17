@@ -19,7 +19,7 @@ async function syncedDevice(page, context) {
   return drive;
 }
 
-test("first connect opens the sign-in popup once and creates the file", async ({
+test("first connect signs in once via Google and creates the file", async ({
   page,
   context,
 }) => {
@@ -29,8 +29,22 @@ test("first connect opens the sign-in popup once and creates the file", async ({
   await page.click("#btnDriveSync");
   await expect.poll(() => drive.files.length).toBe(1);
   expect(drive.read().notes.map((n) => n.name)).toContain("help.md");
-  expect(await page.evaluate(() => __gis.interactive)).toBe(1);
+  expect(drive.auth.starts).toBe(1);
   await expect(page.locator("#syncLabel")).toHaveText("sync");
+  expect(new URL(page.url()).search).toBe("");
+});
+
+test("an expired access token is renewed without leaving the page", async ({
+  page,
+  context,
+}) => {
+  const drive = await fakeGoogle(context);
+  await connectedSession(context, { expired: true });
+  await openApp(page);
+  await expect(page.locator("#syncLabel")).toHaveText("sync");
+  await expect.poll(() => drive.files.length).toBe(1);
+  expect(drive.auth).toMatchObject({ starts: 0 });
+  expect(drive.auth.refreshes).toBeGreaterThan(0);
 });
 
 test("a stale device does not revert other devices' changes", async ({
@@ -151,12 +165,9 @@ test("edits made while an upload is in flight are uploaded too", async ({
     .toBe("second, typed during upload");
 });
 
-test("expired session never opens a popup on its own", async ({ page, context }) => {
-  await fakeGoogle(context);
-  await connectedSession(context, { expired: true });
-  await context.addInitScript(() => {
-    window.__gis = { interactive: 0, silent: 0, silentOk: false, revoked: null };
-  });
+test("a revoked sign-in never leaves the page on its own", async ({ page, context }) => {
+  const drive = await fakeGoogle(context);
+  await connectedSession(context, { expired: true, signedOut: true });
   await openApp(page);
   await expect(page.locator("#syncLabel")).toHaveText("sync failed");
   await page.evaluate(() => {
@@ -165,14 +176,14 @@ test("expired session never opens a popup on its own", async ({ page, context })
     scheduleDriveUpload(true);
   });
   await page.waitForTimeout(300);
-  expect(await page.evaluate(() => __gis)).toMatchObject({ interactive: 0 });
-  expect(await page.evaluate(() => __gis.silent)).toBeGreaterThan(0);
+  expect(drive.auth.starts).toBe(0);
+  expect(drive.auth.refreshes).toBeGreaterThan(0);
 
-  // Clicking reconnect is allowed to open it
+  // Clicking reconnect is allowed to go to Google
   await page.click(".statusbar #syncMenuContainer > button");
   await page.click('#syncMenuFailed button:has-text("reconnect")');
   await expect(page.locator("#syncLabel")).toHaveText("sync");
-  expect(await page.evaluate(() => __gis.interactive)).toBe(1);
+  expect(drive.auth.starts).toBe(1);
 });
 
 test("duplicate Drive files are merged into one", async ({ page, context }) => {
@@ -221,7 +232,7 @@ test("sign-out stops in-flight syncs and reaches other tabs", async ({
   expect(
     await page.evaluate(() => [gdriveConnected, localStorage.getItem("notepad_gdrive_connected")]),
   ).toEqual([false, null]);
-  expect(await page.evaluate(() => __gis.revoked)).not.toBeNull();
+  expect(drive.auth.logouts).toBe(1);
   await expect.poll(() => other.evaluate(() => gdriveConnected)).toBe(false);
 });
 

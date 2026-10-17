@@ -29,7 +29,7 @@
   <body>
     <a class="back" href="../">&larr; back to note</a>
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: March 28, 2026</p>
+    <p class="updated">Last updated: October 17, 2026</p>
 
     <h2>Privacy First</h2>
     <p>This application does not collect, transmit, or store any personal information on any server. Your data stays yours. The entire <a href="https://github.com/jaggli/note-directory">source code is publicly available</a> — you can verify every claim on this page yourself.</p>
@@ -41,13 +41,14 @@
     <p>If you choose to sign in with Google, the application requests access to a hidden, app-specific folder on your Google Drive (<code>drive.appdata</code> scope). This means:</p>
     <ul>
       <li>The app can only read and write its own hidden folder — it has no access to any other files on your Drive.</li>
-      <li>Your notes are stored in your own Google Drive account, under your own storage quota. There is no server involved.</li>
-      <li>Your Google credentials are never seen or stored by the app. Authentication is handled entirely by Google in your browser.</li>
-      <li>You can revoke access at any time via your <a href="https://myaccount.google.com/permissions">Google Account permissions</a>.</li>
+      <li>Your notes are stored in your own Google Drive account, under your own storage quota. They travel directly between your browser and Google and never pass through our server.</li>
+      <li>Your Google password is never seen by the app: you sign in on Google's own page.</li>
+      <li>So that you stay signed in without repeated pop-ups, the access Google grants (a "refresh token") is kept in an encrypted cookie in your browser. A small sign-in function on our server uses it only to fetch short-lived access tokens from Google. Nothing is logged or stored on the server.</li>
+      <li>Disconnecting Drive sync in the app revokes this access and deletes the cookie. You can also revoke access at any time via your <a href="https://myaccount.google.com/permissions">Google Account permissions</a>.</li>
     </ul>
 
     <h2>Cookies &amp; Tracking</h2>
-    <p>We do not use cookies, analytics, or any tracking mechanisms.</p>
+    <p>We do not use analytics or any tracking mechanisms. The only cookie is the sign-in cookie described above, set only if you turn on Google Drive sync.</p>
 
     <h2>Third Parties</h2>
     <p>We do not share any data with third parties. The site is hosted on <a href="https://docs.github.com/en/pages">GitHub Pages</a>, which serves the static files but has no access to your notes or any content you create.</p>

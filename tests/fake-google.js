@@ -1,4 +1,4 @@
-// In-memory stand-ins for Google Identity Services and the Drive v3 API
+// In-memory stand-ins for the sign-in Worker (worker.js) and the Drive v3 API
 
 const CORS = {
   "access-control-allow-origin": "*",
@@ -6,29 +6,33 @@ const CORS = {
   "access-control-allow-methods": "GET, POST, PATCH, DELETE",
 };
 
-// window.__gis counts token requests; silentOk=false simulates an expired
-// Google session (silent refresh fails, only a popup would work)
-const GIS_SCRIPT = `
-window.__gis = window.__gis || { interactive: 0, silent: 0, silentOk: true, revoked: null };
-window.google = { accounts: { oauth2: {
-  initTokenClient(cfg) {
-    return { requestAccessToken(opts) {
-      if (opts && opts.prompt === "") {
-        __gis.silent++;
-        if (!__gis.silentOk) return setTimeout(() => cfg.error_callback({ type: "popup_failed_to_open" }));
-      } else __gis.interactive++;
-      setTimeout(() => cfg.callback({ access_token: "tok" + Math.random(), expires_in: 3600 }));
-    } };
-  },
-  revoke(token) { __gis.revoked = token; },
-} } };`;
-
 exports.fakeGoogle = async (context) => {
   const drive = { files: [], nextId: 1, beforePatch: null };
 
-  await context.route("https://accounts.google.com/gsi/client", (route) =>
-    route.fulfill({ contentType: "text/javascript", body: GIS_SCRIPT }),
-  );
+  // signedIn: the browser holds a valid sign-in cookie. starts counts trips
+  // to Google's sign-in page, refreshes the silent token requests.
+  const auth = { signedIn: false, starts: 0, refreshes: 0, logouts: 0 };
+  context.__auth = auth;
+  await context.route("**/auth/token", (route) => {
+    auth.refreshes++;
+    if (!auth.signedIn)
+      return route.fulfill({ status: 401, contentType: "application/json", body: '{"error":"signed_out"}' });
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ access_token: "tok" + Math.random(), expires_in: 3600 }),
+    });
+  });
+  // Google's consent page, approved immediately
+  await context.route("**/auth/start", (route) => {
+    auth.starts++;
+    auth.signedIn = true;
+    route.fulfill({ status: 302, headers: { location: "/?drive=connected" } });
+  });
+  await context.route("**/auth/logout", (route) => {
+    auth.logouts++;
+    auth.signedIn = false;
+    route.fulfill({ contentType: "application/json", body: '{"ok":true}' });
+  });
 
   await context.route("https://www.googleapis.com/**", async (route) => {
     const req = route.request();
@@ -86,14 +90,17 @@ exports.fakeGoogle = async (context) => {
     drive.files[i].content = JSON.stringify(data);
     drive.files[i].version++;
   };
+  drive.auth = auth;
   drive.add = (data) =>
     drive.files.push({ id: "f" + drive.nextId++, version: 1, content: JSON.stringify(data) });
   return drive;
 };
 
-// Pretend the user connected Drive earlier (valid token unless `expired`)
-exports.connectedSession = (context, { expired = false } = {}) =>
-  context.addInitScript((expired) => {
+// Pretend the user connected Drive earlier (valid access token unless
+// `expired`; `signedOut` means the sign-in cookie is gone or revoked)
+exports.connectedSession = (context, { expired = false, signedOut = false } = {}) => {
+  if (context.__auth) context.__auth.signedIn = !signedOut;
+  return context.addInitScript((expired) => {
     if (localStorage.getItem("notepad_gdrive_connected") !== null) return;
     localStorage.setItem("notepad_gdrive_connected", "true");
     localStorage.setItem(
@@ -101,3 +108,4 @@ exports.connectedSession = (context, { expired = false } = {}) =>
       JSON.stringify({ token: "tok", expiry: Date.now() + (expired ? -1 : 3600e3) }),
     );
   }, expired);
+};
