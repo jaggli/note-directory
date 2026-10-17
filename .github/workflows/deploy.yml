@@ -1,0 +1,36 @@
+# Push to main → tests → deploy to Cloudflare (note.directory)
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push replaces a deploy still waiting; a running one finishes
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Serial: some UI tests are timing-sensitive under parallel load
+      - run: npx playwright test --workers=1
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4.151.1"

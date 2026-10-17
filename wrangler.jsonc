@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "note-directory",
+  // Not a secret; lets CI deploy with an API token alone
+  "account_id": "cd0a3951ad319f256ebb0f3a2b44e9c2",
   "main": "worker.js",
   "compatibility_date": "2025-09-01",
   // The repo root is the site; .assetsignore keeps dev files out
