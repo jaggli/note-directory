@@ -14,5 +14,6 @@
     "GOOGLE_CLIENT_ID": "355563554662-02psj7te5k9m01j8qefegce60ubghdjp.apps.googleusercontent.com"
   },
   // Secrets (wrangler secret put): GOOGLE_CLIENT_SECRET, COOKIE_KEY
+  "routes": [{ "pattern": "note.directory", "custom_domain": true }],
   "workers_dev": true
 }
