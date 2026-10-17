@@ -7286,13 +7286,34 @@ editor.addEventListener("keydown", (e) => {
     const start = editor.selectionStart;
     const end = editor.selectionEnd;
     const val = editor.value;
+    const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+    const nl = val.indexOf("\n", lineStart);
+    const line = val.slice(lineStart, nl === -1 ? val.length : nl);
+    const listMarker =
+      start === end &&
+      isMarkdownFile(getActiveNote()?.name || "") &&
+      line.match(LIST_RE);
 
-    if (start === end && !e.shiftKey) {
+    if (
+      listMarker &&
+      start <= lineStart + listMarker[0].length &&
+      !inCodeFence(val, lineStart)
+    ) {
+      // Cursor at the start of a list item: change its nesting level
+      const lead = line.match(/^(?:\t| {1,2})?/)[0];
+      if (!e.shiftKey) {
+        editor.setRangeText("  ", lineStart, lineStart, "preserve");
+        editor.setSelectionRange(start + 2, start + 2);
+      } else if (lead) {
+        editor.setRangeText("", lineStart, lineStart + lead.length, "preserve");
+        const pos = Math.max(lineStart, start - lead.length);
+        editor.setSelectionRange(pos, pos);
+      }
+    } else if (start === end && !e.shiftKey) {
       // No selection: insert 2 spaces
       editor.setRangeText("  ", start, end, "end");
     } else {
       // Selection: indent/dedent all selected lines
-      const lineStart = val.lastIndexOf("\n", start - 1) + 1;
       const lineEnd = val.indexOf("\n", end);
       const actualEnd = lineEnd === -1 ? val.length : lineEnd;
       const block = val.substring(lineStart, actualEnd);

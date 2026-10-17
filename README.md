@@ -91,7 +91,7 @@ across devices via Google Drive.
 - Cursor position memory (persisted per note across
   sessions and mode switches)
 - Cursor position (line/column) and vim mode indicator in status bar
-- Indent/dedent selection with Tab/Shift+Tab
+- Indent/dedent selection with Tab/Shift+Tab; at the start of a markdown list item they change its nesting level
 - Move lines up/down with Alt+Arrow keys
 - Undo/redo with per-note history
 - Browser back/forward for note and tab switches
@@ -198,8 +198,8 @@ Features include:
 | Ctrl+Shift+M    | Toggle vim mode                                |
 | Ctrl+Z          | Undo                                           |
 | Ctrl+Shift+Z    | Redo                                           |
-| Tab             | Insert 2 spaces / indent selection             |
-| Shift+Tab       | Dedent selection                               |
+| Tab             | Insert 2 spaces / indent selection or list item |
+| Shift+Tab       | Dedent selection or list item                   |
 | Alt+↑ / Alt+↓   | Move line up / down                            |
 | e               | Switch from view/zen to edit tab               |
 | Escape          | Close search / sidebar / find bar / exit zen   |

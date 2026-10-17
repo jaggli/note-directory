@@ -254,8 +254,8 @@ Each language defines rules as `[regex, cssClass]` pairs. `tokenize()` finds all
 
 | Shortcut      | Action                                                  |
 | ------------- | ------------------------------------------------------- |
-| Tab           | Insert 2 spaces (no selection) or indent selected lines |
-| Shift+Tab     | Dedent selected lines                                   |
+| Tab           | Insert 2 spaces (no selection) or indent selected lines; at the start of a markdown list item (before or right after its `-`/`1.`/`- [ ]` marker) indent the item |
+| Shift+Tab     | Dedent selected lines, or the current line (keeps the cursor in place at the start of a list item) |
 | Alt+↑ / Alt+↓ | Move selected line(s) up/down                           |
 | Ctrl+Z        | Undo                                                    |
 | Ctrl+Shift+Z  | Redo                                                    |

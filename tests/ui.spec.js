@@ -165,3 +165,39 @@ for (const tab of ["view", "zen"]) {
     expect(await page.evaluate(() => getActiveNote().content)).toBe("hello world");
   });
 }
+
+test("tab at the start of a list item changes its nesting level", async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.evaluate(() => createNote("list.md", "- a\n- \n  - [ ] b\nplain"));
+  const at = (pos) =>
+    page.evaluate((p) => editor.setSelectionRange(p, p), pos);
+  const state = () =>
+    page.evaluate(() => [editor.value, editor.selectionStart]);
+  await page.locator("#editor").focus();
+
+  // Empty item, cursor after the marker
+  await at(6);
+  await page.keyboard.press("Tab");
+  expect(await state()).toEqual(["- a\n  - \n  - [ ] b\nplain", 8]);
+  await page.keyboard.press("Shift+Tab");
+  expect(await state()).toEqual(["- a\n- \n  - [ ] b\nplain", 6]);
+
+  // Item with content, cursor at line start
+  await at(0);
+  await page.keyboard.press("Tab");
+  expect(await state()).toEqual(["  - a\n- \n  - [ ] b\nplain", 2]);
+  await page.keyboard.press("Shift+Tab");
+  expect(await state()).toEqual(["- a\n- \n  - [ ] b\nplain", 0]);
+
+  // Task item, cursor after the checkbox
+  await at(15);
+  await page.keyboard.press("Shift+Tab");
+  expect(await state()).toEqual(["- a\n- \n- [ ] b\nplain", 13]);
+
+  // Inside the item text, Tab still inserts spaces
+  await at(1 + 2);
+  await page.keyboard.press("Tab");
+  expect((await state())[0]).toBe("- a  \n- \n- [ ] b\nplain");
+});
