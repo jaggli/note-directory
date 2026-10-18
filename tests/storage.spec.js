@@ -20,10 +20,12 @@ async function useLegacy(page) {
   );
 }
 
-// Waits until every save is committed to IndexedDB
+// Waits until every save is committed to IndexedDB, and writes the
+// localStorage mirror now instead of within MIRROR_EVERY
 const flushed = (page) =>
   page.evaluate(async () => {
     saveState();
+    flushMirror();
     while (idbFlushing) await idbFlushing;
   });
 
@@ -306,4 +308,69 @@ test("a note deleted in another tab leaves this tab's URL", async ({ page, conte
   await page.reload();
   await openApp(page, page.url());
   expect(await page.evaluate(() => state.notes.map((n) => n.name))).not.toContain("doomed.md");
+});
+
+test("the full mirror is written at most every MIRROR_EVERY ms, and on hide", async ({ page }) => {
+  await openApp(page);
+  await flushed(page);
+  const writes = await page.evaluate(async () => {
+    const keys = [];
+    // On the prototype: WebKit stores "localStorage.setItem = …" as an item
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      keys.push(k);
+      return set.call(this, k, v);
+    };
+    for (let i = 0; i < 5; i++) {
+      getActiveNote().content += i;
+      getActiveNote().updatedAt = Date.now();
+      saveState();
+    }
+    const quick = keys.filter((k) => k === "notepad_data").length;
+    const journal = keys.filter((k) => k === "notepad_pending").length;
+    const later = await new Promise((r) =>
+      setTimeout(() => r(keys.filter((k) => k === "notepad_data").length), MIRROR_EVERY + 200),
+    );
+    return { quick, journal, later };
+  });
+  // Right after a mirror write, saves only journal; one mirror write follows
+  expect(writes.quick).toBe(0);
+  expect(writes.journal).toBe(5);
+  expect(writes.later).toBe(1);
+
+  // Hiding the tab writes a waiting mirror at once
+  await page.evaluate(() => {
+    getActiveNote().content += "!";
+    getActiveNote().updatedAt = Date.now();
+    saveState();
+  });
+  expect(await page.evaluate(() => mirrorTimer !== null)).toBe(true);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", { value: true, configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem("notepad_data")).notes[0].content.endsWith("!")),
+  ).toBe(true);
+});
+
+test("a tab that dies between saves keeps the edit (journal)", async ({ page, context }) => {
+  await openApp(page);
+  await page.evaluate(() => createNote("crash.md", "before"));
+  await flushed(page);
+  // Neither IndexedDB nor the mirror get to write anymore
+  await page.evaluate(() => {
+    idbCommit = () => new Promise(() => {});
+    writeMirror = () => {};
+    flushMirror = () => {};
+    getActiveNote().content = "before and after";
+    getActiveNote().updatedAt = Date.now();
+    saveState();
+  });
+  await page.close();
+  const next = await context.newPage();
+  await openApp(next);
+  expect(await next.evaluate(() => state.notes.find((n) => n.name === "crash.md").content)).toBe(
+    "before and after",
+  );
 });

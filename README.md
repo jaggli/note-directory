@@ -24,10 +24,10 @@ across devices via Google Drive.
   exports exactly like any other note (see
   [docs/drawing-format.md](docs/drawing-format.md)).
 - **Local storage**: Notes are persisted in your
-  browser's IndexedDB, with no 5MB cap. A copy stays in
-  `localStorage` while it fits, for tabs still on an older
-  version; data from before IndexedDB moves over on its
-  own. A storage meter appears when the browser's quota is
+  browser's IndexedDB, with no 5MB cap; a save writes only
+  the notes that changed. A copy stays in `localStorage`
+  while it fits, for tabs still on an older version; data
+  from before IndexedDB moves over on its own. A storage meter appears when the browser's quota is
   half used (see [docs/local-editing.md](docs/local-editing.md#storage)).
 - **Cross-tab sync**: Open the editor in multiple tabs —
   changes to notes, sidebar width, word wrap, vim mode,

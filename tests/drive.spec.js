@@ -131,9 +131,10 @@ test("remote change wins over unchanged local note despite clock skew", async ({
   a.updatedAt = 1;
   drive.write(data);
   await sync(page);
-  const stored = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("notepad_data")).notes.find((n) => n.name === "a.md"),
-  );
+  const stored = await page.evaluate(() => {
+    flushMirror();
+    return JSON.parse(localStorage.getItem("notepad_data")).notes.find((n) => n.name === "a.md");
+  });
   expect(stored.content).toBe("from a device with a slow clock");
 });
 
