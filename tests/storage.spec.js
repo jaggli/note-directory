@@ -20,6 +20,14 @@ async function useLegacy(page) {
   );
 }
 
+// Reload and wait for the app. Not openApp(page.url()): navigating to the
+// same URL again can reload a second time in WebKit, and the old version
+// throws when its start-up is cut short (Blob.stream() during unload)
+const reloaded = async (page) => {
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector(".note-item"));
+};
+
 // Waits until every save is committed to IndexedDB, and writes the
 // localStorage mirror now instead of within MIRROR_EVERY
 const flushed = (page) =>
@@ -98,8 +106,7 @@ test("upgrade: notes from localStorage move to IndexedDB unchanged", async ({ pa
 
   // IndexedDB alone is enough from now on
   await page.evaluate(() => localStorage.removeItem("notepad_data"));
-  await page.reload();
-  await openApp(page, page.url());
+  await reloaded(page);
   expect(summary(await page.evaluate(() => state.notes))).toEqual(summary(before.notes));
 });
 
@@ -153,10 +160,8 @@ test("old and new version open side by side see each other's edits", async ({ pa
       .poll(() => p.evaluate(() => decodeURIComponent(location.hash)))
       .not.toMatch(/from-(old|new)\.md/);
   await flushed(page);
-  await old.reload();
-  await openApp(old, old.url());
-  await page.reload();
-  await openApp(page, page.url());
+  await reloaded(old);
+  await reloaded(page);
   for (const p of [page, old]) {
     expect(await names(p)).not.toContain("from-old.md");
     expect(await names(p)).not.toContain("from-new.md");
@@ -175,8 +180,7 @@ test("going back to the old version finds every note", async ({ page }) => {
   await flushed(page);
   const notes = summary(await page.evaluate(() => state.notes));
   await useLegacy(page);
-  await page.reload();
-  await openApp(page, page.url());
+  await reloaded(page);
   expect(await page.evaluate(() => typeof idbFlush)).toBe("undefined");
   expect(summary(await page.evaluate(() => state.notes))).toEqual(notes);
 });
@@ -196,8 +200,7 @@ test("past the localStorage limit: no error, nothing lost", async ({ page }) => 
   await expect(page.locator("#modalOverlay")).toBeHidden();
   expect(await page.evaluate(() => localStorage.getItem("notepad_data"))).toBeNull();
 
-  await page.reload();
-  await openApp(page, page.url());
+  await reloaded(page);
   const sizes = await page.evaluate(() =>
     Object.fromEntries(state.notes.map((n) => [n.name, n.content.length])),
   );
@@ -214,8 +217,7 @@ test("past the localStorage limit: no error, nothing lost", async ({ page }) => 
     render();
   });
   await flushed(page);
-  await page.reload();
-  await openApp(page, page.url());
+  await reloaded(page);
   await flushed(page);
   const mirror = await page.evaluate(() => JSON.parse(localStorage.getItem("notepad_data")));
   expect(mirror.notes.map((n) => n.name)).toContain("small.md");
@@ -278,8 +280,7 @@ test("without IndexedDB everything works as before", async ({ page }) => {
   expect(await page.evaluate(() => idb)).toBeNull();
   await page.evaluate(() => createNote("plain.md", "still saved"));
   await page.waitForTimeout(400);
-  await page.reload();
-  await openApp(page, page.url());
+  await reloaded(page);
   expect(await page.evaluate(() => state.notes.map((n) => n.name))).toContain("plain.md");
 });
 
@@ -305,8 +306,7 @@ test("a note deleted in another tab leaves this tab's URL", async ({ page, conte
   await expect
     .poll(() => page.evaluate(() => decodeURIComponent(location.hash)))
     .not.toContain("doomed.md");
-  await page.reload();
-  await openApp(page, page.url());
+  await reloaded(page);
   expect(await page.evaluate(() => state.notes.map((n) => n.name))).not.toContain("doomed.md");
 });
 
