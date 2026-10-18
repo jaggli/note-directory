@@ -2609,14 +2609,22 @@ function renderMarkdown(src) {
         } else {
           itemHtml = content;
         }
+        let prev = lines[i];
         i++;
-        // Fold continuation lines (indented text that isn't a new list item)
+        // Fold continuation lines into the item: indented text, or
+        // unindented ("lazy") text that doesn't start another block.
+        // They join with a space like a paragraph; a line ending in two
+        // spaces or a backslash forces a line break.
         while (
           i < lines.length &&
           !listRe.test(lines[i]) &&
-          lines[i].match(/^\s+\S/)
+          (/^\s+\S/.test(lines[i]) ||
+            (/^\S/.test(lines[i]) && !/^(<(h[1-6]|hr|blockquote)|\x00CB|\||&lt;\/?(details|summary))/i.test(lines[i])))
         ) {
-          itemHtml += "<br>" + lines[i].trim();
+          const hard = /( {2,}|\\)$/.test(prev);
+          if (hard) itemHtml = itemHtml.replace(/( +|\\)$/, "");
+          itemHtml += (hard ? "<br>" : " ") + lines[i].trim();
+          prev = lines[i];
           i++;
         }
         if (isTask) {
@@ -2728,6 +2736,35 @@ function renderMarkdown(src) {
     return "[" + label + "](" + url + ")";
   });
 
+  // Bare URLs become links — outside tags and existing links. Held aside
+  // so emphasis rules can't reach into them (a_b_c)
+  const autoLinks = [];
+  text = text
+    .split(/(<a\b[^>]*>[\s\S]*?<\/a>|<[^>]+>)/)
+    .map((part, idx) =>
+      idx % 2
+        ? part
+        : part.replace(
+            /\bhttps?:\/\/[^\s<>"]+/gi,
+            (url) => {
+              // Trailing punctuation belongs to the sentence
+              const tail = url.match(/(?:[.,;:!?'*_~]|&quot;|\))+$/);
+              let end = tail ? tail[0] : "";
+              url = url.slice(0, url.length - end.length);
+              // Keep a closing paren that balances one in the URL
+              while (end.startsWith(")") && url.split("(").length > url.split(")").length) {
+                url += ")";
+                end = end.slice(1);
+              }
+              autoLinks.push(
+                '<a href="' + url + '" rel="noopener noreferrer">' + url + "</a>",
+              );
+              return "\x00AL" + (autoLinks.length - 1) + "\x00" + end;
+            },
+          ),
+    )
+    .join("");
+
   // Bold & italic
   text = text.replace(
     /(?<![a-zA-Z0-9])\*\*\*(.+?)\*\*\*(?![a-zA-Z0-9])/g,
@@ -2762,7 +2799,7 @@ function renderMarkdown(src) {
   let result = "";
   let inParagraph = false;
   const blockTag =
-    /^<(h[1-6]|ul|ol|li|blockquote|pre|hr|table|thead|tbody|tr|th|td|\x00)/;
+    /^<(h[1-6]|ul|ol|li|blockquote|pre|hr|table|thead|tbody|tr|th|td)|^\x00CB/;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
@@ -2792,6 +2829,7 @@ function renderMarkdown(src) {
   // Step 3: restore code blocks, inline codes, and backslash escapes
   text = text.replace(/\x00CB(\d+)\x00/g, (_, idx) => codeBlocks[+idx]);
   text = text.replace(/\x00IC(\d+)\x00/g, (_, idx) => inlineCodes[+idx]);
+  text = text.replace(/\x00AL(\d+)\x00/g, (_, idx) => autoLinks[+idx]);
   text = text.replace(/\x00ES(\d+)\x00/g, (_, idx) => escapes[+idx]);
 
   // Step 4: selectively re-enable <details> and <summary> ONLY
@@ -3507,6 +3545,9 @@ async function createNote(name, content, focusName, ext) {
     content: contentStr,
     updatedAt: Date.now(),
   };
+  // Notes that arrive with content (help, imports) open at the top —
+  // otherwise the caret lands at the end and the preview follows it
+  if (contentStr) note.cursorPos = 0;
   state.notes.unshift(note);
   state.activeId = note.id;
   saveState();
@@ -3769,8 +3810,12 @@ function searchNotes(query) {
   }
   if (searchScope === "note") return searchActiveNote(query);
   const results = [];
+  let contentOnly = 0;
   for (const note of state.notes) {
-    const nameMatch = matchLine(note.name, query);
+    const exactName = exactMatch(note.name, query);
+    const nameMatch = exactName || fuzzyMatch(note.name, query);
+    // Enough content hits: keep looking for name matches only
+    if (!nameMatch && contentOnly >= MAX_RESULTS * 2) continue;
     const raw = note.content.split("\n");
     const lines = isDrawFile(note.name) ? drawSearchLines(note.content) : raw;
     const lineLimit = Math.min(lines.length, MAX_LINES_PER_NOTE);
@@ -3797,16 +3842,18 @@ function searchNotes(query) {
     const nameScore = nameMatch ? nameMatch.score * 4 : 0;
     const totalScore = nameScore + bestLineScore;
     const activeBoost = note.id === state.activeId ? 1000 : 0;
+    // Name matches rank first (exact before fuzzy), then content matches
+    const tier = exactName ? 2e6 : nameMatch ? 1e6 : 0;
 
     if (totalScore > 0) {
       results.push({
         note,
-        score: totalScore + activeBoost,
+        score: tier + activeBoost + totalScore,
         nameMatch,
         lines: topLines,
       });
+      if (!nameMatch) contentOnly++;
     }
-    if (results.length >= MAX_RESULTS * 2) break;
   }
   results.sort((a, b) => b.score - a.score);
   results.length = Math.min(results.length, MAX_RESULTS);
@@ -8156,7 +8203,7 @@ const HELP_DESKTOP = [
   "",
   "## Share via URL",
   "",
-  "Click **share** to embed a note directly in the URL.",
+  "Pick **menu → share** to embed a note directly in the URL.",
   "No server, no upload — the entire note lives in the link.",
   "Anyone with the link can read it instantly (~60kB limit).",
   "",
@@ -8206,7 +8253,7 @@ const HELP_DESKTOP = [
   "  All children checked auto-checks the parent.",
   "- **Inter-note links** — [label](other.md) navigates",
   "  to that note. Browser back button works.",
-  "- **Drawings** — ![label](sketch.draw) shows a drawing,",
+  "- **Drawings** — `![label](sketch.draw)` embeds a drawing,",
   "  or put one inline in a fenced \\`\\`\\`draw block.",
   "",
   "## Drawings",
@@ -8214,6 +8261,13 @@ const HELP_DESKTOP = [
   "Pick **drawing** from the ▾ next to + (or :draw in vim).",
   "A drawing is text too: file → source shows one line per",
   "shape, so it syncs, shares and searches like any note.",
+  "",
+  "```draw",
+  "draw 1",
+  'r a 0 0 140 60 c=blue f=semi "note"',
+  'e b 240 -10 150 80 c=green "drawing"',
+  "a x a b",
+  "```",
   "",
   "- v select · h hand · d draw · shift+d highlighter · e eraser",
   "- r rectangle · o ellipse · m diamond · l line · a arrow · t text",
@@ -8309,7 +8363,7 @@ const HELP_MOBILE = [
   "",
   "## Share via URL",
   "",
-  "Tap **share** to embed a note directly in the URL.",
+  "Tap **menu → share** to embed a note directly in the URL.",
   "No server, no upload — the entire note lives in the link.",
   "Anyone with the link can read it instantly (~60kB limit).",
   "",

@@ -191,3 +191,48 @@ test("theme: picked from the submenu, persists, repaints drawings", async ({ pag
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "latte");
 });
+
+test("list items fold wrapped lines into one paragraph", async ({ page }) => {
+  await openApp(page);
+  const html = await page.evaluate(() =>
+    renderMarkdown("- one\n  two\nthree\n- hard  \n  break\n\npara"),
+  );
+  expect(html).toContain("<li>one two three</li>");
+  expect(html).toContain("<li>hard<br>break</li>");
+  expect(html).toContain("<p>para</p>");
+});
+
+test("bare urls become links, outside existing links and code", async ({ page }) => {
+  await openApp(page);
+  const html = await page.evaluate(() =>
+    renderMarkdown(
+      "see https://a.com/x_y_z. and (https://b.com/w_(1)) " +
+        "[l](https://c.com) `https://d.com`",
+    ),
+  );
+  expect(html).toContain('<a href="https://a.com/x_y_z" rel="noopener noreferrer">https://a.com/x_y_z</a>.');
+  expect(html).toContain('>https://b.com/w_(1)</a>)');
+  expect(html.match(/c\.com/g)).toHaveLength(2); // href and title only
+  expect(html).toContain("<code>https://d.com</code>");
+});
+
+test("first visit opens help at the top, without missing drawings", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await openApp(page);
+  await expect(page.locator("#mdPreview h1")).toHaveText(/Welcome/);
+  await expect(page.locator("#mdPreview .draw-embed svg")).toHaveCount(1);
+  await expect(page.locator("#mdPreview")).not.toContainText("not found");
+  expect(await page.evaluate(() => mdPreview.scrollTop)).toBe(0);
+});
+
+test("search: note names rank before content, even the open note's", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(async () => {
+    await createNote("pear.md", "nothing here\n");
+    for (let i = 0; i < 25; i++) await createNote("n" + i + ".md", "pear pear pear\n");
+  });
+  await page.locator("#editor").focus();
+  await page.keyboard.press("Control+p");
+  await page.keyboard.type("pear");
+  await expect(page.locator(".search-result-item").first()).toContainText("pear.md");
+});
