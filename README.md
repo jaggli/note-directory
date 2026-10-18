@@ -8,8 +8,8 @@ on any server. No signup, no database, no dependencies, no BS.
 Just open the page and start typing.
 
 Built as `index.html` + `app.js` (+ `draw.js` for
-drawings) with vanilla JS and CSS (~12k lines). Your notes are stored in `localStorage`
-by default. Optionally, sign in with Google to sync notes
+drawings) with vanilla JS and CSS (~12k lines). Your notes are stored in your
+browser (IndexedDB) by default. Optionally, sign in with Google to sync notes
 across devices via Google Drive.
 
 ## How it works
@@ -24,8 +24,11 @@ across devices via Google Drive.
   exports exactly like any other note (see
   [docs/drawing-format.md](docs/drawing-format.md)).
 - **Local storage**: Notes are persisted in your
-  browser's `localStorage` (5MB limit). A storage meter
-  appears when usage exceeds 200kB.
+  browser's IndexedDB, with no 5MB cap. A copy stays in
+  `localStorage` while it fits, for tabs still on an older
+  version; data from before IndexedDB moves over on its
+  own. A storage meter appears when the browser's quota is
+  half used (see [docs/local-editing.md](docs/local-editing.md#storage)).
 - **Cross-tab sync**: Open the editor in multiple tabs —
   changes to notes, sidebar width, word wrap, vim mode,
   and pin state sync instantly via `storage` events.
