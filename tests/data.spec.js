@@ -1,7 +1,11 @@
 const { test, expect, openApp } = require("./fixtures");
 
+// The localStorage mirror, written now instead of within MIRROR_EVERY
 const stored = (page) =>
-  page.evaluate(() => JSON.parse(localStorage.getItem("notepad_data")));
+  page.evaluate(() => {
+    flushMirror();
+    return JSON.parse(localStorage.getItem("notepad_data"));
+  });
 
 test("edits in a tab that lost Drive leadership are still saved", async ({
   page,

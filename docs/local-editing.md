@@ -43,22 +43,31 @@ record per note (key `id`), store `meta` holds one record `"state"` with
 `{order, activeId, deletedIds, deletedAt}`. Settings stay in localStorage —
 they're tiny and read synchronously before the first paint.
 
-localStorage keeps a **mirror** of the whole state (`notepad_data`, the
-format of the localStorage-only versions) for as long as it fits:
+Each save commits only the notes that changed. Changes are found by
+comparing each note's fields with a shallow copy taken at its last commit —
+no serializing; an unchanged content is the very same string. Before the
+commit, the changed notes and the tombstones go to a small localStorage
+**journal** (`notepad_pending`), written synchronously, so a tab closed or
+killed mid-commit loses nothing; it's removed once everything is committed.
+
+localStorage also keeps a **mirror** of the whole state (`notepad_data`,
+the format of the localStorage-only versions) for as long as it fits. It's
+the expensive part (~10ms at 8MB), so it's written at most every
+`MIRROR_EVERY` (2s) and right away when the tab is hidden or closed:
 
 - tabs still running an older version see changes through `storage` events,
   and their writes reach IndexedDB via the newer tabs' merge;
 - going back to an older version finds every note.
 
 Past ~5MB the mirror is removed (a stale one would only shadow newer notes)
-and retried once a minute. While it's off, `notepad_pending` journals the
-notes not yet committed to IndexedDB, so a tab closed mid-write loses
-nothing. Newer tabs tell each other about commits on the `note-directory`
-BroadcastChannel.
+and retried once a minute. Newer tabs tell each other about commits on the
+`note-directory` BroadcastChannel. Before a save, other tabs' mirror and
+journal are merged — skipped when the stored string is the one this tab
+last wrote or merged.
 
-**Loading** merges mirror, IndexedDB and journal with the cross-tab merge
-(newest `updatedAt` per note wins, tombstones are unioned); the mirror's
-order and active note win since it's written in step with every save.
+**Loading** merges IndexedDB, mirror and journal with the cross-tab merge
+(newest `updatedAt` per note wins, tombstones are unioned); IndexedDB's
+order and active note win since it's committed on every save.
 Data from before IndexedDB therefore migrates on first load with no
 special case and nothing to click. **Committing** writes only notes whose
 JSON changed, skips notes IndexedDB has in a newer version (and adopts
@@ -74,7 +83,7 @@ against this one: upgrade, both open side by side, and going back.
 | Key                        | Content                | Purpose                                |
 | -------------------------- | ---------------------- | -------------------------------------- |
 | `notepad_data`             | Full state JSON        | Mirror of the notes (see above)        |
-| `notepad_pending`          | Partial state JSON     | Notes not yet in IndexedDB, mirror off |
+| `notepad_pending`          | Partial state JSON     | Journal: notes not yet in IndexedDB    |
 | `notepad_wrap`             | `"true"` / `"false"`   | Word wrap toggle                       |
 | `notepad_vim`              | `"true"` / `"false"`   | Vim mode toggle                        |
 | `notepad_sidebar_width`    | Pixel value            | Sidebar width                          |
@@ -108,8 +117,8 @@ against this one: upgrade, both open side by side, and going back.
 ```
 saveState()
   → mergeFromStorage()                other tabs' mirror / journal
-  → localStorage mirror               sync; dropped when it doesn't fit
-  → journal (mirror off only)         sync
+  → writePending()                    sync journal of changed notes
+  → writeMirror()                     whole state, at most every 2s
   → scheduleIdbFlush()                async commit of changed notes
   → updateStorageUsage()              refresh the storage meter UI
 ```
