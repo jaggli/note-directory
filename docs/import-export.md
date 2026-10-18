@@ -130,7 +130,7 @@ When opening a shared URL:
 - **Binary detection:** Files with null bytes (`\x00`) in the first 8KB are skipped
 - **Filename sanitization:** Control characters stripped, length capped at 255, leading dots removed
 - **Metadata validation:** `.note.directory` must have valid structure (object with `notes` array, each entry with string `id`, string `name`, number `updatedAt`). Invalid metadata causes fallback to plain-zip import — no errors thrown
-- **Storage limits:** Each file checked against `localStorage` capacity before import
+- **Storage limits:** Each file checked against the storage quota before import
 
 ### What's safe by design
 

@@ -36,13 +36,45 @@ editor.scroll → gutter.scrollTop = editor.scrollTop
 
 ---
 
-## localStorage Handling
+## Storage
+
+Notes live in IndexedDB (database `note-directory`): store `notes` holds one
+record per note (key `id`), store `meta` holds one record `"state"` with
+`{order, activeId, deletedIds, deletedAt}`. Settings stay in localStorage —
+they're tiny and read synchronously before the first paint.
+
+localStorage keeps a **mirror** of the whole state (`notepad_data`, the
+format of the localStorage-only versions) for as long as it fits:
+
+- tabs still running an older version see changes through `storage` events,
+  and their writes reach IndexedDB via the newer tabs' merge;
+- going back to an older version finds every note.
+
+Past ~5MB the mirror is removed (a stale one would only shadow newer notes)
+and retried once a minute. While it's off, `notepad_pending` journals the
+notes not yet committed to IndexedDB, so a tab closed mid-write loses
+nothing. Newer tabs tell each other about commits on the `note-directory`
+BroadcastChannel.
+
+**Loading** merges mirror, IndexedDB and journal with the cross-tab merge
+(newest `updatedAt` per note wins, tombstones are unioned); the mirror's
+order and active note win since it's written in step with every save.
+Data from before IndexedDB therefore migrates on first load with no
+special case and nothing to click. **Committing** writes only notes whose
+JSON changed, skips notes IndexedDB has in a newer version (and adopts
+those), deletes tombstoned records and unions tombstones in `meta` — all in
+one transaction. If IndexedDB is missing or doesn't answer within 3s, the
+app runs on localStorage alone, as before.
+
+`tests/storage.spec.js` runs the last localStorage-only release (from git)
+against this one: upgrade, both open side by side, and going back.
 
 ### Storage Keys
 
 | Key                        | Content                | Purpose                                |
 | -------------------------- | ---------------------- | -------------------------------------- |
-| `notepad_data`             | Full state JSON        | Notes, activeId, deletedIds            |
+| `notepad_data`             | Full state JSON        | Mirror of the notes (see above)        |
+| `notepad_pending`          | Partial state JSON     | Notes not yet in IndexedDB, mirror off |
 | `notepad_wrap`             | `"true"` / `"false"`   | Word wrap toggle                       |
 | `notepad_vim`              | `"true"` / `"false"`   | Vim mode toggle                        |
 | `notepad_sidebar_width`    | Pixel value            | Sidebar width                          |
@@ -75,15 +107,19 @@ editor.scroll → gutter.scrollTop = editor.scrollTop
 
 ```
 saveState()
-  → if (!isTabLeader) return          only the active tab writes
-  → localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  → mergeFromStorage()                other tabs' mirror / journal
+  → localStorage mirror               sync; dropped when it doesn't fit
+  → journal (mirror off only)         sync
+  → scheduleIdbFlush()                async commit of changed notes
   → updateStorageUsage()              refresh the storage meter UI
 ```
 
 ### Storage Quota
 
-- **Limit:** 5 MB (`STORAGE_LIMIT = 5 * 1024 * 1024`)
-- **Calculation:** iterates all localStorage keys, sums `(key.length + value.length) * 2` (UTF-16)
+- **Limit:** the browser's quota (`navigator.storage.estimate()`); 5 MB of
+  localStorage without IndexedDB
+- **Calculation:** size of the notes as committed (UTF-16); without
+  IndexedDB all localStorage keys
 - **Checked before:** note creation, file import, drag-and-drop
 - **On overflow:** modal displayed, operation cancelled
 

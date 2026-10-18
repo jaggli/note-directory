@@ -388,12 +388,12 @@ function activeNoteVersion() {
   return note ? note.id + ":" + note.updatedAt : "";
 }
 
+// Another tab's saves: the mirror, and its journal while the mirror is off
 function mergeFromStorage() {
-  try {
-    return mergeStoredState(JSON.parse(localStorage.getItem(STORAGE_KEY)));
-  } catch {
-    return false;
-  }
+  if (!stateLoaded) return false;
+  const a = mergeStoredState(readStored(STORAGE_KEY));
+  const b = mergeStoredState(readStored(PENDING_KEY));
+  return a || b;
 }
 
 let _vimPreClickPos = null; // saved cursor pos before mouse click
@@ -414,21 +414,315 @@ let vimState = {
   desiredCol: null, // sticky column for j/k movement
 };
 
-function loadState() {
+// ── IndexedDB ───────────────────────────────────────
+// Notes live in IndexedDB (one record per note, plus a "state" record with
+// order, active note and tombstones), which has no 5MB cap. localStorage
+// keeps a mirror of the whole state for as long as it fits: tabs still
+// running an older version keep seeing changes through storage events, and
+// an older version would still find every note. Past 5MB the mirror is
+// dropped and a small journal of not-yet-committed notes takes over, so
+// closing the tab mid-write loses nothing. Loading merges all three —
+// newest note wins, tombstones are unioned — which also migrates
+// localStorage-only data without asking. No IndexedDB: localStorage only,
+// as before.
+const IDB_NAME = "note-directory";
+const PENDING_KEY = "notepad_pending";
+let idb = null;
+let stateLoaded = false;
+const idbWritten = new Map(); // id → note JSON as committed to IndexedDB
+const idbGone = new Set(); // tombstoned ids already deleted from IndexedDB
+let idbMetaWritten = "";
+let idbBytes = 0;
+let idbFlushing = null;
+let idbAgain = false;
+let idbFailed = false;
+let mirrorOffUntil = 0;
+let storageQuota = 0;
+const notesChannel =
+  typeof BroadcastChannel === "function"
+    ? new BroadcastChannel("note-directory")
+    : null;
+
+function idbOpen() {
+  return new Promise((resolve) => {
+    // Some browsers (private modes) never answer — don't hang the app
+    const timer = setTimeout(() => resolve(null), 3000);
+    const done = (db) => {
+      clearTimeout(timer);
+      resolve(db);
+    };
+    let req;
+    try {
+      req = indexedDB.open(IDB_NAME, 1);
+    } catch {
+      return done(null);
+    }
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore("notes", { keyPath: "id" });
+      req.result.createObjectStore("meta");
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      // A newer version upgrading the schema: step aside, mirror only
+      db.onversionchange = () => {
+        db.close();
+        if (idb === db) idb = null;
+      };
+      db.onclose = () => {
+        if (idb === db) idb = null;
+      };
+      done(db);
+    };
+    req.onerror = () => done(null);
+  });
+}
+
+function idbReadAll(db) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(["notes", "meta"], "readonly");
+    const notes = tx.objectStore("notes").getAll();
+    const meta = tx.objectStore("meta").get("state");
+    tx.oncomplete = () => resolve({ notes: notes.result, meta: meta.result });
+    tx.onerror = tx.onabort = () => reject(tx.error);
+  });
+}
+
+// Writes notes unless IndexedDB already holds a newer one (another tab);
+// resolves with those newer notes so the caller can adopt them
+function idbCommit(db, notes, gone, meta) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(["notes", "meta"], "readwrite");
+    const store = tx.objectStore("notes");
+    const newer = [];
+    for (const n of notes) {
+      store.get(n.id).onsuccess = (e) => {
+        const cur = e.target.result;
+        if (cur && cur.updatedAt > n.updatedAt) newer.push(cur);
+        else store.put(n);
+      };
+    }
+    for (const id of gone) store.delete(id);
+    const metaStore = tx.objectStore("meta");
+    metaStore.get("state").onsuccess = (e) => {
+      const cur = e.target.result;
+      if (cur) {
+        // Keep tombstones another tab wrote meanwhile
+        const ids = new Set(meta.deletedIds);
+        for (const id of cur.deletedIds || []) {
+          if (ids.has(id)) continue;
+          ids.add(id);
+          meta.deletedIds.push(id);
+          meta.deletedAt[id] = cur.deletedAt?.[id] ?? Date.now();
+        }
+      }
+      metaStore.put(meta, "state");
+    };
+    tx.oncomplete = () => resolve(newer);
+    tx.onerror = tx.onabort = () => reject(tx.error);
+  });
+}
+
+function readStored(key) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) state = JSON.parse(raw);
-    if (!state.deletedIds) state.deletedIds = [];
-    if (!state.deletedAt) state.deletedAt = {};
-    pruneTombstones();
+    const s = JSON.parse(localStorage.getItem(key));
+    return s && Array.isArray(s.notes) ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+// Returns true if this browser had notes before (not a first visit)
+async function loadState() {
+  idb = await idbOpen();
+  let stored = null;
+  if (idb) {
+    try {
+      const { notes, meta } = await idbReadAll(idb);
+      if (meta || notes.length) {
+        // Notes in their saved order; any the order doesn't know go first
+        const pos = new Map((meta?.order || []).map((id, i) => [id, i]));
+        notes.sort((a, b) => (pos.get(a.id) ?? -1) - (pos.get(b.id) ?? -1));
+        stored = {
+          notes,
+          activeId: meta?.activeId ?? null,
+          deletedIds: meta?.deletedIds || [],
+          deletedAt: meta?.deletedAt || {},
+        };
+        for (const n of notes) setWritten(n.id, JSON.stringify(n));
+        for (const id of stored.deletedIds) idbGone.add(id);
+      }
+    } catch {
+      idb = null;
+    }
+  }
+  const mirror = readStored(STORAGE_KEY);
+  const pending = readStored(PENDING_KEY);
+  // The mirror is written in step with every save, so its order and
+  // active note are the freshest; IndexedDB fills in whatever it lacks
+  state = { notes: [], activeId: null, deletedIds: [], deletedAt: {} };
+  const base = mirror || stored;
+  if (base) {
+    state = { ...base };
+    state.notes = [...base.notes];
+    state.deletedIds = [...(base.deletedIds || [])];
+    state.deletedAt = { ...(base.deletedAt || {}) };
+  }
+  if (mirror && stored) mergeStoredState(stored);
+  if (pending) mergeStoredState(pending);
+  pruneTombstones();
+  if (!getActiveNote()) state.activeId = state.notes[0]?.id ?? null;
+  stateLoaded = true;
+  if (idb) {
+    navigator.storage
+      ?.estimate?.()
+      .then((e) => {
+        storageQuota = e.quota || 0;
+        updateStorageUsage();
+      })
+      .catch(() => {});
+    // Migrates localStorage-only notes, commits a leftover journal
+    scheduleIdbFlush();
+  }
+  return !!(base || pending);
+}
+
+function setWritten(id, json) {
+  idbBytes += json.length * 2 - (idbWritten.get(id)?.length ?? 0) * 2;
+  idbWritten.set(id, json);
+}
+
+function scheduleIdbFlush() {
+  if (!idb) return;
+  if (idbFlushing) {
+    idbAgain = true;
+    return;
+  }
+  idbFlushing = idbFlush().finally(() => {
+    idbFlushing = null;
+    if (idbAgain) scheduleIdbFlush();
+  });
+}
+
+async function idbFlush() {
+  do {
+    idbAgain = false;
+    const db = idb;
+    if (!db) return;
+    const dirty = [];
+    for (const n of state.notes) {
+      const json = JSON.stringify(n);
+      if (idbWritten.get(n.id) !== json) dirty.push({ note: n, json });
+    }
+    const gone = state.deletedIds.filter((id) => !idbGone.has(id));
+    const meta = {
+      order: state.notes.map((n) => n.id),
+      activeId: state.activeId,
+      deletedIds: [...state.deletedIds],
+      deletedAt: { ...state.deletedAt },
+    };
+    const metaJson = JSON.stringify(meta);
+    if (!dirty.length && !gone.length && metaJson === idbMetaWritten) break;
+    let newer;
+    try {
+      // Clones now: the editor may change the notes while this commits
+      newer = await idbCommit(
+        db,
+        dirty.map((d) => JSON.parse(d.json)),
+        gone,
+        meta,
+      );
+    } catch {
+      // Disk full or IndexedDB broken: the mirror or journal still holds
+      // the notes; say so once, retry on the next save
+      if (!idbFailed) {
+        idbFailed = true;
+        showModal(
+          "Couldn't save to browser storage. Free up disk space, or export your notes.",
+          "ok",
+          null,
+        );
+      }
+      return;
+    }
+    idbFailed = false;
+    const skipped = new Set(newer.map((n) => n.id));
+    for (const d of dirty) if (!skipped.has(d.note.id)) setWritten(d.note.id, d.json);
+    for (const id of gone) {
+      idbGone.add(id);
+      if (idbWritten.has(id)) {
+        idbBytes -= idbWritten.get(id).length * 2;
+        idbWritten.delete(id);
+      }
+    }
+    idbMetaWritten = metaJson;
+    const written = dirty.filter((d) => !skipped.has(d.note.id)).map((d) => d.note);
+    notesChannel?.postMessage({
+      notes: written.map((n) => JSON.parse(idbWritten.get(n.id))),
+      deletedIds: meta.deletedIds,
+      deletedAt: meta.deletedAt,
+    });
+    // Another tab committed a newer version meanwhile: adopt it
+    if (newer.length) {
+      for (const n of newer) setWritten(n.id, JSON.stringify(n));
+      adoptStored({ notes: newer, deletedIds: meta.deletedIds, deletedAt: meta.deletedAt });
+    }
+  } while (idbAgain);
+  if (!idbAgain) {
+    try {
+      localStorage.removeItem(PENDING_KEY);
+    } catch {}
+  }
+}
+
+// Merge notes from another tab and repaint what changed
+function adoptStored(stored) {
+  const before = activeNoteVersion();
+  if (!mergeStoredState(stored)) return;
+  if (activeNoteVersion() !== before) {
+    render();
+    // The open note was deleted or changed — a stale URL would bring it back
+    updateUrl();
+  } else renderNoteList();
+}
+
+notesChannel?.addEventListener("message", (e) => {
+  if (!stateLoaded) return;
+  const msg = e.data;
+  if (!msg || !Array.isArray(msg.notes)) return;
+  // Already committed by the sender — no need to write them again
+  for (const n of msg.notes) {
+    const mine = state.notes.find((m) => m.id === n.id);
+    if (!mine || mine.updatedAt <= n.updatedAt) setWritten(n.id, JSON.stringify(n));
+  }
+  adoptStored(msg);
+});
+
+// Notes not yet in IndexedDB, kept where a closing tab can write them
+// synchronously — only needed while the mirror is off
+function writePending() {
+  const notes = state.notes.filter(
+    (n) => idbWritten.get(n.id) !== JSON.stringify(n),
+  );
+  try {
+    localStorage.setItem(
+      PENDING_KEY,
+      JSON.stringify({
+        notes,
+        activeId: state.activeId,
+        deletedIds: state.deletedIds,
+        deletedAt: state.deletedAt,
+      }),
+    );
   } catch {}
 }
 
 function wouldExceedStorage(extraBytes) {
+  if (idb) return storageQuota > 0 && idbBytes + extraBytes > storageQuota;
   return getStorageUsed() + extraBytes > STORAGE_LIMIT;
 }
 
 function getStorageUsed() {
+  if (idb) return idbBytes;
   let total = 0;
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -438,15 +732,38 @@ function getStorageUsed() {
 }
 
 function saveState() {
+  if (!stateLoaded) return;
   mergeFromStorage();
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {
-    showModal(
-      "Storage full. Delete some notes to free up space.",
-      "ok",
-      null,
-    );
+  let mirrored = false;
+  // A mirror that didn't fit is retried once a minute, not on every save
+  if (!idb || Date.now() >= mirrorOffUntil) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      mirrored = true;
+      mirrorOffUntil = 0;
+    } catch (e) {
+      if (!idb) {
+        showModal(
+          "Storage full. Delete some notes to free up space.",
+          "ok",
+          null,
+        );
+      } else {
+        // A stale mirror would only shadow newer notes: drop it
+        mirrorOffUntil = Date.now() + 60000;
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch {}
+      }
+    }
+  }
+  if (idb) {
+    if (mirrored) {
+      try {
+        localStorage.removeItem(PENDING_KEY);
+      } catch {}
+    } else writePending();
+    scheduleIdbFlush();
   }
   updateStorageUsage();
 }
@@ -510,10 +827,12 @@ function sortNotes() {
 
 let urlTimeout = null;
 
+// Streams come from a Response, not Blob.stream(): WebKit reads blobs via a
+// blob: URL, which fails (uncaught) while the page unloads
 async function compress(text) {
-  const stream = new Blob([text])
-    .stream()
-    .pipeThrough(new CompressionStream("deflate-raw"));
+  const stream = new Response(text).body.pipeThrough(
+    new CompressionStream("deflate-raw"),
+  );
   const buf = await new Response(stream).arrayBuffer();
   const bytes = new Uint8Array(buf);
   let binary = "";
@@ -528,9 +847,9 @@ async function decompress(b64) {
   const binary = atob(b64.replace(/-/g, "+").replace(/_/g, "/"));
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const stream = new Blob([bytes])
-    .stream()
-    .pipeThrough(new DecompressionStream("deflate-raw"));
+  const stream = new Response(bytes).body.pipeThrough(
+    new DecompressionStream("deflate-raw"),
+  );
   return await new Response(stream).text();
 }
 
@@ -1471,19 +1790,22 @@ const storageUsage = document.getElementById("storageUsage");
 
 function updateStorageUsage() {
   const bytes = getStorageUsed();
-  if (bytes < 200 * 1024) {
+  // IndexedDB: the browser's quota (often gigabytes) — show only when near
+  const limit = idb ? storageQuota : STORAGE_LIMIT;
+  const pct = limit ? Math.min((bytes / limit) * 100, 100) : 0;
+  if (bytes < 200 * 1024 || (idb && pct < 50)) {
     storageUsage.innerHTML = "";
     storageUsage.title = "";
     return;
   }
-  const pct = Math.min((bytes / STORAGE_LIMIT) * 100, 100);
   const label =
     bytes >= 1024 * 1024
       ? (bytes / (1024 * 1024)).toFixed(1) + "MB"
       : (bytes / 1024).toFixed(0) + "kB";
   const cls = pct >= 90 ? " critical" : pct >= 70 ? " warn" : "";
   storageUsage.innerHTML = `<span class="storage-bar"><span class="storage-fill${cls}" style="width:${pct}%"></span></span>${label} (${pct.toFixed(0)}%)`;
-  storageUsage.title = `localStorage: ${label} / 5MB`;
+  const of = limit >= 1024 ** 3 ? (limit / 1024 ** 3).toFixed(1) + "GB" : (limit / 1024 ** 2).toFixed(0) + "MB";
+  storageUsage.title = `${idb ? "storage" : "localStorage"}: ${label} / ${of}`;
 }
 
 /* Selection occurrence markers */
@@ -7022,13 +7344,17 @@ window.addEventListener("storage", (e) => {
   if (e.key === TAB_LEADER_KEY && e.newValue !== tabId) {
     revokeLeadership();
   }
-  if (e.key === STORAGE_KEY && e.newValue) {
+  if ((e.key === STORAGE_KEY || e.key === PENDING_KEY) && e.newValue && stateLoaded) {
     try {
       const before = activeNoteVersion();
       if (!mergeStoredState(JSON.parse(e.newValue))) return;
+      // Older versions only write localStorage — keep IndexedDB current
+      scheduleIdbFlush();
       // Only touch the editor if the open note itself changed
-      if (activeNoteVersion() !== before) render();
-      else renderNoteList();
+      if (activeNoteVersion() !== before) {
+        render();
+        updateUrl();
+      } else renderNoteList();
     } catch {}
   }
   // Drive connect / token refresh / sign-out in another tab
@@ -8209,7 +8535,7 @@ const HELP_DESKTOP = [
   "",
   "## Tips",
   "",
-  "Browsers can clear localStorage without warning.",
+  "Browsers can clear their storage without warning.",
   "Bookmark your notes (URL updates as you type)",
   "or enable Drive sync so nothing gets lost.",
   "",
@@ -8369,7 +8695,7 @@ const HELP_MOBILE = [
   "",
   "## Tips",
   "",
-  "Browsers can clear localStorage without warning.",
+  "Browsers can clear their storage without warning.",
   "Bookmark your notes (URL updates as you type)",
   "or enable Drive sync so nothing gets lost.",
   "",
@@ -8537,8 +8863,7 @@ async function openHelp() {
 }
 
 async function init() {
-  const isFirstVisit = !localStorage.getItem(STORAGE_KEY);
-  loadState();
+  const isFirstVisit = !(await loadState());
   loadWrap();
   applyTheme(currentTheme());
   loadVim();
