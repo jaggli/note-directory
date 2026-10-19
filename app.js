@@ -1743,6 +1743,7 @@ function updateLineNumbers() {
   }
 
   // Wrap mode: each gutter line is as tall as its rendered line
+  syncScrollbarGap(); // content may have just gained or lost a scrollbar
   const rows = highlightLayer.children;
   if (rows.length !== lineCount) updateHighlight();
   const heights = Array.from(rows, (r) => r.offsetHeight);
@@ -4676,18 +4677,22 @@ function toggleWrap() {
     syncScrollbarGap();
   } else {
     highlightLayer.style.paddingRight = "";
-    _lastScrollbarW = 0;
+    _lastScrollbarW = "";
   }
   updateLineNumbers();
 }
 
 // Compensate highlight layer padding for textarea scrollbar width
-let _lastScrollbarW = 0;
+let _lastScrollbarW = "";
 function syncScrollbarGap() {
-  const scrollbarW = editor.offsetWidth - editor.clientWidth;
-  if (scrollbarW !== _lastScrollbarW) {
-    _lastScrollbarW = scrollbarW;
-    highlightLayer.style.paddingRight = 16 + scrollbarW + "px";
+  const gap =
+    parseFloat(getComputedStyle(editor).paddingRight) +
+    editor.offsetWidth -
+    editor.clientWidth +
+    "px";
+  if (gap !== _lastScrollbarW) {
+    _lastScrollbarW = gap;
+    highlightLayer.style.paddingRight = gap;
   }
 }
 
@@ -7529,7 +7534,7 @@ window.addEventListener("storage", (e) => {
       requestAnimationFrame(syncScrollbarGap);
     } else {
       highlightLayer.style.paddingRight = "";
-      _lastScrollbarW = 0;
+      _lastScrollbarW = "";
     }
   }
   if (e.key === VIM_KEY && e.newValue) {
@@ -8315,7 +8320,7 @@ function applyDriveSettings(settings) {
       requestAnimationFrame(syncScrollbarGap);
     } else {
       highlightLayer.style.paddingRight = "";
-      _lastScrollbarW = 0;
+      _lastScrollbarW = "";
     }
     updateLineNumbers();
   }
