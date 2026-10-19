@@ -7784,29 +7784,88 @@ function openSettings(section) {
   const drive = gdriveConnected
     ? `<div class="set-row">${icon("cloud")}<span class="set-text">Google Drive<small>${syncFailedState ? "Sync paused" : lastSyncAt ? "Synced " + relativeTime(lastSyncAt) : "Connected"} · in Drive's hidden app folder</small></span><button class="btn sm" data-set="sync">${syncFailedState ? "Reconnect" : "Sync now"}</button><button class="btn ghost sm" data-set="disconnect">Disconnect</button></div>`
     : `<div class="set-row">${icon("cloud")}<span class="set-text">Google Drive<small>Keep notes in sync across devices, in Drive's hidden app folder</small></span><button class="btn sm" data-set="sync">Connect…</button></div>`;
+  const sections = [
+    ["appearance", "contrast", "Appearance"],
+    ["editor", "code", "Editor"],
+    ["sync", "cloud", "Sync and backup"],
+    ["storage", "archive", "Storage"],
+    ["shortcuts", "keyboard", "Shortcuts"],
+  ];
+  const keys = [
+    ["Search notes and lines", "⌘P"],
+    ["All commands", "⌘⇧P"],
+    ...paletteCommands()
+      .filter((c) => c[2])
+      .map((c) => [c[2] === "⌘E" ? "Edit ⇄ Preview" : c[1], c[2]]),
+    ["Undo · redo", "⌘Z · ⌘⇧Z"],
+    ["Move line up · down", "⌥↑ · ⌥↓"],
+    ["Close the topmost layer", "Esc"],
+  ];
+  const panel = (id, title, body) =>
+    `<section class="set-panel" id="set-${id}"><h3 class="set-panel-title">${title}</h3>${body}</section>`;
   const dlg = openDialog(
-    `<div class="settings-head"><h2>Settings</h2><button class="btn ghost square" data-set="close" aria-label="Close">${icon("x")}</button></div>` +
-      `<div class="set-group" id="set-appearance"><h3>Theme</h3>` +
-      row("system", "", "Match system", "Latte by day, your dark theme by night", sw(followsSystem())) +
-      `<div class="themes">${THEMES.map(card).join("")}</div></div>` +
-      `<div class="set-group" id="set-editor"><h3>Editor</h3>` +
-      row("wrap", "", "Wrap long lines", "Also in the status bar", sw(editorArea.classList.contains("wrap"))) +
-      (touchOnly.matches ? "" : row("vim", "", "Vim keys", keyLabel("⌃⇧M"), sw(vimState.enabled))) +
-      row("format", "", "Format markdown on save", "Headings, lists and tables, on " + keyLabel("⌘S"), sw(formatOnSave())) +
-      `</div>` +
-      `<div class="set-group" id="set-sync"><h3>Sync and backup</h3>${drive}` +
-      `<div class="set-row">${icon("archive")}<span class="set-text">Export all as ZIP<small>Every note, drawings as SVG too, re-importable</small></span><button class="btn sm" data-set="export">Export</button></div>` +
-      `<div class="set-row">${icon("import")}<span class="set-text">Import files<small>Text files or a ZIP from Export</small></span><button class="btn sm" data-set="import">Choose…</button></div></div>` +
-      `<div class="set-group" id="set-storage"><h3>Storage</h3>` +
-      `<div class="storage"><div><span>Browser storage</span><span>${sizeLabel(bytes)}${limit ? " of " + sizeLabel(limit) : ""}</span></div><div class="meter${pct >= 90 ? " critical" : pct >= 70 ? " warn" : ""}"><i style="width:${pct}%"></i></div></div>` +
-      (largest ? `<div class="set-row"><span class="set-text">Largest notes<small>${largest}</small></span></div>` : "") +
-      `<div class="set-row"><span class="set-text">Browsers may clear storage without warning<small>Turn on Google Drive or export now and then</small></span></div></div>` +
-      `<p class="settings-note">Notes never pass through note.directory's server. Sign-in uses a small worker that only holds Google's token.</p>`,
+    `<nav class="set-nav" aria-label="Settings sections"><h2>Settings</h2>` +
+      sections
+        .map(
+          ([id, ic, label]) =>
+            `<button class="set-nav-item" data-set="section" data-section="${id}">${icon(ic)}${label}</button>`,
+        )
+        .join("") +
+      `</nav>` +
+      `<div class="settings-head"><h2>Settings</h2></div>` +
+      `<button class="btn ghost square set-close" data-set="close" aria-label="Close">${icon("x")}</button>` +
+      `<div class="set-main">` +
+      panel(
+        "appearance",
+        "Appearance",
+        `<div class="set-group"><h4>Theme</h4>` +
+          row("system", "", "Match system", "Latte by day, your dark theme by night", sw(followsSystem())) +
+          `</div><div class="set-group"><h4>Dark</h4><div class="themes">${THEMES.filter((t) => t !== "latte").map(card).join("")}</div></div>` +
+          `<div class="set-group"><h4>Light</h4><div class="themes">${card("latte")}</div></div>`,
+      ) +
+      panel(
+        "editor",
+        "Editor",
+        `<div class="set-group">` +
+          row("wrap", "", "Wrap long lines", "Also in the status bar", sw(editorArea.classList.contains("wrap"))) +
+          (touchOnly.matches ? "" : row("vim", "", "Vim keys", keyLabel("⌃⇧M"), sw(vimState.enabled))) +
+          row("format", "", "Format markdown on save", "Headings, lists and tables, on " + keyLabel("⌘S"), sw(formatOnSave())) +
+          `</div>`,
+      ) +
+      panel(
+        "sync",
+        "Sync and backup",
+        `<div class="set-group">${drive}` +
+          `<div class="set-row">${icon("archive")}<span class="set-text">Export all as ZIP<small>Every note, drawings as SVG too, re-importable</small></span><button class="btn sm" data-set="export">Export</button></div>` +
+          `<div class="set-row">${icon("import")}<span class="set-text">Import files<small>Text files or a ZIP from Export</small></span><button class="btn sm" data-set="import">Choose…</button></div></div>` +
+          `<p class="settings-note">Notes never pass through note.directory's server. Sign-in uses a small worker that only holds Google's token.</p>`,
+      ) +
+      panel(
+        "storage",
+        "Storage",
+        `<div class="set-group"><div class="storage"><div><span>Browser storage</span><span>${sizeLabel(bytes)}${limit ? " of " + sizeLabel(limit) : ""}</span></div><div class="meter${pct >= 90 ? " critical" : pct >= 70 ? " warn" : ""}"><i style="width:${pct}%"></i></div></div>` +
+          (largest ? `<div class="set-row"><span class="set-text">Largest notes<small>${largest}</small></span></div>` : "") +
+          `<div class="set-row"><span class="set-text">Browsers may clear storage without warning<small>Turn on Google Drive or export now and then</small></span></div></div>`,
+      ) +
+      panel(
+        "shortcuts",
+        "Shortcuts",
+        `<div class="set-group set-keys">` +
+          keys
+            .map(
+              ([label, key]) =>
+                `<div class="set-row"><span class="set-text">${escapeHtml(label)}</span><span class="kbd boxed">${escapeHtml(key.split(" · ").map(keyLabel).join(" · "))}</span></div>`,
+            )
+            .join("") +
+          `</div>`,
+      ) +
+      `</div>`,
     (e, close) => {
       const b = e.target.closest("[data-set]");
       if (!b) return;
       const set = b.dataset.set;
       if (set === "close") return close();
+      if (set === "section") return showSection(b.dataset.section);
       if (set === "export") return downloadAll();
       if (set === "import") {
         close();
@@ -7844,8 +7903,17 @@ function openSettings(section) {
     () => {},
     "settings",
   );
-  if (section) dlg.querySelector("#set-" + section)?.scrollIntoView();
-  dlg.querySelector("[data-set=close]").focus();
+  // Desktop shows one section beside the nav; phones scroll through all
+  function showSection(id) {
+    for (const p of dlg.querySelectorAll(".set-panel"))
+      p.classList.toggle("active", p.id === "set-" + id);
+    for (const n of dlg.querySelectorAll(".set-nav-item"))
+      n.setAttribute("aria-selected", n.dataset.section === id);
+    if (isMobile() && id !== "appearance")
+      dlg.querySelector("#set-" + id)?.scrollIntoView();
+  }
+  showSection(section || "appearance");
+  dlg.querySelector(".set-nav-item[aria-selected=true]")?.focus();
 }
 
 // ⌥⇧F, ⋯ › Format markdown, :fmt

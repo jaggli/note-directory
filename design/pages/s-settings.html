@@ -1,5 +1,5 @@
 <h1 class="pg-title">Settings</h1>
-<p class="pg-lede">There are only a handful of settings, scattered over three places today. A small dialog lists them all. The quick toggles stay where they're used — Wrap and Vim in the status bar, Theme in note ▾.</p>
+<p class="pg-lede">There are only a handful of settings, scattered over three places today. A small dialog lists them all. The quick toggles stay where they're used — Wrap and Vim in the status bar, Theme in note ▾. Desktop shows one section beside the nav; a phone gets one sheet that scrolls through all of them.</p>
 
 <section class="sec">
   <h2>Appearance</h2>
@@ -23,6 +23,7 @@
           <div class="n-row"><i data-i="keyboard"></i><span class="name">Shortcuts</span></div>
         </nav>
         <section>
+          <div style="display:flex;justify-content:space-between;align-items:center"><h4 style="font:var(--n-heading);margin:0">Appearance</h4><button class="n-btn ghost icon"><i data-i="x"></i></button></div>
           <div class="n-set-group">
             <h5>Theme</h5>
             <div class="n-set-row"><span class="text">Match system<small>Latte by day, your dark theme by night</small></span><span class="n-switch" aria-checked="true"></span></div>
@@ -73,5 +74,42 @@
         <div class="n-set-row"><span class="text">Browsers may clear storage without warning<small>Turn on Drive or export now and then</small></span></div>
       </div>
     </section></div><span class="cap">Storage</span></div>
+    <div class="spec"><div class="n-settings" style="width:460px;grid-template-columns:1fr;height:auto"><section style="gap:4px">
+      <div class="n-set-group"><h5>Shortcuts</h5>
+        <div class="n-set-row" style="min-height:30px"><span class="text">Search notes and lines</span><span class="n-kbd boxed">⌘P</span></div>
+        <div class="n-set-row" style="min-height:30px"><span class="text">All commands</span><span class="n-kbd boxed">⌘⇧P</span></div>
+        <div class="n-set-row" style="min-height:30px"><span class="text">New note</span><span class="n-kbd boxed">⌃N</span></div>
+        <div class="n-set-row" style="min-height:30px"><span class="text">Edit ⇄ Preview</span><span class="n-kbd boxed">⌘E</span></div>
+        <div class="n-set-row" style="min-height:30px"><span class="text">Find and replace</span><span class="n-kbd boxed">⌘⌥F</span></div>
+        <div class="n-set-row" style="min-height:30px"><span class="text">Delete note</span><span class="n-kbd boxed">⌘⇧D</span></div>
+      </div>
+    </section></div><span class="cap">Shortcuts — desktop only, read from the commands</span></div>
   </div>
+</section>
+
+<section class="sec">
+  <h2>Phone</h2>
+  <div class="frames">
+    <div class="frame phone"><div class="n" data-theme style="width:390px;height:844px;display:grid;grid-template-rows:54px 56px 1fr;background:var(--n-raised)">
+      <div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 16px;border-bottom:1px solid var(--n-line)"><b style="font:var(--n-heading)">Settings</b><button class="n-btn ghost icon" style="width:40px;height:40px"><i data-i="x"></i></button></div>
+      <div style="overflow:hidden;padding:16px;display:grid;align-content:start;gap:14px">
+        <h4 style="font:var(--n-heading);margin:0">Appearance</h4>
+        <div class="n-set-row" style="min-height:48px"><span class="text">Match system<small>Latte by day, your dark theme by night</small></span><span class="n-switch" aria-checked="true"></span></div>
+        <div class="n-themes" style="grid-template-columns:1fr 1fr">
+          <button class="n-theme-card on" data-theme="mocha" data-fixed><span class="pv" style="background:var(--p-bg)"><span style="background:var(--p-panel)"><i style="background:var(--p-blue)"></i></span><span><i style="background:var(--p-mauve);width:50%"></i><i style="background:var(--p-text);width:80%"></i></span></span>Mocha</button>
+          <button class="n-theme-card" data-theme="espresso" data-fixed><span class="pv" style="background:var(--p-bg)"><span style="background:var(--p-panel)"><i style="background:var(--p-blue)"></i></span><span><i style="background:var(--p-mauve);width:50%"></i><i style="background:var(--p-text);width:80%"></i></span></span>Espresso</button>
+        </div>
+        <h4 style="font:var(--n-heading);margin:8px 0 0">Editor</h4>
+        <div class="n-set-row" style="min-height:48px"><span class="text">Wrap long lines<small>Also in the status bar</small></span><span class="n-switch" aria-checked="true"></span></div>
+        <div class="n-set-row" style="min-height:48px"><span class="text">Format markdown on save<small>Headings, lists and tables</small></span><span class="n-switch" aria-checked="true"></span></div>
+        <h4 style="font:var(--n-heading);margin:8px 0 0">Sync and backup</h4>
+        <div class="n-set-row" style="min-height:48px"><i data-i="cloud"></i><span class="text">Google Drive<small>Synced 2 min ago</small></span><button class="n-btn sm">Sync now</button></div>
+      </div>
+    </div></div>
+  </div>
+  <ul class="notes">
+    <li><span><b>No nav on a phone:</b> every section stacked under a sticky header with ×; “Back up…” scrolls straight to Sync and backup.</span></li>
+    <li><span><b>Shortcuts</b> are left out — there's no keyboard.</span></li>
+  </ul>
 </section>

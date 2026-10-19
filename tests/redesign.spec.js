@@ -267,6 +267,9 @@ test("settings: theme cards, match system, format on save", async ({ page }) => 
   await expect(page.locator("html")).toHaveAttribute("data-theme", "latte");
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "frappe");
+  await expect(dlg.locator("#set-editor")).toBeHidden();
+  await dlg.locator('.set-nav-item[data-section="editor"]').click();
+  await expect(dlg.locator("#set-appearance")).toBeHidden();
   await dlg.locator('[data-set="format"]').click();
   await expect(dlg.locator('[data-set="format"] .switch')).toHaveAttribute("aria-checked", "false");
   await page.keyboard.press("Escape");
@@ -291,6 +294,20 @@ test("a Drive conflict copy carries a badge and a banner that resolves it", asyn
   await page.click('#banner button:has-text("Use this one")');
   expect(await names(page)).not.toContain("plan (conflict).md");
   expect(await page.evaluate(() => [getActiveNote().name, getActiveNote().content])).toEqual(["plan.md", "theirs"]);
+});
+
+test("settings on a phone: one sheet with every section", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 760 });
+  await openApp(page);
+  await page.evaluate(() => openSettings("sync"));
+  const dlg = page.locator("#dialogOverlay .settings");
+  await expect(dlg.locator(".set-nav")).toBeHidden();
+  for (const id of ["appearance", "editor", "sync", "storage"])
+    await expect(dlg.locator("#set-" + id)).toBeVisible();
+  const box = await dlg.boundingBox();
+  expect([box.x, box.width]).toEqual([0, 390]);
+  await dlg.locator(".set-close").click();
+  await expect(dlg).toHaveCount(0);
 });
 
 test("tooltips: icon buttons name themselves and their key", async ({ page }) => {
