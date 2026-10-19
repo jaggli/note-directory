@@ -46,8 +46,7 @@ function relativeTime(ts) {
 
 function formatSize(str) {
   const bytes = new Blob([str]).size;
-  if (bytes >= 1024 * 1024)
-    return (bytes / (1024 * 1024)).toFixed(1) + "MB";
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + "MB";
   if (bytes >= 1024) return (bytes / 1024).toFixed(0) + "kB";
   return bytes + "B";
 }
@@ -184,8 +183,7 @@ async function readZip(buf) {
   const entryCount = view.getUint16(eocdPos + 8, true);
   const cdOffset = view.getUint32(eocdPos + 16, true);
 
-  if (entryCount > ZIP_MAX_ENTRIES)
-    throw new Error("Zip has too many files");
+  if (entryCount > ZIP_MAX_ENTRIES) throw new Error("Zip has too many files");
   if (cdOffset >= len) throw new Error("Invalid zip: bad CD offset");
 
   // Parse central directory
@@ -244,10 +242,7 @@ async function readZip(buf) {
       const dataStart = lh + 30 + lhNameLen + lhExtraLen;
       if (dataStart + entry.compSize > len)
         throw new Error("Invalid zip: truncated data");
-      const compData = bytes.subarray(
-        dataStart,
-        dataStart + entry.compSize,
-      );
+      const compData = bytes.subarray(dataStart, dataStart + entry.compSize);
 
       let data;
       if (entry.method === 0) {
@@ -319,8 +314,7 @@ const SWAP_PREFIX = "notepad_swap_";
 const TAB_LEADER_KEY = "notepad_tab_leader";
 let state = { notes: [], activeId: null, deletedIds: [], deletedAt: {} };
 let saveTimeout = null;
-const tabId =
-  Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const tabId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 let isTabLeader = false;
 
 function claimLeadership() {
@@ -603,7 +597,8 @@ async function loadState() {
 // and comparing fields finds changes without serializing — an unchanged
 // content is the very same string
 function setSnap(n) {
-  idbBytes += noteBytes(n) - (idbSnap.has(n.id) ? noteBytes(idbSnap.get(n.id)) : 0);
+  idbBytes +=
+    noteBytes(n) - (idbSnap.has(n.id) ? noteBytes(idbSnap.get(n.id)) : 0);
   idbSnap.set(n.id, { ...n });
 }
 
@@ -683,7 +678,11 @@ async function idbFlush() {
     // Another tab committed a newer version meanwhile: adopt it
     if (newer.length) {
       for (const n of newer) setSnap(n);
-      adoptStored({ notes: newer, deletedIds: meta.deletedIds, deletedAt: meta.deletedAt });
+      adoptStored({
+        notes: newer,
+        deletedIds: meta.deletedIds,
+        deletedAt: meta.deletedAt,
+      });
     }
   } while (idbAgain);
   // Everything committed: the journal has done its job
@@ -938,7 +937,8 @@ async function updateUrl() {
     const query = queryStr ? "?" + queryStr : "";
 
     // A plain text= link is replaced by the compressed form
-    const hashMap = plainTextParam(location.hash)?.params ?? parseHashParams(location.hash);
+    const hashMap =
+      plainTextParam(location.hash)?.params ?? parseHashParams(location.hash);
     hashMap.set("name", note.name);
     hashMap.set("note", compressed);
     hashMap.set("ts", String(note.updatedAt));
@@ -954,11 +954,7 @@ async function updateUrl() {
       );
       btnShare.style.display = "none";
     } else {
-      history.replaceState(
-        { noteId: note.id, tab: currentTab() },
-        "",
-        full,
-      );
+      history.replaceState({ noteId: note.id, tab: currentTab() }, "", full);
       btnShare.style.display = "";
     }
   } catch {}
@@ -1226,9 +1222,7 @@ function trimHistory(h) {
 
 function pushHistory(id, content) {
   const h = getHistory(id);
-  const lastContent = h.past.length
-    ? h.past[h.past.length - 1].content
-    : null;
+  const lastContent = h.past.length ? h.past[h.past.length - 1].content : null;
   if (content === lastContent) return;
   h.past.push({ content });
   h.future = [];
@@ -1276,10 +1270,7 @@ function undo() {
   if (!h.past.length) return;
   const oldContent = editor.value;
   // Skip past entries identical to current state (snapshot duplicates)
-  while (
-    h.past.length &&
-    h.past[h.past.length - 1].content === oldContent
-  ) {
+  while (h.past.length && h.past[h.past.length - 1].content === oldContent) {
     h.past.pop();
   }
   if (!h.past.length) return;
@@ -1711,7 +1702,8 @@ function updateHighlight() {
   let a = 0;
   while (a < n && lines[a] === old[a]) a++;
   let b = 0;
-  while (b < n - a && lines[lines.length - 1 - b] === old[old.length - 1 - b]) b++;
+  while (b < n - a && lines[lines.length - 1 - b] === old[old.length - 1 - b])
+    b++;
   for (let i = old.length - b - 1; i >= a; i--) kids[i].remove();
   let html = "";
   for (let i = a; i < lines.length - b; i++)
@@ -1833,7 +1825,10 @@ function updateStorageUsage() {
       : (bytes / 1024).toFixed(0) + "kB";
   const cls = pct >= 90 ? " critical" : pct >= 70 ? " warn" : "";
   storageUsage.innerHTML = `<span class="storage-bar"><span class="storage-fill${cls}" style="width:${pct}%"></span></span>${label} (${pct.toFixed(0)}%)`;
-  const of = limit >= 1024 ** 3 ? (limit / 1024 ** 3).toFixed(1) + "GB" : (limit / 1024 ** 2).toFixed(0) + "MB";
+  const of =
+    limit >= 1024 ** 3
+      ? (limit / 1024 ** 3).toFixed(1) + "GB"
+      : (limit / 1024 ** 2).toFixed(0) + "MB";
   storageUsage.title = `${idb ? "storage" : "localStorage"}: ${label} / ${of}`;
 }
 
@@ -1911,11 +1906,14 @@ function updateOccurrenceMarkers(force) {
   // Scrollbar track: one marker per pixel row is enough
   const totalLines = vimLastLine() + 1;
   const tops = new Set(
-    matches.map((m) => Math.round((vimLineOf(m.start) / totalLines) * trackHeight)),
+    matches.map((m) =>
+      Math.round((vimLineOf(m.start) / totalLines) * trackHeight),
+    ),
   );
   let trackHtml = "";
   for (const top of tops)
-    trackHtml += '<div class="occurrence-marker" style="top:' + top + 'px"></div>';
+    trackHtml +=
+      '<div class="occurrence-marker" style="top:' + top + 'px"></div>';
 
   // Text highlights only for matches on screen
   const [first, last] = visibleRows();
@@ -2077,8 +2075,7 @@ function renderNoteList() {
   for (let ni = 0; ni < state.notes.length; ni++) {
     const note = state.notes[ni];
     const div = document.createElement("div");
-    div.className =
-      "note-item" + (note.id === state.activeId ? " active" : "");
+    div.className = "note-item" + (note.id === state.activeId ? " active" : "");
     div.setAttribute("role", "listitem");
     div.draggable = true;
     div.dataset.idx = ni;
@@ -2363,7 +2360,8 @@ function showDraw(note, readonly) {
         onSource: (line) => {
           switchMdTab("edit", true);
           const lines = editor.value.split("\n").slice(0, line - 1);
-          editor.selectionStart = editor.selectionEnd = lines.join("\n").length + (line > 1 ? 1 : 0);
+          editor.selectionStart = editor.selectionEnd =
+            lines.join("\n").length + (line > 1 ? 1 : 0);
           updateCursorPos();
           ensureCursorScrolloff();
         },
@@ -2416,7 +2414,9 @@ function hydrateDrawEmbeds() {
           el.classList.add("missing");
           continue;
         }
-        el.replaceChildren(Draw.renderStatic(note ? note.content : el.dataset.draw));
+        el.replaceChildren(
+          Draw.renderStatic(note ? note.content : el.dataset.draw),
+        );
         if (note) el.title = "open " + note.name;
       }
     })
@@ -2606,10 +2606,8 @@ function formatMarkdown(text) {
       for (let c = 0; c < colCount; c++) {
         if (isSep) {
           const dashes = "-".repeat(widths[c]);
-          if (aligns[c] === "center")
-            line += " :" + dashes.slice(2) + ": |";
-          else if (aligns[c] === "right")
-            line += " " + dashes.slice(1) + ": |";
+          if (aligns[c] === "center") line += " :" + dashes.slice(2) + ": |";
+          else if (aligns[c] === "right") line += " " + dashes.slice(1) + ": |";
           else line += " " + dashes + " |";
         } else {
           const cell = rows[r][c] || "";
@@ -2619,11 +2617,7 @@ function formatMarkdown(text) {
             const pad = widths[c] - cell.length;
             const left = Math.floor(pad / 2);
             line +=
-              " " +
-              " ".repeat(left) +
-              cell +
-              " ".repeat(pad - left) +
-              " |";
+              " " + " ".repeat(left) + cell + " ".repeat(pad - left) + " |";
           } else line += " " + cell.padEnd(widths[c]) + " |";
         }
       }
@@ -2641,15 +2635,10 @@ function formatMarkdown(text) {
     const isTableStart =
       (cur.type === "table" || cur.type === "table-sep") &&
       (!prev || (prev.type !== "table" && prev.type !== "table-sep"));
-    const isListStart =
-      cur.type === "list" && (!prev || prev.type !== "list");
-    const isCodeStart =
-      cur.type === "code" && (!prev || prev.type !== "code");
+    const isListStart = cur.type === "list" && (!prev || prev.type !== "list");
+    const isCodeStart = cur.type === "code" && (!prev || prev.type !== "code");
     const needsBlankBefore =
-      blockTypes.has(cur.type) ||
-      isTableStart ||
-      isListStart ||
-      isCodeStart;
+      blockTypes.has(cur.type) || isTableStart || isListStart || isCodeStart;
 
     // Blank line before block elements (if not already blank or first line)
     if (
@@ -2668,10 +2657,8 @@ function formatMarkdown(text) {
     const isTableEnd =
       (cur.type === "table" || cur.type === "table-sep") &&
       (!next || (next.type !== "table" && next.type !== "table-sep"));
-    const isListEnd =
-      cur.type === "list" && (!next || next.type !== "list");
-    const isCodeEnd =
-      cur.type === "code" && (!next || next.type !== "code");
+    const isListEnd = cur.type === "list" && (!next || next.type !== "list");
+    const isCodeEnd = cur.type === "code" && (!next || next.type !== "code");
     const needsBlankAfter =
       blockTypes.has(cur.type) || isTableEnd || isListEnd || isCodeEnd;
 
@@ -2893,9 +2880,7 @@ function renderMarkdown(src) {
       ">"
     );
   }
-  text = text.replace(/^######[ \t]+(.+)$/gm, (_, t) =>
-    makeHeading(6, t),
-  );
+  text = text.replace(/^######[ \t]+(.+)$/gm, (_, t) => makeHeading(6, t));
   text = text.replace(/^#####[ \t]+(.+)$/gm, (_, t) => makeHeading(5, t));
   text = text.replace(/^####[ \t]+(.+)$/gm, (_, t) => makeHeading(4, t));
   text = text.replace(/^###[ \t]+(.+)$/gm, (_, t) => makeHeading(3, t));
@@ -2970,7 +2955,10 @@ function renderMarkdown(src) {
           i < lines.length &&
           !listRe.test(lines[i]) &&
           (/^\s+\S/.test(lines[i]) ||
-            (/^\S/.test(lines[i]) && !/^(<(h[1-6]|hr|blockquote)|\x00CB|\||&lt;\/?(details|summary))/i.test(lines[i])))
+            (/^\S/.test(lines[i]) &&
+              !/^(<(h[1-6]|hr|blockquote)|\x00CB|\||&lt;\/?(details|summary))/i.test(
+                lines[i],
+              )))
         ) {
           const hard = /( {2,}|\\)$/.test(prev);
           if (hard) itemHtml = itemHtml.replace(/( +|\\)$/, "");
@@ -3034,9 +3022,7 @@ function renderMarkdown(src) {
         .split("\n")
         .map((row) => {
           const tds = splitRow(row)
-            .map(
-              (c, i) => "<td" + alignAttr(i) + ">" + c.trim() + "</td>",
-            )
+            .map((c, i) => "<td" + alignAttr(i) + ">" + c.trim() + "</td>")
             .join("");
           return "<tr>" + tds + "</tr>";
         })
@@ -3095,24 +3081,24 @@ function renderMarkdown(src) {
     .map((part, idx) =>
       idx % 2
         ? part
-        : part.replace(
-            /\bhttps?:\/\/[^\s<>"]+/gi,
-            (url) => {
-              // Trailing punctuation belongs to the sentence
-              const tail = url.match(/(?:[.,;:!?'*_~]|&quot;|\))+$/);
-              let end = tail ? tail[0] : "";
-              url = url.slice(0, url.length - end.length);
-              // Keep a closing paren that balances one in the URL
-              while (end.startsWith(")") && url.split("(").length > url.split(")").length) {
-                url += ")";
-                end = end.slice(1);
-              }
-              autoLinks.push(
-                '<a href="' + url + '" rel="noopener noreferrer">' + url + "</a>",
-              );
-              return "\x00AL" + (autoLinks.length - 1) + "\x00" + end;
-            },
-          ),
+        : part.replace(/\bhttps?:\/\/[^\s<>"]+/gi, (url) => {
+            // Trailing punctuation belongs to the sentence
+            const tail = url.match(/(?:[.,;:!?'*_~]|&quot;|\))+$/);
+            let end = tail ? tail[0] : "";
+            url = url.slice(0, url.length - end.length);
+            // Keep a closing paren that balances one in the URL
+            while (
+              end.startsWith(")") &&
+              url.split("(").length > url.split(")").length
+            ) {
+              url += ")";
+              end = end.slice(1);
+            }
+            autoLinks.push(
+              '<a href="' + url + '" rel="noopener noreferrer">' + url + "</a>",
+            );
+            return "\x00AL" + (autoLinks.length - 1) + "\x00" + end;
+          }),
     )
     .join("");
 
@@ -3137,10 +3123,7 @@ function renderMarkdown(src) {
     /(?<![a-zA-Z0-9])__(.+?)__(?![a-zA-Z0-9])/g,
     "<strong>$1</strong>",
   );
-  text = text.replace(
-    /(?<![a-zA-Z0-9])_(.+?)_(?![a-zA-Z0-9])/g,
-    "<em>$1</em>",
-  );
+  text = text.replace(/(?<![a-zA-Z0-9])_(.+?)_(?![a-zA-Z0-9])/g, "<em>$1</em>");
 
   // Strikethrough
   text = text.replace(/~~(.+?)~~/g, "<del>$1</del>");
@@ -3199,9 +3182,8 @@ function renderMarkdown(src) {
 
   // Final href check: placeholders (e.g. "\:") were restored above, so
   // the scheme check in the link pass can be bypassed — re-check here.
-  text = text.replace(
-    /<a href="([^"]*)" title="[^"]*"/g,
-    (m, href) => (!href.includes("<") && isSafeHref(href) ? m : "<a"),
+  text = text.replace(/<a href="([^"]*)" title="[^"]*"/g, (m, href) =>
+    !href.includes("<") && isSafeHref(href) ? m : "<a",
   );
 
   return text;
@@ -3270,7 +3252,11 @@ function updateMdTabBar() {
   fileMenu.classList.toggle("is-md", isMarkdownFile(note?.name));
   if (!isMd && !zenEphemeral && mdViewActive) {
     switchMdTab("edit");
-  } else if (mdViewActive && !zenModeActive && mdTabsKind !== (isDraw ? "draw" : "md")) {
+  } else if (
+    mdViewActive &&
+    !zenModeActive &&
+    mdTabsKind !== (isDraw ? "draw" : "md")
+  ) {
     // Renamed between .md and .draw while in the second tab
     switchMdTab("view");
   }
@@ -3300,9 +3286,7 @@ function switchMdTab(tab, pushHistory) {
   mdViewActive = tab === "view" || tab === "zen";
   mdTabEdit.classList.toggle("active", tab === "edit");
   mdTabView.classList.toggle("active", tab === "view");
-  document
-    .getElementById("mdTabZen")
-    .classList.toggle("active", tab === "zen");
+  document.getElementById("mdTabZen").classList.toggle("active", tab === "zen");
   mdTabEdit.setAttribute("aria-selected", tab === "edit");
   mdTabView.setAttribute("aria-selected", tab === "view");
   document
@@ -3318,8 +3302,7 @@ function switchMdTab(tab, pushHistory) {
     mdPreview.onclick = (e) => {
       const li = e.target.closest("li.task-item");
       const input =
-        e.target.tagName === "INPUT" &&
-        e.target.dataset.task !== undefined
+        e.target.tagName === "INPUT" && e.target.dataset.task !== undefined
           ? e.target
           : null;
       if (!li && !input) return;
@@ -3347,7 +3330,10 @@ function switchMdTab(tab, pushHistory) {
             line.slice(0, t.quote) +
             line
               .slice(t.quote)
-              .replace(TASK_RE, (_, prefix) => prefix + (checked ? "[x]" : "[ ]"));
+              .replace(
+                TASK_RE,
+                (_, prefix) => prefix + (checked ? "[x]" : "[ ]"),
+              );
         });
         return lines.join("\n");
       }
@@ -3437,8 +3423,10 @@ function switchMdTab(tab, pushHistory) {
     const zenEl = document.getElementById("zenBarFilename");
     const zenEndLen = 8;
     const zenSplit = Math.max(zenName.length - zenEndLen, 1);
-    zenEl.querySelector(".zen-bar-filename-start").textContent =
-      zenName.slice(0, zenSplit);
+    zenEl.querySelector(".zen-bar-filename-start").textContent = zenName.slice(
+      0,
+      zenSplit,
+    );
     zenEl.querySelector(".zen-bar-filename-end").textContent =
       zenName.slice(zenSplit);
     zenBar.style.display = "";
@@ -3487,8 +3475,7 @@ function switchMdTab(tab, pushHistory) {
       const scrollMax = mdPreview.scrollHeight - mdPreview.clientHeight;
       if (scrollMax > 0) {
         const target =
-          cursorRatio * mdPreview.scrollHeight -
-          mdPreview.clientHeight / 2;
+          cursorRatio * mdPreview.scrollHeight - mdPreview.clientHeight / 2;
         mdPreview.scrollTop = Math.max(0, Math.min(target, scrollMax));
       }
     });
@@ -3529,8 +3516,7 @@ function switchMdTab(tab, pushHistory) {
       lines.length - 1,
     );
     let charOffset = 0;
-    for (let i = 0; i < targetLine; i++)
-      charOffset += lines[i].length + 1;
+    for (let i = 0; i < targetLine; i++) charOffset += lines[i].length + 1;
     editor.selectionStart = editor.selectionEnd = charOffset;
 
     if (vimState.enabled) {
@@ -3569,7 +3555,7 @@ function persistZenNote() {
         id,
         name: uniqueName(name),
         content,
-          updatedAt: now,
+        updatedAt: now,
       });
       state.activeId = id;
     }
@@ -3601,10 +3587,12 @@ function exitZenMode() {
 
 async function zenShare() {
   try {
-    const note = zenFromUrl && zenEphemeralNote ? zenEphemeralNote : getActiveNote();
+    const note =
+      zenFromUrl && zenEphemeralNote ? zenEphemeralNote : getActiveNote();
     if (!note) return;
     const shareUrl = await shareUrlFor(note);
-    if (!shareUrl) return showModal("Note is too large to share via URL.", "ok", null);
+    if (!shareUrl)
+      return showModal("Note is too large to share via URL.", "ok", null);
     await navigator.clipboard.writeText(shareUrl);
     const label = document.getElementById("zenCopied");
     label.classList.add("visible");
@@ -3686,10 +3674,7 @@ function showMdToast(msg) {
   mdToast.textContent = msg;
   mdToast.classList.add("visible");
   clearTimeout(mdToastTimer);
-  mdToastTimer = setTimeout(
-    () => mdToast.classList.remove("visible"),
-    2000,
-  );
+  mdToastTimer = setTimeout(() => mdToast.classList.remove("visible"), 2000);
 }
 
 // Heading anchor click handler
@@ -3819,12 +3804,14 @@ window.addEventListener("popstate", async (e) => {
     // the content itself (a newly opened share link): that must be shown
     const hashMap = parseHashParams(location.hash);
     const name = hashMap.get("name");
-    if (name && !hashMap.get("note") && plainTextParam(location.hash) === null) {
+    if (
+      name &&
+      !hashMap.get("note") &&
+      plainTextParam(location.hash) === null
+    ) {
       const note = state.notes.find((n) => n.name === name);
       if (note) {
-        const viewParam = new URLSearchParams(location.search).get(
-          "view",
-        );
+        const viewParam = new URLSearchParams(location.search).get("view");
         const tab =
           viewParam === "zen"
             ? "zen"
@@ -3880,8 +3867,7 @@ async function createNote(name, content, focusName, ext) {
     name = result;
   }
   const contentStr = content || "";
-  const estimatedBytes =
-    (name || "").length * 2 + contentStr.length * 2 + 200;
+  const estimatedBytes = (name || "").length * 2 + contentStr.length * 2 + 200;
   if (wouldExceedStorage(estimatedBytes)) {
     showModal(
       "Not enough storage space. Delete some notes to free up space.",
@@ -3907,9 +3893,7 @@ async function createNote(name, content, focusName, ext) {
   render();
   updateUrl();
   if (focusName && !isMobile()) {
-    const input = noteList.querySelector(
-      ".note-item.active .note-item-input",
-    );
+    const input = noteList.querySelector(".note-item.active .note-item-input");
     if (input) {
       input.classList.add("editing");
       input.focus();
@@ -4054,7 +4038,8 @@ const NOTE_RESULTS_MAX = 200;
 function setSearchScope(scope) {
   searchScope = scope === "note" && getActiveNote() ? "note" : "all";
   searchAll.checked = searchScope === "all";
-  searchInput.placeholder = searchScope === "all" ? "search all notes..." : "search this note...";
+  searchInput.placeholder =
+    searchScope === "all" ? "search all notes..." : "search this note...";
   searchInput.setAttribute("aria-label", searchInput.placeholder.slice(0, -3));
   if (searchInput.value.trim()) searchNotes(searchInput.value);
 }
@@ -4064,7 +4049,9 @@ searchAll.addEventListener("change", () => {
   searchInput.focus();
 });
 // Keep focus in the input while clicking the toggle
-searchAll.parentElement.addEventListener("mousedown", (e) => e.preventDefault());
+searchAll.parentElement.addEventListener("mousedown", (e) =>
+  e.preventDefault(),
+);
 
 function openSearch(scope = "all") {
   searchPreviousFocus = document.activeElement;
@@ -4177,7 +4164,8 @@ function searchNotes(query) {
         let offset = 0;
         for (let j = 0; j < i; j++) offset += raw[j].length + 1;
         // Drawing labels sit at the end of their line
-        if (lines !== raw) offset += raw[i].lastIndexOf('"', raw[i].length - 2) + 1;
+        if (lines !== raw)
+          offset += raw[i].lastIndexOf('"', raw[i].length - 2) + 1;
         lineMatches.push({
           line: lines[i],
           lineNum: i + 1,
@@ -4225,8 +4213,15 @@ function searchActiveNote(query) {
       const indices = matches.flatMap((m) =>
         Array.from({ length: m.end - m.start }, (_, k) => m.start + k),
       );
-      const labelAt = lines === raw ? 0 : raw[i].lastIndexOf('"', raw[i].length - 2) + 1;
-      hits.push({ line: lines[i], lineNum: i + 1, lineIndices: indices, charOffset: offset + labelAt + matches[0].start, raw: raw[i] });
+      const labelAt =
+        lines === raw ? 0 : raw[i].lastIndexOf('"', raw[i].length - 2) + 1;
+      hits.push({
+        line: lines[i],
+        lineNum: i + 1,
+        lineIndices: indices,
+        charOffset: offset + labelAt + matches[0].start,
+        raw: raw[i],
+      });
     }
     offset += raw[i].length + 1;
   }
@@ -4272,7 +4267,10 @@ function adoptSearchQuery(query) {
   if (!query) return;
   findInput.value = query;
   vimState.searchDirection = 1;
-  vimState.lastSearch = { pattern: "\\V" + query.replace(/\\/g, "\\\\"), ignoreCase: true };
+  vimState.lastSearch = {
+    pattern: "\\V" + query.replace(/\\/g, "\\\\"),
+    ignoreCase: true,
+  };
   updateFindMatches();
   if (findMatches.length) selectFindMatch(true);
   updateCursorPos();
@@ -4280,11 +4278,15 @@ function adoptSearchQuery(query) {
 
 function showNoteResults(note, hits) {
   searchCount.textContent =
-    hits.length + (hits.length >= NOTE_RESULTS_MAX ? "+" : "") + " line" + (hits.length !== 1 ? "s" : "");
+    hits.length +
+    (hits.length >= NOTE_RESULTS_MAX ? "+" : "") +
+    " line" +
+    (hits.length !== 1 ? "s" : "");
   searchResultsList.innerHTML = "";
   searchSelectedIdx = -1;
   if (!hits.length) {
-    searchResultsList.innerHTML = '<div class="search-no-results">no matches</div>';
+    searchResultsList.innerHTML =
+      '<div class="search-no-results">no matches</div>';
     return;
   }
   hits.forEach((hit, i) => {
@@ -4333,10 +4335,7 @@ function showSearchResults(results) {
     const nameDiv = document.createElement("div");
     nameDiv.className = "search-result-name";
     if (r.nameMatch) {
-      nameDiv.innerHTML = highlightFuzzy(
-        r.note.name,
-        r.nameMatch.indices,
-      );
+      nameDiv.innerHTML = highlightFuzzy(r.note.name, r.nameMatch.indices);
     } else {
       nameDiv.textContent = r.note.name;
     }
@@ -4402,8 +4401,7 @@ searchInput.addEventListener("keydown", (e) => {
   if (e.key === "ArrowUp") {
     e.preventDefault();
     if (items.length) {
-      searchSelectedIdx =
-        (searchSelectedIdx - 1 + items.length) % items.length;
+      searchSelectedIdx = (searchSelectedIdx - 1 + items.length) % items.length;
       updateSearchSelection();
     }
     return;
@@ -4511,16 +4509,14 @@ function selectFindMatch(focusEditor) {
   // Compute the line of the match and scroll to it
   const textBefore = editor.value.substring(0, m.start);
   const line = textBefore.split("\n").length - 1;
-  const lineHeight =
-    parseFloat(getComputedStyle(editor).lineHeight) || 20;
+  const lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 20;
   const targetScroll = line * lineHeight - editor.clientHeight / 2;
   editor.scrollTop = Math.max(0, targetScroll);
   gutter.scrollTop = editor.scrollTop;
   highlightLayer.scrollTop = editor.scrollTop;
   syncOccurrenceScroll();
   if (!focusEditor) findInput.focus();
-  findReplaceCount.textContent =
-    findMatchIdx + 1 + " of " + findMatches.length;
+  findReplaceCount.textContent = findMatchIdx + 1 + " of " + findMatches.length;
 }
 
 function findNext() {
@@ -4539,8 +4535,7 @@ function findPrev() {
     updateFindMatches();
     return;
   }
-  findMatchIdx =
-    (findMatchIdx - 1 + findMatches.length) % findMatches.length;
+  findMatchIdx = (findMatchIdx - 1 + findMatches.length) % findMatches.length;
   selectFindMatch(true);
 }
 
@@ -4654,8 +4649,11 @@ function currentTheme() {
 function applyTheme(name) {
   if (!THEMES.includes(name)) name = THEMES[0];
   document.documentElement.dataset.theme = name;
-  document.querySelector('meta[name="theme-color"]').content =
-    getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+  document.querySelector('meta[name="theme-color"]').content = getComputedStyle(
+    document.documentElement,
+  )
+    .getPropertyValue("--bg")
+    .trim();
   for (const b of document.querySelectorAll("[data-action=set-theme]"))
     b.setAttribute("aria-checked", b.dataset.value === name);
   // Drawings are painted with hex colours, so repaint them
@@ -4736,10 +4734,7 @@ function vimCursorMoving() {
   if (!cur) return;
   cur.classList.add("moving");
   clearTimeout(vimCursorMoveTimer);
-  vimCursorMoveTimer = setTimeout(
-    () => cur.classList.remove("moving"),
-    150,
-  );
+  vimCursorMoveTimer = setTimeout(() => cur.classList.remove("moving"), 150);
 }
 
 // Keep the cursor a few lines away from the top/bottom of the visible
@@ -4759,7 +4754,9 @@ function ensureCursorScrolloff() {
     const c = caretCoords(Math.min(pos, val.length));
     // Snap to the row grid: the glyph box sits inside the line box
     absTop =
-      padTop + Math.max(0, Math.round(((c?.top ?? padTop) - padTop) / lineHeight)) * lineHeight;
+      padTop +
+      Math.max(0, Math.round(((c?.top ?? padTop) - padTop) / lineHeight)) *
+        lineHeight;
   } else {
     const lineIdx = (val.substring(0, pos).match(/\n/g) || []).length;
     absTop = padTop + lineIdx * lineHeight;
@@ -4806,7 +4803,10 @@ function vimUpdateBlockCursor() {
 
   if (editorArea.classList.contains("wrap")) {
     const c = caretCoords(pos);
-    const rowIdx = Math.max(0, Math.round(((c?.top ?? padTop) - padTop) / lineHeight));
+    const rowIdx = Math.max(
+      0,
+      Math.round(((c?.top ?? padTop) - padTop) / lineHeight),
+    );
     absTop = padTop + rowIdx * lineHeight;
     absLeft = c ? c.left : padLeft;
   } else {
@@ -4960,7 +4960,9 @@ function vimLineText(lineIdx) {
 }
 
 function vimFirstNonBlank(lineIdx) {
-  return vimLineStart(lineIdx) + vimLineText(lineIdx).match(/^[ \t]*/)[0].length;
+  return (
+    vimLineStart(lineIdx) + vimLineText(lineIdx).match(/^[ \t]*/)[0].length
+  );
 }
 
 // Normal mode: the cursor sits on a character, never on the "\n"
@@ -5066,7 +5068,11 @@ function vimJoinLines(lineIdx, count) {
     const next = vimLineText(lineIdx + 1).replace(/^[ \t]+/, "");
     const cur = vimLineText(lineIdx);
     const sep = !next || !cur || /[ \t]$/.test(cur) ? "" : " ";
-    vimEdit(le, vimLineStart(lineIdx + 1) + vimLineText(lineIdx + 1).length - next.length, sep);
+    vimEdit(
+      le,
+      vimLineStart(lineIdx + 1) + vimLineText(lineIdx + 1).length - next.length,
+      sep,
+    );
     vimSetCursor(le);
   }
 }
@@ -5079,10 +5085,7 @@ function vimTextObject(type, inner) {
   const pos = editor.selectionStart;
 
   if (type === "w" || type === "W") {
-    const cls =
-      type === "W"
-        ? (ch) => (/\s/.test(ch) ? 0 : 1)
-        : vimCharClass;
+    const cls = type === "W" ? (ch) => (/\s/.test(ch) ? 0 : 1) : vimCharClass;
     const c = cls(val[pos] || "\n");
     if (val[pos] === "\n" || pos >= val.length) return null;
     let s = pos;
@@ -5180,7 +5183,9 @@ function vimCharClass(ch) {
 }
 
 function vimWordClass(big) {
-  return big ? (ch) => (ch === undefined || /\s/.test(ch) ? 0 : 1) : vimCharClass;
+  return big
+    ? (ch) => (ch === undefined || /\s/.test(ch) ? 0 : 1)
+    : vimCharClass;
 }
 
 // Start of next word; an empty line counts as a word
@@ -5247,10 +5252,18 @@ function vimScreenLines() {
   const rows = highlightLayer.children;
   const view = highlightLayer.getBoundingClientRect();
   let [top, bottom] = visibleRows();
-  if (top < bottom && rows[top].getBoundingClientRect().top < view.top - 1) top++;
-  if (top < bottom && rows[bottom].getBoundingClientRect().bottom > view.bottom + 1) bottom--;
+  if (top < bottom && rows[top].getBoundingClientRect().top < view.top - 1)
+    top++;
+  if (
+    top < bottom &&
+    rows[bottom].getBoundingClientRect().bottom > view.bottom + 1
+  )
+    bottom--;
   const so = Math.min(3, (bottom - top) >> 1);
-  return [top > 0 ? top + so : top, bottom < vimLastLine() ? bottom - so : bottom];
+  return [
+    top > 0 ? top + so : top,
+    bottom < vimLastLine() ? bottom - so : bottom,
+  ];
 }
 
 function vimFindChar(pos, char, kind, count) {
@@ -5312,7 +5325,11 @@ function vimMotion(m, count, opPending) {
     }
     case "G":
     case "gg": {
-      const tl = count ? Math.min(count, last + 1) - 1 : m.name === "G" ? last : 0;
+      const tl = count
+        ? Math.min(count, last + 1) - 1
+        : m.name === "G"
+          ? last
+          : 0;
       return { pos: vimFirstNonBlank(tl), type: "linewise" };
     }
     case "w":
@@ -5328,7 +5345,11 @@ function vimMotion(m, count, opPending) {
       // dw on the last word of a line stops at the line end (:help word)
       if (opPending && vimLineOf(p) > vimLineOf(prev) && prev < val.length) {
         const pl = vimLineOf(prev);
-        if (vimLineText(pl).slice(prev - vimLineStart(pl)).trim())
+        if (
+          vimLineText(pl)
+            .slice(prev - vimLineStart(pl))
+            .trim()
+        )
           p = vimLineEnd(pl);
       }
       return { pos: p, type: "exclusive" };
@@ -5354,7 +5375,8 @@ function vimMotion(m, count, opPending) {
     case "%": {
       // N% goes to N percent of the buffer
       if (count) {
-        const tl = Math.min(Math.ceil((count * (last + 1)) / 100), last + 1) - 1;
+        const tl =
+          Math.min(Math.ceil((count * (last + 1)) / 100), last + 1) - 1;
         return { pos: vimFirstNonBlank(Math.max(tl, 0)), type: "linewise" };
       }
       // Bracket under the cursor, else the next one on the line
@@ -5368,7 +5390,8 @@ function vimMotion(m, count, opPending) {
       const d = idx % 2 ? -1 : 1;
       for (let q = p, depth = 0; q >= 0 && q < val.length; q += d) {
         if (val[q] === val[p]) depth++;
-        else if (val[q] === other && --depth === 0) return { pos: q, type: "inclusive" };
+        else if (val[q] === other && --depth === 0)
+          return { pos: q, type: "inclusive" };
       }
       return null;
     }
@@ -5377,7 +5400,11 @@ function vimMotion(m, count, opPending) {
     case "L": {
       const [top, bottom] = vimScreenLines();
       const l =
-        m.name === "H" ? top + c - 1 : m.name === "L" ? bottom - c + 1 : (top + bottom) >> 1;
+        m.name === "H"
+          ? top + c - 1
+          : m.name === "L"
+            ? bottom - c + 1
+            : (top + bottom) >> 1;
       return {
         pos: vimFirstNonBlank(Math.max(top, Math.min(bottom, l))),
         type: "linewise",
@@ -5433,12 +5460,17 @@ function vimMotionRange(pos, r) {
   let e = Math.max(pos, r.pos);
   if (r.type === "inclusive") {
     e = Math.min(e + 1, vimLineEnd(vimLineOf(e)));
-  } else if (e > s && e === vimLineStart(vimLineOf(e)) && vimLineOf(e) > vimLineOf(s)) {
+  } else if (
+    e > s &&
+    e === vimLineStart(vimLineOf(e)) &&
+    vimLineOf(e) > vimLineOf(s)
+  ) {
     // Exclusive motion ending at column 0: stop at the previous line's
     // end, and go linewise if it started at/before the first non-blank
     const sl = vimLineOf(s);
     const el = vimLineOf(e) - 1;
-    if (s <= vimFirstNonBlank(sl)) return { linewise: true, first: sl, last: el };
+    if (s <= vimFirstNonBlank(sl))
+      return { linewise: true, first: sl, last: el };
     e = vimLineEnd(el);
   }
   return { linewise: false, start: s, end: e };
@@ -5449,10 +5481,8 @@ function vimMotionRange(pos, r) {
 // | command [char]). Returns null while incomplete, { invalid } on garbage.
 
 const VIM_OPERATORS = new Set(["d", "c", "y", ">", "<"]);
-const VIM_TEXTOBJ = new Set('wWp()b{}B[]<>"\'`'.split(""));
-const VIM_COMMANDS = new Set(
-  "xXDCsSYJpPu.iaIAoOvVnN*#:/?~".split(""),
-);
+const VIM_TEXTOBJ = new Set("wWp()b{}B[]<>\"'`".split(""));
+const VIM_COMMANDS = new Set("xXDCsSYJpPu.iaIAoOvVnN*#:/?~".split(""));
 
 function vimParse(keys) {
   let i = 0;
@@ -5559,7 +5589,8 @@ function _vimExecKey(key) {
 // Number of leading count keys ("12dw" → 2)
 function countKeys(keys) {
   let n = 0;
-  while (n < keys.length && /^[0-9]$/.test(keys[n]) && (n || keys[n] !== "0")) n++;
+  while (n < keys.length && /^[0-9]$/.test(keys[n]) && (n || keys[n] !== "0"))
+    n++;
   return n;
 }
 
@@ -5586,7 +5617,11 @@ function _vimExecNormal(cmd) {
     let range;
     if (cmd.lines) {
       if (cnt > 1 && li === vimLastLine()) return;
-    range = { linewise: true, first: li, last: Math.min(li + cnt - 1, vimLastLine()) };
+      range = {
+        linewise: true,
+        first: li,
+        last: Math.min(li + cnt - 1, vimLastLine()),
+      };
     } else if (cmd.textobj) {
       const obj = vimTextObject(cmd.textobj.type, cmd.textobj.inner);
       if (!obj) return;
@@ -5601,8 +5636,14 @@ function _vimExecNormal(cmd) {
         if (pos < val.length && !/\s/.test(val[pos])) {
           const cls = vimWordClass(motion.name === "W");
           let p = pos;
-          while (p + 1 < val.length && val[p + 1] !== "\n" && cls(val[p + 1]) === cls(val[pos])) p++;
-          for (let i = 1; i < cnt; i++) p = vimNextWordEnd(p, motion.name === "W");
+          while (
+            p + 1 < val.length &&
+            val[p + 1] !== "\n" &&
+            cls(val[p + 1]) === cls(val[pos])
+          )
+            p++;
+          for (let i = 1; i < cnt; i++)
+            p = vimNextWordEnd(p, motion.name === "W");
           range = { linewise: false, start: pos, end: p + 1 };
         }
       }
@@ -5644,9 +5685,11 @@ function _vimExecNormal(cmd) {
     case "~": {
       const end = Math.min(pos + cnt, le);
       if (end <= pos) return;
-      const text = val.slice(pos, end).replace(/./g, (ch) =>
-        ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase(),
-      );
+      const text = val
+        .slice(pos, end)
+        .replace(/./g, (ch) =>
+          ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase(),
+        );
       vimEdit(pos, end, text);
       return vimSetCursor(Math.min(end, vimLastCol(li)));
     }
@@ -5680,7 +5723,8 @@ function _vimExecNormal(cmd) {
       vimState._replaying = true;
       const finishInsert = () => {
         if (vimState.mode !== "insert") return;
-        if (lc.insert) vimEdit(editor.selectionStart, editor.selectionStart, lc.insert);
+        if (lc.insert)
+          vimEdit(editor.selectionStart, editor.selectionStart, lc.insert);
         vimLeaveInsert();
       };
       try {
@@ -5734,7 +5778,9 @@ function _vimExecNormal(cmd) {
       if (!obj) return;
       const word = val.slice(obj.start, obj.end);
       vimState.searchDirection = cmd.cmd === "*" ? 1 : -1;
-      const pattern = /^\w+$/.test(word) ? `\\<${word}\\>` : "\\V" + word.replace(/\\/g, "\\\\");
+      const pattern = /^\w+$/.test(word)
+        ? `\\<${word}\\>`
+        : "\\V" + word.replace(/\\/g, "\\\\");
       return vimSearch(pattern, vimState.searchDirection, cnt, true);
     }
     case "/":
@@ -5753,10 +5799,12 @@ function vimApplyOperator(op, range, pos, times = 1) {
     if (op === "y") {
       vimSetRegister(vimLinesText(first, last), true);
       // yk moves up; yj stays
-      if (vimLineOf(pos) > first) vimSetCursor(vimColPos(first, pos - vimLineStart(vimLineOf(pos))));
+      if (vimLineOf(pos) > first)
+        vimSetCursor(vimColPos(first, pos - vimLineStart(vimLineOf(pos))));
       return;
     }
-    if (op === ">" || op === "<") return vimShiftLines(first, last, op === ">" ? 1 : -1, times);
+    if (op === ">" || op === "<")
+      return vimShiftLines(first, last, op === ">" ? 1 : -1, times);
     if (op === "c") {
       vimSetRegister(vimLinesText(first, last), true);
       const indent = vimLineText(first).match(/^[ \t]*/)[0];
@@ -5777,7 +5825,12 @@ function vimApplyOperator(op, range, pos, times = 1) {
     return vimEnterInsert(start, "c");
   }
   // > / < with a charwise motion still shift whole lines
-  vimShiftLines(vimLineOf(start), vimLineOf(Math.max(start, end - 1)), op === ">" ? 1 : -1, times);
+  vimShiftLines(
+    vimLineOf(start),
+    vimLineOf(Math.max(start, end - 1)),
+    op === ">" ? 1 : -1,
+    times,
+  );
 }
 
 // Leave insert mode: record typed text for ".", cursor back one (vim)
@@ -5785,7 +5838,8 @@ function vimLeaveInsert() {
   const ie = vimState.insertEntry;
   const end = editor.selectionStart;
   if (ie && vimState.lastChange && !vimState._replaying)
-    vimState.lastChange.insert = end > ie.pos ? editor.value.slice(ie.pos, end) : "";
+    vimState.lastChange.insert =
+      end > ie.pos ? editor.value.slice(ie.pos, end) : "";
   vimState.insertEntry = null;
   vimSetMode("normal");
   if (end > vimLineStart(vimLineOf(end))) vimSetCursor(end - 1);
@@ -5798,7 +5852,8 @@ function vimLeaveInsert() {
 // pattern, repeats the last search (n / N).
 function vimSearch(pattern, dir, count = 1, ignoreCase) {
   if (!pattern) {
-    if (!vimState.lastSearch) return vimShowError("No previous regular expression");
+    if (!vimState.lastSearch)
+      return vimShowError("No previous regular expression");
     ({ pattern, ignoreCase } = vimState.lastSearch);
   }
   let re;
@@ -5810,7 +5865,7 @@ function vimSearch(pattern, dir, count = 1, ignoreCase) {
   vimState.lastSearch = { pattern, ignoreCase };
   const val = editor.value;
   const starts = [];
-  for (let m; (m = re.exec(val)); ) {
+  for (let m; (m = re.exec(val));) {
     starts.push(m.index);
     if (!m[0]) re.lastIndex++;
   }
@@ -5819,8 +5874,9 @@ function vimSearch(pattern, dir, count = 1, ignoreCase) {
   for (let i = 0; i < count; i++) {
     const next =
       dir > 0
-        ? starts.find((s) => s > p) ?? starts[0]
-        : [...starts].reverse().find((s) => s < p) ?? starts[starts.length - 1];
+        ? (starts.find((s) => s > p) ?? starts[0])
+        : ([...starts].reverse().find((s) => s < p) ??
+          starts[starts.length - 1]);
     p = next;
   }
   vimState.desiredCol = null;
@@ -5832,15 +5888,38 @@ function vimSearch(pattern, dir, count = 1, ignoreCase) {
 // \M, \c \C, \( \| \+ \= \{n,m} \{-}, \< \>, \a \l \u \x \h …
 
 const VIM_CLASSES = {
-  a: "[A-Za-z]", A: "[^A-Za-z]", l: "[a-z]", L: "[^a-z]", u: "[A-Z]",
-  U: "[^A-Z]", x: "[0-9A-Fa-f]", X: "[^0-9A-Fa-f]", o: "[0-7]", O: "[^0-7]",
-  h: "[A-Za-z_]", H: "[^A-Za-z_]", s: "[ \\t]", S: "[^ \\t\\n]", d: "\\d",
-  D: "[^\\d\\n]", w: "[0-9A-Za-z_]", W: "[^0-9A-Za-z_\\n]", t: "\\t",
-  n: "\\n", r: "\\r", e: "\\x1b",
+  a: "[A-Za-z]",
+  A: "[^A-Za-z]",
+  l: "[a-z]",
+  L: "[^a-z]",
+  u: "[A-Z]",
+  U: "[^A-Z]",
+  x: "[0-9A-Fa-f]",
+  X: "[^0-9A-Fa-f]",
+  o: "[0-7]",
+  O: "[^0-7]",
+  h: "[A-Za-z_]",
+  H: "[^A-Za-z_]",
+  s: "[ \\t]",
+  S: "[^ \\t\\n]",
+  d: "\\d",
+  D: "[^\\d\\n]",
+  w: "[0-9A-Za-z_]",
+  W: "[^0-9A-Za-z_\\n]",
+  t: "\\t",
+  n: "\\n",
+  r: "\\r",
+  e: "\\x1b",
 };
 const VIM_POSIX = {
-  alpha: "A-Za-z", digit: "0-9", alnum: "A-Za-z0-9", upper: "A-Z",
-  lower: "a-z", space: " \\t\\n\\r\\f\\v", blank: " \\t", xdigit: "0-9A-Fa-f",
+  alpha: "A-Za-z",
+  digit: "0-9",
+  alnum: "A-Za-z0-9",
+  upper: "A-Z",
+  lower: "a-z",
+  space: " \\t\\n\\r\\f\\v",
+  blank: " \\t",
+  xdigit: "0-9A-Fa-f",
 };
 
 function vimRegexSource(p) {
@@ -5871,7 +5950,7 @@ function vimRegexSource(p) {
     let j = i;
     let body = "[";
     if (p[j] === "^") body += p[j++];
-    if (p[j] === "]") (body += "\\]"), j++;
+    if (p[j] === "]") ((body += "\\]"), j++);
     while (j < p.length && p[j] !== "]") {
       const posix = p.slice(j).match(/^\[:(\w+):\]/);
       if (posix && VIM_POSIX[posix[1]]) {
@@ -5880,7 +5959,7 @@ function vimRegexSource(p) {
       } else if (p[j] === "\\" && j + 1 < p.length) {
         body += p[j] + p[j + 1];
         j += 2;
-      } else body += p[j] === "[" ? "\\[" : p[j], j++;
+      } else ((body += p[j] === "[" ? "\\[" : p[j]), j++);
     }
     if (j >= p.length) return "\\[";
     i = j + 1;
@@ -5908,11 +5987,15 @@ function vimRegexSource(p) {
       else if (VIM_CLASSES[n]) out += VIM_CLASSES[n];
       else if (/[1-9]/.test(n)) out += "\\" + n;
       else if (mode !== "v" && n === "(") out += "(";
-      else if (mode !== "v" && n === "%" && p[i] === "(") (out += "(?:"), i++;
+      else if (mode !== "v" && n === "%" && p[i] === "(") ((out += "(?:"), i++);
       else if (mode !== "v" && ")|+".includes(n)) out += n;
       else if (mode !== "v" && (n === "=" || n === "?")) out += "?";
       else if (mode !== "v" && n === "{") out += brace();
-      else if (mode === "V" && (n === "." || n === "*" || n === "^" || n === "$")) out += n;
+      else if (
+        mode === "V" &&
+        (n === "." || n === "*" || n === "^" || n === "$")
+      )
+        out += n;
       else if (mode === "V" && n === "[") out += cls();
       else out += esc(n);
       continue;
@@ -5929,7 +6012,7 @@ function vimRegexSource(p) {
       else if (c === "=") out += "?";
       else if (c === "{") out += brace();
       else if (c === "[") out += cls();
-      else if (c === "%" && p[i] === "(") (out += "(?:"), i++;
+      else if (c === "%" && p[i] === "(") ((out += "(?:"), i++);
       else if (c === "/" || c === "}") out += esc(c);
       else out += c;
       continue;
@@ -5941,7 +6024,10 @@ function vimRegexSource(p) {
     else if (c === "^") out += atomStart() ? "^" : "\\^";
     else if (c === "$") {
       const rest = p.slice(i);
-      out += rest === "" || rest.startsWith("\\|") || rest.startsWith("\\)") ? "$" : "\\$";
+      out +=
+        rest === "" || rest.startsWith("\\|") || rest.startsWith("\\)")
+          ? "$"
+          : "\\$";
     } else if (c === "~") out += esc(vimState.lastSubRep || "");
     else out += esc(c);
   }
@@ -5954,7 +6040,7 @@ function vimRegexSource(p) {
 function vimCompile(pattern, ignoreCase) {
   const { source, ic } = vimRegexSource(pattern);
   const smart = !/[A-Z]/.test(pattern.replace(/\\./g, ""));
-  return new RegExp(source, "gm" + (ic ?? ignoreCase ?? smart ? "i" : ""));
+  return new RegExp(source, "gm" + ((ic ?? ignoreCase ?? smart) ? "i" : ""));
 }
 
 // ── Vim ex ranges ──
@@ -5964,9 +6050,9 @@ function vimCompile(pattern, ignoreCase) {
 function vimParseAddress(s, i, cur = vimCursorLine()) {
   let line = null;
   const num = s.slice(i).match(/^\d+/);
-  if (num) (line = parseInt(num[0], 10) - 1), (i += num[0].length);
-  else if (s[i] === ".") (line = cur), i++;
-  else if (s[i] === "$") (line = vimLastLine()), i++;
+  if (num) ((line = parseInt(num[0], 10) - 1), (i += num[0].length));
+  else if (s[i] === ".") ((line = cur), i++);
+  else if (s[i] === "$") ((line = vimLastLine()), i++);
   else if (s[i] === "'" && (s[i + 1] === "<" || s[i + 1] === ">")) {
     const m = vimState.visualMarks;
     if (!m) throw new Error("Mark not set");
@@ -5983,7 +6069,8 @@ function vimParseAddress(s, i, cur = vimCursorLine()) {
 
 function vimParseRange(s) {
   let i = s.match(/^\s*/)[0].length;
-  if (s[i] === "%") return { first: 0, last: vimLastLine(), rest: s.slice(i + 1) };
+  if (s[i] === "%")
+    return { first: 0, last: vimLastLine(), rest: s.slice(i + 1) };
   const a = vimParseAddress(s, i);
   if (a.line === null) return { first: null, last: null, rest: s.slice(a.i) };
   let first = a.line;
@@ -6021,11 +6108,17 @@ function vimSubstitute(cmd, first, last) {
   if (!pat) pat = vimState.lastSearch?.pattern;
   if (!pat) return vimShowError("No previous regular expression");
   // ~ in the replacement is the previous replacement string
-  rep = rep.replace(/(^|[^\\])~/g, (_, pre) => pre + (vimState.lastSubRep || ""));
+  rep = rep.replace(
+    /(^|[^\\])~/g,
+    (_, pre) => pre + (vimState.lastSubRep || ""),
+  );
   vimState.lastSubRep = rep;
   let re;
   try {
-    re = vimCompile(pat, flags.includes("i") ? true : flags.includes("I") ? false : undefined);
+    re = vimCompile(
+      pat,
+      flags.includes("i") ? true : flags.includes("I") ? false : undefined,
+    );
   } catch (e) {
     return vimShowError("Invalid pattern: " + e.message);
   }
@@ -6035,7 +6128,8 @@ function vimSubstitute(cmd, first, last) {
   const end = vimLineEnd(last);
   const text = editor.value.slice(start, end);
   const nl = [];
-  for (let k = text.indexOf("\n"); k !== -1; k = text.indexOf("\n", k + 1)) nl.push(k);
+  for (let k = text.indexOf("\n"); k !== -1; k = text.indexOf("\n", k + 1))
+    nl.push(k);
   const lineAt = (off) => {
     let lo = 0;
     let hi = nl.length;
@@ -6056,14 +6150,22 @@ function vimSubstitute(cmd, first, last) {
     count++;
     return vimExpandReplacement(rep, a);
   });
-  if (!count) return flags.includes("e") ? undefined : vimShowError("Pattern not found: " + pat);
+  if (!count)
+    return flags.includes("e")
+      ? undefined
+      : vimShowError("Pattern not found: " + pat);
   const summary = `${count} substitution${count > 1 ? "s" : ""} on ${lines.size} line${lines.size > 1 ? "s" : ""}`;
-  if (flags.includes("n")) return showMdToast(summary.replace("substitution", "match"));
+  if (flags.includes("n"))
+    return showMdToast(summary.replace("substitution", "match"));
   vimState._undoPushed = false;
   vimEdit(start, end, out);
   // Cursor on the last substituted line (shifted by inserted line breaks)
   const grown = out.split("\n").length - text.split("\n").length;
-  vimSetCursor(vimFirstNonBlank(Math.min(first + Math.max(...lines) + Math.max(grown, 0), vimLastLine())));
+  vimSetCursor(
+    vimFirstNonBlank(
+      Math.min(first + Math.max(...lines) + Math.max(grown, 0), vimLastLine()),
+    ),
+  );
   if (lines.size > 2) showMdToast(summary);
 }
 
@@ -6077,7 +6179,8 @@ function vimExpandReplacement(rep, m) {
     if (piece === "&") piece = m[0];
     else if (piece === "\\" && k + 1 < rep.length) {
       const n = rep[++k];
-      if (/\d/.test(n)) piece = n === "0" ? m[0] : typeof m[+n] === "string" ? m[+n] : "";
+      if (/\d/.test(n))
+        piece = n === "0" ? m[0] : typeof m[+n] === "string" ? m[+n] : "";
       else if (n === "r" || n === "n") piece = "\n";
       else if (n === "t") piece = "\t";
       else if (n === "u" || n === "l") {
@@ -6093,7 +6196,9 @@ function vimExpandReplacement(rep, m) {
     }
     if (all) piece = all === "U" ? piece.toUpperCase() : piece.toLowerCase();
     if (once && piece) {
-      piece = (once === "u" ? piece[0].toUpperCase() : piece[0].toLowerCase()) + piece.slice(1);
+      piece =
+        (once === "u" ? piece[0].toUpperCase() : piece[0].toLowerCase()) +
+        piece.slice(1);
       once = null;
     }
     out += piece;
@@ -6109,7 +6214,8 @@ function vimRenderVisual() {
   if (vimState.visualLine) {
     const first = Math.min(vimLineOf(a), vimLineOf(h));
     const last = Math.max(vimLineOf(a), vimLineOf(h));
-    const end = last < vimLastLine() ? vimLineStart(last + 1) : editor.value.length;
+    const end =
+      last < vimLastLine() ? vimLineStart(last + 1) : editor.value.length;
     editor.setSelectionRange(vimLineStart(first), end);
   } else {
     editor.setSelectionRange(
@@ -6133,7 +6239,11 @@ function vimVisualRange() {
     };
   }
   const s = Math.min(a, h);
-  return { linewise: false, start: s, end: Math.min(Math.max(a, h) + 1, editor.value.length) };
+  return {
+    linewise: false,
+    start: s,
+    end: Math.min(Math.max(a, h) + 1, editor.value.length),
+  };
 }
 
 function vimExecVisual(key) {
@@ -6157,7 +6267,11 @@ function _vimExecVisual(key) {
   };
 
   // Text objects extend the selection (viw, vi()
-  if (keys.length >= 2 && (keys[keys.length - 2] === "i" || keys[keys.length - 2] === "a") && countKeys(keys) === keys.length - 2) {
+  if (
+    keys.length >= 2 &&
+    (keys[keys.length - 2] === "i" || keys[keys.length - 2] === "a") &&
+    countKeys(keys) === keys.length - 2
+  ) {
     vimState.keys = [];
     vimSetCursor(vimState.visualHead);
     const obj = vimTextObject(key, keys[keys.length - 2] === "i");
@@ -6193,7 +6307,12 @@ function _vimExecVisual(key) {
   const count = n ? parseInt(keys.slice(0, n).join(""), 10) : 1;
   // "." repeats a visual change on the same amount of text from the cursor
   if ("dxcs><J~uU".includes(k) && !vimState._replaying)
-    vimState.lastChange = { visual: vimVisualShape(range), key: k, count, insert: null };
+    vimState.lastChange = {
+      visual: vimVisualShape(range),
+      key: k,
+      count,
+      insert: null,
+    };
 
   switch (k) {
     case "Escape":
@@ -6208,7 +6327,10 @@ function _vimExecVisual(key) {
       vimState.visualLine = k === "V";
       return vimRenderVisual();
     case "o":
-      [vimState.visualAnchor, vimState.visualHead] = [vimState.visualHead, vimState.visualAnchor];
+      [vimState.visualAnchor, vimState.visualHead] = [
+        vimState.visualHead,
+        vimState.visualAnchor,
+      ];
       return vimRenderVisual();
     case ":":
       vimSetCursor(vimState.visualHead);
@@ -6228,7 +6350,9 @@ function _vimExecVisual(key) {
       exit();
       return vimApplyOperator("c", range, start);
     case "J": {
-      const first = vimLineOf(range.linewise ? vimLineStart(range.first) : range.start);
+      const first = vimLineOf(
+        range.linewise ? vimLineStart(range.first) : range.start,
+      );
       const last = range.linewise ? range.last : vimLineOf(range.end - 1);
       exit();
       return vimJoinLines(first, last - first + 1);
@@ -6256,7 +6380,8 @@ function _vimExecVisual(key) {
 
 // Size of a visual selection, relative to its start (see :help visual-repeat)
 function vimVisualShape(range) {
-  if (range.linewise) return { linewise: true, lines: range.last - range.first };
+  if (range.linewise)
+    return { linewise: true, lines: range.last - range.first };
   const first = vimLineOf(range.start);
   const last = vimLineOf(Math.max(range.start, range.end - 1));
   return last === first
@@ -6312,8 +6437,7 @@ function vimOpenCommandBar(prefix, initial = "") {
   vimCommandBar.classList.remove("error");
   vimCommandInput.readOnly = false;
   vimCommandBar.classList.add("visible");
-  document.querySelector(".vim-command-prefix").textContent =
-    prefix || ":";
+  document.querySelector(".vim-command-prefix").textContent = prefix || ":";
   vimCommandInput.value = initial;
   vimCommandInput.focus();
 }
@@ -6539,9 +6663,7 @@ function vimExecCommand(cmd) {
 vimCommandInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
-    const prefix = document.querySelector(
-      ".vim-command-prefix",
-    ).textContent;
+    const prefix = document.querySelector(".vim-command-prefix").textContent;
     const cmd = vimCommandInput.value;
     vimCloseCommandBar();
     if (prefix === "/" || prefix === "?") {
@@ -6583,8 +6705,7 @@ function vimHandleKeydown(e) {
 
   // Let Ctrl/Cmd combos pass through (except Ctrl+R, Ctrl+D, Ctrl+U in normal)
   if (e.metaKey) return;
-  if (e.ctrlKey && e.key !== "r" && e.key !== "d" && e.key !== "u")
-    return;
+  if (e.ctrlKey && e.key !== "r" && e.key !== "d" && e.key !== "u") return;
 
   if (vimState.mode === "insert") {
     if (e.key === "Escape") {
@@ -6747,10 +6868,7 @@ function triggerDownload(blob, filename) {
 function downloadNote() {
   const note = getActiveNote();
   if (!note) return;
-  triggerDownload(
-    new Blob([note.content], { type: "text/plain" }),
-    note.name,
-  );
+  triggerDownload(new Blob([note.content], { type: "text/plain" }), note.name);
 }
 
 // Drawing as an image: the clipboard gets a PNG, the download an SVG
@@ -6791,9 +6909,12 @@ async function noteHtml(note) {
     try {
       await loadDraw();
       for (const el of embeds) {
-        const ref = el.dataset.ref && state.notes.find((n) => n.name === el.dataset.ref);
+        const ref =
+          el.dataset.ref && state.notes.find((n) => n.name === el.dataset.ref);
         if (el.dataset.ref && !ref) continue;
-        el.replaceChildren(Draw.renderStatic(ref ? ref.content : el.dataset.draw));
+        el.replaceChildren(
+          Draw.renderStatic(ref ? ref.content : el.dataset.draw),
+        );
       }
     } catch {}
   }
@@ -6829,7 +6950,8 @@ async function noteHtml(note) {
     } catch {
       continue;
     }
-    for (const rule of rules) if (wanted.test(rule.cssText)) css.push(rule.cssText);
+    for (const rule of rules)
+      if (wanted.test(rule.cssText)) css.push(rule.cssText);
   }
   const title = escapeHtml(note.name);
   return `<!doctype html>
@@ -6865,7 +6987,8 @@ async function downloadHtml(note) {
 
 // Zen's download: the note as it is shown (HTML for markdown, SVG for drawings)
 async function zenDownload() {
-  const note = zenFromUrl && zenEphemeralNote ? zenEphemeralNote : getActiveNote();
+  const note =
+    zenFromUrl && zenEphemeralNote ? zenEphemeralNote : getActiveNote();
   if (!note) return;
   if (isMarkdownFile(note.name)) return downloadHtml(note);
   if (isDrawFile(note.name)) {
@@ -6913,10 +7036,7 @@ async function downloadAll() {
     content: JSON.stringify(directory, null, 2),
   });
   const zip = await buildZip(files);
-  triggerDownload(
-    new Blob([zip], { type: "application/zip" }),
-    "notes.zip",
-  );
+  triggerDownload(new Blob([zip], { type: "application/zip" }), "notes.zip");
 }
 
 // Share link for a note, built from its content (never from location,
@@ -7060,9 +7180,7 @@ const TEXT_EXTS = new Set(
 );
 
 const TEXT_NAMES = new Set(
-  "dockerfile containerfile vagrantfile rakefile gemfile podfile".split(
-    " ",
-  ),
+  "dockerfile containerfile vagrantfile rakefile gemfile podfile".split(" "),
 );
 
 const TEXT_SUFFIXES =
@@ -7143,7 +7261,9 @@ async function importZip(file) {
   }
 
   // Images rendered from drawings at export are not notes
-  const renders = new Set(Array.isArray(metadata?.renders) ? metadata.renders : []);
+  const renders = new Set(
+    Array.isArray(metadata?.renders) ? metadata.renders : [],
+  );
   const importable = entries.filter(
     (e) => e.name !== ".note.directory" && !renders.has(e.name),
   );
@@ -7167,18 +7287,14 @@ async function importZip(file) {
 
     if (wouldExceedStorage(content.length * 2 + name.length * 2 + 200)) {
       await showModal(
-        '"' +
-          name +
-          '" is too large. Delete some notes to free up space.',
+        '"' + name + '" is too large. Delete some notes to free up space.',
         "ok",
         null,
       );
       continue;
     }
 
-    const meta = metadata
-      ? metadata.notes.find((n) => n.name === name)
-      : null;
+    const meta = metadata ? metadata.notes.find((n) => n.name === name) : null;
     const existing = state.notes.find((n) => n.name === name);
 
     if (meta && existing && meta.id === existing.id) {
@@ -7260,10 +7376,7 @@ document.addEventListener("drop", async (e) => {
       file.type === "application/zip"
     ) {
       zipFiles.push(file);
-    } else if (
-      file.type.startsWith("text/") ||
-      isTextFilename(file.name)
-    ) {
+    } else if (file.type.startsWith("text/") || isTextFilename(file.name)) {
       textFiles.push(file);
     } else {
       unsupported.push(file.name);
@@ -7373,7 +7486,11 @@ window.addEventListener("storage", (e) => {
   if (e.key === TAB_LEADER_KEY && e.newValue !== tabId) {
     revokeLeadership();
   }
-  if ((e.key === STORAGE_KEY || e.key === PENDING_KEY) && e.newValue && stateLoaded) {
+  if (
+    (e.key === STORAGE_KEY || e.key === PENDING_KEY) &&
+    e.newValue &&
+    stateLoaded
+  ) {
     try {
       lastRaw[e.key] = e.newValue;
       const before = activeNoteVersion();
@@ -7644,7 +7761,12 @@ function continueList() {
     editor.setRangeText("", start, end, "start");
   } else {
     const next = bullet || Number(num) + 1 + delim;
-    editor.setRangeText("\n" + indent + next + gap + (task ? "[ ] " : ""), pos, pos, "end");
+    editor.setRangeText(
+      "\n" + indent + next + gap + (task ? "[ ] " : ""),
+      pos,
+      pos,
+      "end",
+    );
   }
   editor.dispatchEvent(new Event("input"));
   return true;
@@ -7754,13 +7876,7 @@ document.addEventListener("keydown", (e) => {
 
   // In zen mode, block all shortcuts except "e", Escape, and Cmd/Ctrl+A
   if (zenModeActive) {
-    if (
-      !inInput &&
-      e.key === "e" &&
-      !e.metaKey &&
-      !e.ctrlKey &&
-      !e.altKey
-    ) {
+    if (!inInput && e.key === "e" && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       exitZenMode();
     } else if (e.key === "Escape") {
@@ -7795,12 +7911,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   // Find & Replace (skip if typing in an input)
-  if (
-    !inInput &&
-    !mdViewActive &&
-    (e.metaKey || e.ctrlKey) &&
-    e.key === "h"
-  ) {
+  if (!inInput && !mdViewActive && (e.metaKey || e.ctrlKey) && e.key === "h") {
     e.preventDefault();
     openFindReplace();
     return;
@@ -7817,10 +7928,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   // Close find replace
-  if (
-    e.key === "Escape" &&
-    findReplaceBar.classList.contains("visible")
-  ) {
+  if (e.key === "Escape" && findReplaceBar.classList.contains("visible")) {
     e.preventDefault();
     closeFindReplace();
     return;
@@ -7980,8 +8088,7 @@ function restoreToken() {
     }
   } catch {}
   // No token — check if user was previously connected
-  if (localStorage.getItem(GDRIVE_CONNECTED_KEY) === "true")
-    return "expired";
+  if (localStorage.getItem(GDRIVE_CONNECTED_KEY) === "true") return "expired";
   return "none";
 }
 
@@ -8010,7 +8117,9 @@ function showSyncFailed() {
   document.getElementById("syncMenuFailed").style.display = "";
   document.getElementById("syncMenuDisconnected").style.display = "none";
   // Offline needs no action; a missing or revoked sign-in does
-  document.getElementById("syncSignedOutHint").style.display = gdriveSignedOut ? "" : "none";
+  document.getElementById("syncSignedOutHint").style.display = gdriveSignedOut
+    ? ""
+    : "none";
 }
 
 function hideSyncConnected() {
@@ -8228,10 +8337,7 @@ function applyDriveSettings(settings) {
   }
   if (/^\d+$/.test(settings.sidebarWidth || "")) {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, settings.sidebarWidth);
-    sidebar.style.setProperty(
-      "--sidebar-width",
-      settings.sidebarWidth + "px",
-    );
+    sidebar.style.setProperty("--sidebar-width", settings.sidebarWidth + "px");
   }
 }
 
@@ -8432,7 +8538,10 @@ async function runSync() {
       const payload = gatherDrivePayload();
       if (needsUpload || files.length !== 1) {
         // Another device wrote since we downloaded → merge again
-        if (files[0] && (await gdriveVersion(files[0].id)) !== files[0].version) {
+        if (
+          files[0] &&
+          (await gdriveVersion(files[0].id)) !== files[0].version
+        ) {
           if (attempt >= 3) throw new Error("Drive file keeps changing");
           // We now contain `remote` — it is the ancestor for the next merge
           base = {
@@ -8911,7 +9020,11 @@ async function init() {
   const driveReturn = query.get("drive");
   if (driveReturn) {
     query.delete("drive");
-    history.replaceState(null, "", location.pathname + (query.size ? "?" + query : ""));
+    history.replaceState(
+      null,
+      "",
+      location.pathname + (query.size ? "?" + query : ""),
+    );
     if (driveReturn === "connected") {
       localStorage.setItem(GDRIVE_CONNECTED_KEY, "true");
       clearToken();
@@ -9040,8 +9153,7 @@ if (
   !CSS.supports("interactive-widget: resizes-content")
 ) {
   const onViewportResize = () => {
-    document.documentElement.style.height =
-      window.visualViewport.height + "px";
+    document.documentElement.style.height = window.visualViewport.height + "px";
   };
   window.visualViewport.addEventListener("resize", onViewportResize);
 }
