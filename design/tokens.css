@@ -39,6 +39,7 @@
   /* Light theme: menus are white on a grey shadow, text on accent is white */
   --n-raised: #ffffff;
   --n-on-accent: #ffffff;
+  --n-shadow-0: 0 0 0 1px rgb(76 79 105 / 12%), 0 1px 2px rgb(76 79 105 / 8%);
   --n-shadow-1: 0 0 0 1px rgb(76 79 105 / 10%), 0 2px 4px rgb(76 79 105 / 6%), 0 8px 24px rgb(76 79 105 / 10%);
   --n-shadow-2: 0 0 0 1px rgb(76 79 105 / 10%), 0 8px 16px rgb(76 79 105 / 8%), 0 24px 56px rgb(76 79 105 / 16%);
   --n-scrim: rgb(76 79 105 / 28%);
@@ -116,7 +117,9 @@
   --n-status: 26px;
   --n-touch: 44px;
 
-  /* Elevation: one step for menus and popovers, one for dialogs and the palette */
+  /* Elevation: 0 for secondary controls resting on the canvas, 1 for menus,
+     popovers and the tool dock, 2 for dialogs and the palette */
+  --n-shadow-0: 0 0 0 1px var(--n-line-strong), 0 1px 2px rgb(0 0 0 / 14%);
   --n-shadow-1: 0 0 0 1px var(--n-line-strong), 0 4px 12px rgb(0 0 0 / 22%);
   --n-shadow-2: 0 0 0 1px var(--n-line-strong), 0 12px 40px rgb(0 0 0 / 40%);
 

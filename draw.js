@@ -993,13 +993,13 @@
 .draw-ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .draw-panel{position:absolute;background:var(--n-raised);box-shadow:var(--n-shadow-1);border-radius:var(--n-r-lg)}
 .draw-sep{width:1px;height:20px;margin:0 4px;flex:none;background:var(--n-line-strong)}
-.draw-tools{left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px;border-radius:var(--n-r-xl);max-width:calc(100% - 16px);overflow-x:auto;scrollbar-width:none}
+.draw-tools{left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px;border-radius:calc(var(--n-r-md) + 4px);max-width:calc(100% - 16px);overflow-x:auto;scrollbar-width:none}
 .draw-ui .draw-tools button{width:32px;height:32px}
 .draw-ui .draw-tools button.active,.draw-ui .draw-toolgrid button.active{background:var(--n-accent);color:var(--n-on-accent)}
 .draw-ui .draw-tools .draw-tool-more,.draw-ui .draw-tools .draw-undo,.draw-toolgrid{display:none}
 @media (pointer:coarse){.draw-ui .draw-tools .draw-undo{display:flex}}
-.draw-zoom{left:14px;bottom:14px;display:flex;align-items:center;gap:1px;padding:3px}
-.draw-ui .draw-zoom button{width:24px;height:24px;border-radius:var(--n-r-sm)}
+.draw-zoom{left:14px;bottom:14px;display:flex;align-items:center;gap:1px;padding:3px;border-radius:calc(var(--n-r-md) + 3px);box-shadow:var(--n-shadow-0)}
+.draw-ui .draw-zoom button{width:24px;height:24px;border-radius:var(--n-r-md)}
 .draw-ui .draw-zoom .draw-pct{width:auto;min-width:46px;font:var(--n-label);font-feature-settings:"tnum"}
 .draw-zoom .draw-ic{width:14px;height:14px}
 .draw-zoom .draw-sep{height:16px;margin:0 3px}
@@ -1051,6 +1051,7 @@
 .draw-text.wrap{white-space:pre-wrap;text-align:center;word-break:break-word}
 .draw-readonly .draw-tools,.draw-readonly .draw-style,.draw-readonly .draw-edit{display:none!important}
 /* Phones: a bottom sheet with finger-sized targets */
+@container (min-width:601px) and (max-width:880px){.draw-zoom{bottom:auto;top:14px}.draw-ui .draw-badge{top:56px}}
 @container (max-width:600px){
 .draw-ui .draw-tools .draw-tool-extra:not(.active){display:none}
 .draw-ui .draw-tools .draw-tool-more,.draw-ui .draw-tools .draw-undo{display:flex}

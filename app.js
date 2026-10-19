@@ -7433,11 +7433,12 @@ function noteState(note) {
     hour: "2-digit",
     minute: "2-digit",
   });
+  // These three repeat the sidebar footer: shown only while it is hidden
   if (gdriveConnected && syncDotCount > 0)
-    return { label: "Syncing…", detail: "Saving to Google Drive" };
+    return { label: "Syncing…", detail: "Saving to Google Drive", sync: true };
   if (gdriveConnected && !syncFailedState)
-    return { label: "Synced", detail: "In this browser and Google Drive" };
-  return { label: "Saved", detail: "In this browser at " + at };
+    return { label: "Synced", detail: "In this browser and Google Drive", sync: true };
+  return { label: "Saved", detail: "In this browser at " + at, sync: true };
 }
 
 let titleBarKey = "";
@@ -7453,6 +7454,7 @@ function updateTitleBar() {
   if (!note) return;
   crumbName.innerHTML = nameHtml(note.name);
   crumbState.textContent = st.label;
+  crumbState.classList.toggle("sync-state", !!st.sync);
   crumbBtn.dataset.tip = st.label;
   crumbBtn.dataset.sub = st.detail;
 }

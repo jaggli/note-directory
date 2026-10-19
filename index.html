@@ -747,11 +747,13 @@
         place-items: center;
         width: 16px;
         height: 16px;
-        margin: 0 8px 0 0;
+        /* Centred on the first line, whatever is drawn inside (a checked
+           box would otherwise take its baseline from the tick) */
+        align-self: flex-start;
+        font: inherit;
+        margin: calc((1lh - 16px) / 2) 8px 0 0;
         border-radius: 4px;
         box-shadow: inset 0 0 0 1.5px var(--n-text-3);
-        position: relative;
-        top: 3px;
         cursor: pointer;
         flex-shrink: 0;
       }
@@ -1025,6 +1027,9 @@
         --n-control: 26px;
         --n-row: 28px;
         --n-bar: 40px;
+        /* 0: secondary controls resting on the canvas; 1: menus, the tool dock; 2: dialogs */
+        --n-shadow-0:
+          0 0 0 1px var(--n-line-strong), 0 1px 2px rgb(0 0 0 / 14%);
         --n-shadow-1:
           0 0 0 1px var(--n-line-strong), 0 4px 12px rgb(0 0 0 / 22%);
         --n-shadow-2:
@@ -1036,6 +1041,8 @@
         --n-raised: #ffffff;
         --n-on-accent: #ffffff;
         --n-scrim: rgb(76 79 105 / 28%);
+        --n-shadow-0:
+          0 0 0 1px rgb(76 79 105 / 12%), 0 1px 2px rgb(76 79 105 / 8%);
         --n-shadow-1:
           0 0 0 1px rgb(76 79 105 / 10%), 0 2px 4px rgb(76 79 105 / 6%),
           0 8px 24px rgb(76 79 105 / 10%);
@@ -1603,10 +1610,20 @@
 
       .side-foot {
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
         gap: 8px;
         padding: 8px 10px 10px;
         border-top: 1px solid var(--n-line);
         flex: none;
+        overflow: hidden;
+        container-type: inline-size;
+      }
+
+      /* A narrow sidebar keeps the state and drops the time */
+      @container (max-width: 210px) {
+        #syncWhen {
+          display: none;
+        }
       }
 
       .side-foot:not(:has(> :not([hidden], [style*="none"]))) {
@@ -1632,6 +1649,7 @@
       }
 
       .sync-line .grow {
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1730,6 +1748,10 @@
         font: var(--n-caption);
         color: var(--n-text-3);
         white-space: nowrap;
+      }
+
+      .app:not(.sidebar-hidden) .crumb-state.sync-state {
+        display: none;
       }
 
       .crumb-input {
@@ -2181,7 +2203,7 @@
         width: 380px;
         max-width: calc(100% - 24px);
         padding: 5px;
-        border-radius: var(--n-r-lg);
+        border-radius: calc(var(--n-r-md) + 5px);
         background: var(--n-raised);
         box-shadow: var(--n-shadow-1);
       }
@@ -2820,7 +2842,8 @@
         display: flex;
         gap: 4px;
         padding: 4px;
-        border-radius: var(--n-r-xl);
+        /* Concentric: outer radius = inner radius + padding */
+        border-radius: calc(var(--n-r-md) + 4px);
         background: var(--n-raised);
         box-shadow: var(--n-shadow-1);
       }

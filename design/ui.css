@@ -278,7 +278,7 @@ button.n-status-item:hover { background: var(--n-hover); color: var(--n-text); }
 
 .n-find {
   display: grid; grid-template-columns: 22px 1fr; gap: 4px; width: 380px; padding: 5px;
-  border-radius: var(--n-r-lg); background: var(--n-raised); box-shadow: var(--n-shadow-1);
+  border-radius: calc(var(--n-r-md) + 5px); background: var(--n-raised); box-shadow: var(--n-shadow-1);
 }
 .n-find .row { display: flex; align-items: center; gap: 2px; }
 .n-find .n-field { flex: 1; height: 24px; }
@@ -397,7 +397,9 @@ button.n-status-item:hover { background: var(--n-hover); color: var(--n-text); }
 .n-canvas.nogrid { background-image: none; }
 .n-dock {
   position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: var(--n-r-xl);
+  display: flex; align-items: center; gap: 2px; padding: 4px;
+  /* Concentric: outer radius = inner radius + padding */
+  border-radius: calc(var(--n-r-md) + 4px);
   background: var(--n-raised); box-shadow: var(--n-shadow-1);
 }
 .n-dock .sep { width: 1px; height: 20px; margin: 0 4px; background: var(--n-line-strong); }
@@ -407,9 +409,9 @@ button.n-status-item:hover { background: var(--n-hover); color: var(--n-text); }
 .n-tool > .n-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); pointer-events: none; }
 .n-zoom {
   position: absolute; left: 14px; bottom: 14px; display: flex; align-items: center; gap: 1px; padding: 3px;
-  border-radius: var(--n-r-lg); background: var(--n-raised); box-shadow: var(--n-shadow-1);
+  border-radius: calc(var(--n-r-md) + 3px); background: var(--n-raised); box-shadow: var(--n-shadow-0);
 }
-.n-zoom .pct { min-width: 46px; height: 24px; font: var(--n-label); font-feature-settings: "tnum"; border-radius: var(--n-r-sm); }
+.n-zoom .pct { min-width: 46px; height: 24px; font: var(--n-label); font-feature-settings: "tnum"; border-radius: var(--n-r-md); }
 .n-zoom .pct:hover { background: var(--n-hover); }
 .n-inspector {
   position: absolute; right: 14px; top: 14px; width: 216px; padding: 10px 12px 12px; display: grid; gap: 12px;

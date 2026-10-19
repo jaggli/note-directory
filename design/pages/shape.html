@@ -1,5 +1,5 @@
 <h1 class="pg-title">Space, shape, motion</h1>
-<p class="pg-lede">A 4 px grid, three control heights, four radii, two shadows, two durations. Dense like a code editor, never cramped: rows are 28 px, phones get 44 px targets.</p>
+<p class="pg-lede">A 4 px grid, three control heights, four radii, three shadows, two durations. Dense like a code editor, never cramped: rows are 28 px, phones get 44 px targets.</p>
 
 <section class="sec">
   <h2>Sizes</h2>
@@ -23,9 +23,15 @@
     <div class="spec"><div style="width:90px;height:56px;border-radius:var(--n-r-md);background:var(--n-raised);box-shadow:inset 0 0 0 1px var(--n-line-strong)"></div><span class="cap">r-md 6 · controls, rows</span></div>
     <div class="spec"><div style="width:90px;height:56px;border-radius:var(--n-r-lg);background:var(--n-raised);box-shadow:inset 0 0 0 1px var(--n-line-strong)"></div><span class="cap">r-lg 10 · menus, toasts</span></div>
     <div class="spec"><div style="width:90px;height:56px;border-radius:var(--n-r-xl);background:var(--n-raised);box-shadow:inset 0 0 0 1px var(--n-line-strong)"></div><span class="cap">r-xl 14 · dialogs, palette</span></div>
-    <div class="spec"><div style="width:140px;height:56px;border-radius:var(--n-r-lg);background:var(--n-raised);box-shadow:var(--n-shadow-1)"></div><span class="cap">shadow-1 · menus, popovers, find, canvas panels</span></div>
+    <div class="spec"><div style="width:140px;height:56px;border-radius:var(--n-r-lg);background:var(--n-raised);box-shadow:var(--n-shadow-0)"></div><span class="cap">shadow-0 · secondary canvas controls (zoom)</span></div>
+    <div class="spec"><div style="width:140px;height:56px;border-radius:var(--n-r-lg);background:var(--n-raised);box-shadow:var(--n-shadow-1)"></div><span class="cap">shadow-1 · menus, popovers, find, tool dock, inspector</span></div>
     <div class="spec"><div style="width:140px;height:56px;border-radius:var(--n-r-xl);background:var(--n-raised);box-shadow:var(--n-shadow-2)"></div><span class="cap">shadow-2 · palette, dialogs, settings</span></div>
   </div>
+</section>
+
+<section class="sec">
+  <h2>Nested corners</h2>
+  <div class="prose"><p>A container hugging rounded controls takes <strong>outer radius = inner radius + padding</strong>, so both curves share a centre: the tool dock is 6 + 4 = 10, the zoom panel 6 + 3 = 9, menus 6 + 4 = 10, segmented controls 4 + 2 = 6. Containers with roomy padding (popovers, dialogs) keep their own radius.</p></div>
 </section>
 
 <section class="sec">

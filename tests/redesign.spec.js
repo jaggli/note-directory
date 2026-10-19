@@ -85,10 +85,15 @@ test("list: kinds, pinned section, double-click renames in place", async ({ page
 
 test("⌘\\ folds the sidebar away and the title bar brings it back", async ({ page }) => {
   await openApp(page);
+  // "Saved" repeats the sidebar footer, so it only shows with the sidebar away
+  await expect(page.locator("#crumbState")).toBeHidden();
   await page.keyboard.press("ControlOrMeta+\\");
   await expect(page.locator(".sidebar")).toBeHidden();
+  await expect(page.locator("#crumbState")).toHaveText("Saved");
+  await expect(page.locator("#crumbState")).toBeVisible();
   await page.click("#btnSidebar");
   await expect(page.locator(".sidebar")).toBeVisible();
+  await expect(page.locator("#crumbState")).toBeHidden();
 });
 
 test("⌘E switches Edit and Preview; the status bar follows", async ({ page }) => {
