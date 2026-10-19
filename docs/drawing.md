@@ -20,10 +20,11 @@ for offline use. It injects its own UI styles. No libraries.
 
 - `isDrawFile(name)` — extension `.draw`. `hasViewTab(name)` covers `.md`
   and `.draw`: both get the tab bar.
-- Tabs read **draw / zen** for drawings (edit / view / zen for markdown);
-  the text behind a drawing opens from **file → source** (the hidden edit
-  tab). `mdViewActive` is true on the draw tab; `drawActive()` means
-  "editable canvas is showing".
+- The view switch reads **Canvas | Source** for drawings (**Edit | Preview**
+  for markdown); Canvas is the second tab (`view`), Source the edit tab,
+  shown first by CSS (`.seg.is-draw`). Zen is a separate button.
+  `mdViewActive` is true on the canvas; `drawActive()` means "editable
+  canvas is showing".
 - `render()` opens the draw tab whenever the active note **changes** to a
   drawing, so drawings always open on the canvas. Browser back/forward
   restores the tab that was in the history entry.
@@ -129,8 +130,8 @@ never HTML. Referenced embeds are clickable and open the drawing.
 ## Search, Export, Import
 
 - **Search** indexes only labels (`drawSearchLines()`), not coordinates.
-- **File menu** on a drawing: *copy as png* (clipboard, falls back to a
-  download) and *download svg*. Exports use the dark background; the PNG
+- **⋯ menu** on a drawing: *Copy as PNG* (clipboard, falls back to a
+  download) and *Download as SVG*. Exports use the dark background; the PNG
   uses the browser's monospace font because SVG images can't load web fonts.
 - **Export all** adds `name.draw.svg` next to each drawing and lists them in
   `.note.directory` → `renders`; importing that zip skips them.

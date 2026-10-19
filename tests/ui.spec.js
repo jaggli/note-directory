@@ -9,16 +9,18 @@ test("toolbar and menu buttons work without inline handlers", async ({
   await openApp(page);
   const count = () => page.evaluate(() => state.notes.length);
   const n0 = await count();
-  await page.click('.statusbar button:has-text("new")');
+  await page.click('.side-head [data-action="new-note-rename"]');
   expect(await count()).toBe(n0 + 1);
+  await expect(page.locator("#crumbInput")).toBeFocused();
+  await page.keyboard.press("Escape");
 
-  await page.click("#fileMenuContainer > button");
-  expect(await visible(page, "#fileMenu")).toBe(true);
-  await page.click('#fileMenu button:has-text("help")');
+  await page.click("#btnAppMenu");
+  expect(await visible(page, "#appMenu")).toBe(true);
+  await page.click('#appMenu button:has-text("Help")');
   expect(await page.evaluate(() => getActiveNote().name)).toBe("help.md");
-  await expect(page.locator("#mdTabView")).toHaveClass(/active/);
+  await expect(page.locator("#mdTabView")).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#mdPreview")).toBeVisible();
-  expect(await visible(page, "#fileMenu")).toBe(false);
+  expect(await visible(page, "#appMenu")).toBe(false);
 
   await page.click("#mdTabView");
   expect(await page.evaluate(() => mdViewActive && !zenModeActive)).toBe(true);
@@ -32,46 +34,59 @@ test("toolbar and menu buttons work without inline handlers", async ({
   const w0 = await wrapped();
   await page.click("#btnWrap");
   expect(await wrapped()).toBe(!w0);
+  await expect(page.locator("#btnWrap")).toHaveAttribute("aria-pressed", String(!w0));
 
-  await page.click('.statusbar button:has-text("search")');
+  await page.click(".side-search .field");
   expect(await visible(page, "#searchResults")).toBe(true);
-  await page.click(".btn-search-close");
+  await page.click("#searchBackdrop", { position: { x: 5, y: 5 } });
   expect(await visible(page, "#searchResults")).toBe(false);
 
-  await page.click("#btnReplace");
+  await page.click("#btnNoteMenu");
+  expect(await visible(page, "#noteMenu")).toBe(true);
+  await page.keyboard.press("Escape");
+  expect(await visible(page, "#noteMenu")).toBe(false);
+
+  await page.click("#btnShare");
+  await expect.poll(() => visible(page, "#sharePop")).toBe(true);
+  await page.click("#btnShare");
+  await expect.poll(() => visible(page, "#sharePop")).toBe(false);
+
+  await page.locator("#editor").focus();
+  await page.keyboard.press("Control+h");
   expect(await visible(page, "#findReplaceBar")).toBe(true);
   await page.click("[data-action=close-find-replace]");
   expect(await visible(page, "#findReplaceBar")).toBe(false);
 
   await page.click("#btnVim");
   expect(await page.evaluate(() => vimState.enabled)).toBe(true);
+  await expect(page.locator("#vimPill")).toHaveText("NORMAL");
 });
 
 test("format shortcut shows a toast", async ({ page }) => {
   await openApp(page);
   await page.locator("#editor").focus();
   await page.keyboard.press("Control+Shift+F");
-  await expect(page.locator("#mdToast")).toHaveText("formatted");
+  await expect(page.locator("#mdToast")).toHaveText("Formatted");
 });
 
-test("delete dialog still works after an import dialog", async ({ page }) => {
+test("delete is immediate and undoable, also with ⌘Z", async ({ page }) => {
   await openApp(page);
-  const choice = page.evaluate(() => showImportModal("foo.md"));
-  await page.locator(".modal-actions button", { hasText: "skip" }).click();
-  expect(await choice).toBe("skip");
+  await page.evaluate(() => createNote("bye.md", "keep me"));
+  await page.keyboard.press("Escape");
+  const names = () => page.evaluate(() => state.notes.map((n) => n.name));
+  await page.keyboard.press("Control+Shift+D");
+  await expect(page.locator("#modalOverlay")).toBeHidden();
+  expect(await names()).not.toContain("bye.md");
+  await expect(page.locator("#mdToast")).toContainText("Deleted bye.md");
+  await page.click("#mdToast .toast-act");
+  expect(await names()).toContain("bye.md");
+  expect(await page.evaluate(() => getActiveNote().content)).toBe("keep me");
 
-  const before = await page.evaluate(() => state.notes.length);
-  await page.evaluate(() => {
-    confirmDelete(getActiveNote().id);
-  });
-  const labels = await page
-    .locator(".modal-actions button:visible")
-    .allTextContents();
-  expect(labels.map((s) => s.trim())).toEqual(["cancel", "delete"]);
-  await page.click("#modalConfirm");
-  await expect
-    .poll(() => page.evaluate(() => state.notes.length))
-    .toBe(before - 1);
+  await page.click('.note-item:has-text("bye.md")', { button: "right" });
+  await page.click('#noteMenu [data-note-act="delete"]');
+  expect(await names()).not.toContain("bye.md");
+  await page.keyboard.press("Control+z");
+  expect(await names()).toContain("bye.md");
 });
 
 test("concurrent dialogs are shown one after another", async ({ page }) => {
@@ -110,8 +125,10 @@ test("zen share copies the open note, also right after creating it", async ({ pa
     for (const n of state.notes.filter((n) => n.name === "markdown-features.md")) n.name += ".old";
     await openMdDemo(); // creates the note
     switchMdTab("zen", true);
-    await zenShare();
   });
+  await page.click("[data-action=zen-share]");
+  await page.click('#sharePop [data-share="copy"]');
+  await expect(page.locator("#mdToast")).toHaveText("Link copied");
   const shared = await page.evaluate(async () => {
     const hash = new URL(await navigator.clipboard.readText()).hash;
     return decompress(parseHashParams(hash).get("note"));

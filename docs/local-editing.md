@@ -237,11 +237,14 @@ loadFromUrl()
   → read "note" and "name" from URL params
   → if no "note" param → return false
   → decompress(noteData)
-  → if view=zen → store as ephemeral (not persisted)
+  → if view=zen → store as ephemeral (not persisted); leaving zen
+      shows it under the shared banner, still unsaved
   → if note exists with same name:
       same content → activate it
-      different → modal: "update" or "new file"
-  → otherwise → create new note
+      URL older than the local note → activate it (stale own URL)
+  → otherwise → sharedNote: shown, not in state.notes, banner
+      Save to my notes / Dismiss (clash: Show mine / Keep both /
+      Replace mine); the first edit or ticked task saves it
 ```
 
 ---
@@ -309,15 +312,19 @@ Each language defines rules as `[regex, cssClass]` pairs. `tokenize()` finds all
 
 | Shortcut        | Action                                            |
 | --------------- | ------------------------------------------------- |
-| Ctrl+N          | New note (Ctrl only, not Cmd — avoids new window) |
-| Ctrl+F          | Search the current note (one row per line)        |
-| Ctrl+P          | Search all notes (inside the dialog: switch scope) |
-| Ctrl+H          | Open find & replace                               |
+| Ctrl+N, Alt+N   | New note (Ctrl only, not Cmd — avoids new window; Alt+N where Chrome keeps Ctrl+N) |
+| Cmd/Ctrl+P      | Palette: notes and lines (Tab: this note), `>` commands |
+| Cmd/Ctrl+Shift+P, Cmd/Ctrl+/ | Palette on commands                  |
+| Cmd/Ctrl+F      | Find in this note (on a canvas: the palette on its shapes) |
+| Cmd+Alt+F, Ctrl+H | Find and replace                                |
+| Cmd/Ctrl+E      | Edit ⇄ Preview, Canvas ⇄ Source                   |
+| F2              | Rename the open note in the title bar             |
+| Cmd/Ctrl+\      | Show or hide the sidebar                          |
 | Ctrl+S          | See [Ctrl+S behavior](#ctrls-behavior) below      |
-| Ctrl+Shift+D    | Delete current note                               |
-| Ctrl+Shift+F    | Format markdown (`.md` files only)                |
+| Cmd/Ctrl+Shift+D | Delete current note (Undo in the toast, or Cmd/Ctrl+Z) |
+| Alt+Shift+F, Cmd/Ctrl+Shift+F | Format markdown (`.md` files only)   |
 | Ctrl+Shift+M    | Toggle vim mode                                   |
-| Escape          | Close search / find-replace / sidebar             |
+| Escape          | Close the topmost layer: menu, find, palette, sidebar |
 
 ### Markdown View
 
@@ -331,7 +338,7 @@ Ctrl/Cmd+S always suppresses the browser save dialog. Beyond that, behavior depe
 
 | Context                        | Action                                     |
 | ------------------------------ | ------------------------------------------ |
-| Edit mode, non-vim, `.md` file | Format markdown → save → update URL → sync |
+| Edit mode, non-vim, `.md` file | Format markdown (Settings › Format markdown on save, on by default) → save → update URL → sync |
 | Edit mode, non-vim, other file | Save → update URL → sync                   |
 | View tab (markdown preview)    | Save → update URL → sync (no formatting)   |
 | Vim mode (any file)            | Nothing (use `:w` to save)                 |

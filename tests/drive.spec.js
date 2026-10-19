@@ -25,12 +25,12 @@ test("first connect signs in once via Google and creates the file", async ({
 }) => {
   const drive = await fakeGoogle(context);
   await openApp(page);
-  await page.click("#fileMenuContainer > button");
+  await page.click("#btnAppMenu");
   await page.click("#btnDriveSync");
   await expect.poll(() => drive.files.length).toBe(1);
   expect(drive.read().notes.map((n) => n.name)).toContain("help.md");
   expect(drive.auth.starts).toBe(1);
-  await expect(page.locator("#syncLabel")).toHaveText("sync");
+  await expect(page.locator("#syncLabel")).toHaveText("Synced to Google Drive");
   expect(new URL(page.url()).search).toBe("");
 });
 
@@ -41,7 +41,7 @@ test("an expired access token is renewed without leaving the page", async ({
   const drive = await fakeGoogle(context);
   await connectedSession(context, { expired: true });
   await openApp(page);
-  await expect(page.locator("#syncLabel")).toHaveText("sync");
+  await expect(page.locator("#syncLabel")).toHaveText("Synced to Google Drive");
   await expect.poll(() => drive.files.length).toBe(1);
   expect(drive.auth).toMatchObject({ starts: 0 });
   expect(drive.auth.refreshes).toBeGreaterThan(0);
@@ -170,7 +170,7 @@ test("a revoked sign-in never leaves the page on its own", async ({ page, contex
   const drive = await fakeGoogle(context);
   await connectedSession(context, { expired: true, signedOut: true });
   await openApp(page);
-  await expect(page.locator("#syncLabel")).toHaveText("sync failed");
+  await expect(page.locator("#syncLabel")).toHaveText(/^Sync paused/);
   await page.evaluate(() => {
     lastSyncCheck = 0;
     onTabResume();
@@ -181,10 +181,11 @@ test("a revoked sign-in never leaves the page on its own", async ({ page, contex
   expect(drive.auth.refreshes).toBeGreaterThan(0);
 
   // Clicking reconnect is allowed to go to Google
-  await page.click(".statusbar #syncMenuContainer > button");
+  await page.click("#syncMenuContainer > button");
   await expect(page.locator("#syncSignedOutHint")).toBeVisible();
-  await page.click('#syncMenuFailed button:has-text("reconnect")');
-  await expect(page.locator("#syncLabel")).toHaveText("sync");
+  await expect(page.locator("#syncLabel")).toHaveText("Sync paused · sign-in expired");
+  await page.click('#syncMenuFailed button:has-text("Reconnect")');
+  await expect(page.locator("#syncLabel")).toHaveText("Synced to Google Drive");
   expect(drive.auth.starts).toBe(1);
 });
 
@@ -193,10 +194,11 @@ test("being offline fails the sync without the sign-in hint", async ({ page, con
   await connectedSession(context, { expired: true });
   await context.route("**/auth/token", (route) => route.abort("internetdisconnected"));
   await openApp(page);
-  await expect(page.locator("#syncLabel")).toHaveText("sync failed");
-  await page.click(".statusbar #syncMenuContainer > button");
-  await expect(page.locator('#syncMenuFailed button:has-text("reconnect")')).toBeVisible();
+  await expect(page.locator("#syncLabel")).toHaveText(/^Sync paused/);
+  await page.click("#syncMenuContainer > button");
+  await expect(page.locator('#syncMenuFailed button:has-text("Reconnect")')).toBeVisible();
   await expect(page.locator("#syncSignedOutHint")).toBeHidden();
+  await expect(page.locator("#syncLabel")).toHaveText("Sync paused · will retry");
 });
 
 test("duplicate Drive files are merged into one", async ({ page, context }) => {

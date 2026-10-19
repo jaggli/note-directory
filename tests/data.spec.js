@@ -36,7 +36,7 @@ test("creates and deletes from other tabs are merged, not overwritten", async ({
   await openApp(other);
   await other.evaluate(async () => {
     await createNote("fromB.md", "b");
-    await confirmDelete(state.notes.find((n) => n.name === "doomed.md").id);
+    deleteNote(state.notes.find((n) => n.name === "doomed.md").id);
   });
   await page.evaluate(() => createNote("fromA.md", "a"));
   const names = (await stored(page)).notes.map((n) => n.name);
@@ -66,7 +66,7 @@ test("undo/redo survive fast typing and ignore other inputs", async ({
   await page.keyboard.press("Control+y");
   expect(await value()).toBe("Ax");
 
-  await page.click("#btnReplace");
+  await page.keyboard.press("Control+h");
   await page.locator("#findInput").fill("q");
   await page.keyboard.press("Control+z");
   expect(await page.evaluate(() => getActiveNote().content)).toBe("Ax");
@@ -123,7 +123,7 @@ test("zip import never reuses an id that is taken", async ({ page }) => {
         content: JSON.stringify({ notes: [{ id: victim.id, name: "original.md", updatedAt: 1 }] }),
       },
     ]);
-    await importZip(new File([zip], "x.zip"));
+    await importFiles([new File([zip], "x.zip")]);
     const ids = state.notes.map((n) => n.id);
     return ids.length === new Set(ids).size;
   });
@@ -173,7 +173,8 @@ test("replace all keeps offsets with length-changing case folding", async ({
 }) => {
   await openApp(page);
   await page.evaluate(() => createNote("find.txt", "İ foo"));
-  await page.click("#btnReplace");
+  await page.locator("#editor").focus();
+  await page.keyboard.press("Control+h");
   await page.locator("#findInput").fill("foo");
   await page.locator("#replaceInput").fill("bar");
   await page.click("[data-action=replace-all]");
@@ -183,7 +184,8 @@ test("replace all keeps offsets with length-changing case folding", async ({
 test("replace after editing hits the selected match", async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => createNote("find.txt", "foo foo"));
-  await page.click("#btnReplace");
+  await page.locator("#editor").focus();
+  await page.keyboard.press("Control+h");
   await page.locator("#findInput").fill("foo");
   await page.locator("#editor").focus();
   await page.evaluate(() => {
@@ -191,9 +193,10 @@ test("replace after editing hits the selected match", async ({ page }) => {
   });
   await page.keyboard.type("XX");
   await page.locator("#replaceInput").fill("bar");
-  await page.click("[data-action=replace-current]"); // selects
-  await page.click("[data-action=replace-current]"); // replaces
+  await page.click("[data-action=replace-current]"); // the match after the cursor
   expect(await page.evaluate(() => editor.value)).toBe("XXbar foo");
+  await page.click("[data-action=replace-current]"); // then the next one
+  expect(await page.evaluate(() => editor.value)).toBe("XXbar bar");
 });
 
 test("rename without a change keeps updatedAt", async ({ page }) => {

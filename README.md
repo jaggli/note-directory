@@ -55,20 +55,25 @@ across devices via Google Drive.
 - Syntax highlighting for 12 languages
   (JS, TS, Python, Rust, Go, CSS/SCSS, HTML/XML,
   JSON, YAML, TOML, Markdown, Shell/Bash)
-- Search: Ctrl+F finds lines in the current note, Ctrl+P
-  fuzzy-searches all notes (switch with a checkbox or the
-  other shortcut)
-- Find & replace within a note
-- Drag-and-drop file import
+- Palette (⌘P / Ctrl+P): fuzzy search over note names and
+  lines in every note; Tab narrows it to this note; `>`
+  lists every command with its shortcut
+- Find (⌘F) and replace (⌘⌥F / Ctrl+H) in a floating widget
+- Import files from a picker or by dropping them; one
+  dialog resolves every name clash (Replace · Keep both · Skip)
 - Drag to reorder notes in sidebar
 - Pin notes to keep them at the top
 - Export all notes as a ZIP (includes metadata for re-import)
-- Import notes by dropping ZIP or text files onto the editor
-- Google Drive sync with per-file conflict resolution
+- Google Drive sync; notes changed on two devices keep both
+  versions, marked *Conflict* with a banner that resolves them
+- Shared links open for reading under a banner and join
+  your notes only when you save, edit or tick a task
+- Settings: theme (or match the system), wrap, vim, format
+  on save, sync and backup, storage
 - Vim mode (toggle in status bar, desktop only)
 - Word wrap toggle with wrap-aware line numbers
 - Current line highlighting
-- Markdown preview with edit/view/zen tabs for `.md` files
+- Edit | Preview for `.md` files, Canvas | Source for drawings, and zen
 - Inter-note linking (`[label](other.md)`) with browser
   back/forward navigation between notes
 - Heading anchors in preview (hover to reveal `#` link,
@@ -100,18 +105,19 @@ across devices via Google Drive.
 - Move lines up/down with Alt+Arrow keys
 - Undo/redo with per-note history
 - Browser back/forward for note and tab switches
-- Delete confirmation dialog
-- Built-in help page (accessible from the menu)
-- Mobile-optimized UI with touch-friendly controls
+- Delete without a dialog: Undo in the toast (or ⌘Z)
+- Built-in help page (note ▾ › Help)
+- Phones: one region at a time, actions sheets, long-press
+  on a note, and a key bar with Tab, ⇧Tab, tasks and undo
 
 </details>
 
 <details>
 <summary><strong>Drawings</strong></summary>
 
-Pick **drawing** from the ▾ next to + (or `:draw` in vim).
-Drawings open on a canvas; **file → source** shows the
-text behind them and **zen** shows them read-only.
+Pick **New drawing** from the ▾ next to + (or `:draw` in vim).
+Drawings open on a **Canvas**; **Source** shows the text
+behind them and **zen** shows them read-only.
 
 - Tools: select, hand, pen (pressure-sensitive with a
   stylus), highlighter, eraser, rectangle, ellipse,
@@ -191,23 +197,28 @@ Features include:
 <details>
 <summary><strong>Keyboard shortcuts</strong></summary>
 
-| Shortcut        | Action                                         |
-| --------------- | ---------------------------------------------- |
-| Ctrl+N          | New note                                       |
-| Ctrl+F          | Search the current note (line by line)         |
-| Ctrl+P          | Search all notes                               |
-| Ctrl+H          | Find & replace                                 |
-| Ctrl+S          | Format (`.md` only) + save + sync              |
-| Ctrl+Shift+D    | Delete note                                    |
-| Ctrl+Shift+F    | Format markdown                                |
-| Ctrl+Shift+M    | Toggle vim mode                                |
-| Ctrl+Z          | Undo                                           |
-| Ctrl+Shift+Z    | Redo                                           |
-| Tab             | Insert 2 spaces / indent selection or list item |
-| Shift+Tab       | Dedent selection or list item                   |
-| Alt+↑ / Alt+↓   | Move line up / down                            |
-| e               | Switch from view/zen to edit tab               |
-| Escape          | Close search / sidebar / find bar / exit zen   |
+Shown as on a Mac; elsewhere ⌘ is Ctrl and ⌥ is Alt. The
+app shows each key the way your platform writes it.
+
+| Shortcut        | Action                                          |
+| --------------- | ----------------------------------------------- |
+| ⌃N (Alt+N)      | New note (Chrome keeps ⌘N, and Ctrl+N on Windows) |
+| ⌘P              | Search notes and lines (Tab: this note)         |
+| ⌘⇧P, ⌘/         | All commands                                    |
+| ⌘F              | Find in this note                               |
+| ⌘⌥F, Ctrl+H     | Find and replace                                |
+| ⌘E              | Edit ⇄ Preview, Canvas ⇄ Source                 |
+| F2              | Rename the open note                            |
+| ⌘\              | Show or hide the sidebar                        |
+| ⌘S              | Format (`.md`, if on in Settings) + save + sync |
+| ⌘⇧D             | Delete note (Undo in the toast)                 |
+| ⌥⇧F             | Format markdown                                 |
+| ⌃⇧M             | Toggle vim mode                                 |
+| ⌘Z / ⌘⇧Z        | Undo / redo                                     |
+| Tab / ⇧Tab      | Indent / dedent; at a list item, its nesting    |
+| ⌥↑ / ⌥↓         | Move line up / down                             |
+| E               | Preview → Edit                                  |
+| Escape          | Close the topmost layer: menu, find, palette, zen |
 
 When vim mode is active, standard vim keybindings take
 precedence in the editor. The shortcuts above still work

@@ -913,118 +913,167 @@
   //  Editor
   // ═══════════════════════════════════════════════════
 
+  // Chrome icons, 16×16 stroke paths
   const ICONS = {
-    select: '<path d="M6 3v14l3.6-3.4 2.4 5.4 2.2-1-2.4-5.3H17z"/>',
-    hand: '<path d="M8 11V5.5a1.3 1.3 0 0 1 2.6 0V10m0-5.5a1.3 1.3 0 0 1 2.6 0V10m0-4a1.3 1.3 0 0 1 2.6 0v4.5m0-2a1.3 1.3 0 0 1 2.6 0V13c0 3.6-2.6 6-6 6-2.6 0-4-1.2-5.4-3.4l-2-3.2a1.3 1.3 0 0 1 2.2-1.4L8 13"/>',
-    pen: '<path d="M3 16c2-4 4-9 6-8s-2 7 1 7 4-8 7-9"/>',
-    highlight: '<path d="M12.5 4.5l4 4-7 7H5.5v-4z M4 19h14"/>',
-    eraser: '<path d="M9 18h9M4.5 13.5l7-7a1.5 1.5 0 0 1 2 0l3 3a1.5 1.5 0 0 1 0 2L11 17.5H8z"/>',
-    rect: '<rect x="3.5" y="5.5" width="15" height="11" rx="1.5"/>',
-    ellipse: '<ellipse cx="11" cy="11" rx="8" ry="6"/>',
-    diamond: '<path d="M11 3l8 8-8 8-8-8z"/>',
-    line: '<path d="M4 18L18 4"/>',
-    arrow: '<path d="M4 18L18 4M10 4h8v8"/>',
-    text: '<path d="M5 5h12M11 5v13M8.5 18h5"/>',
+    select: '<path d="M3.5 2.5l9 4.5-4 1.2-1.6 4z"/>',
+    hand: '<path d="M5.5 8V3.8a1 1 0 0 1 2 0v3.7M7.5 7V2.8a1 1 0 0 1 2 0V7M9.5 7V3.8a1 1 0 0 1 2 0v5.7A4.5 4.5 0 0 1 7 14h-.3a4 4 0 0 1-3.2-1.7L2.3 9.8a1 1 0 0 1 1.5-1.2L5.5 10"/>',
+    pen: '<path d="M2.5 12c2-3 3.5-7 5.5-7s1 6 3 6 2.5-3 2.5-3"/>',
+    highlight: '<path d="M9.5 2.5l4 4L8 12H5V9zM3 14h5"/>',
+    eraser: '<path d="M9 2.5l4.5 4.5-6.5 6.5H4.5l-2-2a1 1 0 0 1 0-1.4zM6 6l4.5 4.5M7 13.5h6.5"/>',
+    rect: '<rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/>',
+    ellipse: '<ellipse cx="8" cy="8" rx="5.5" ry="4.5"/>',
+    diamond: '<path d="M8 2l6 6-6 6-6-6z"/>',
+    line: '<path d="M3 13L13 3"/>',
+    arrow: '<path d="M3 13L13 3M7 3h6v6"/>',
+    text: '<path d="M3.5 4.5V3h9v1.5M8 3v10M6 13h4"/>',
+    plus: '<path d="M8 3v10M3 8h10"/>',
+    minus: '<path d="M3 8h10"/>',
+    fit: '<path d="M2.5 5.5v-3h3M10.5 2.5h3v3M13.5 10.5v3h-3M5.5 13.5h-3v-3"/><rect x="5.5" y="5.5" width="5" height="5" rx="1"/>',
+    grid: '<g fill="currentColor" stroke="none"><circle cx="4" cy="4" r="1"/><circle cx="8" cy="4" r="1"/><circle cx="12" cy="4" r="1"/><circle cx="4" cy="8" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="12" cy="12" r="1"/></g>',
+    undo: '<path d="M5.5 4L2.5 7l3 3M2.5 7h7a3.5 3.5 0 0 1 0 7H7"/>',
+    redo: '<path d="M10.5 4l3 3-3 3M13.5 7h-7a3.5 3.5 0 0 0 0 7H9"/>',
+    x: '<path d="M4 4l8 8M12 4l-8 8"/>',
+    copy: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/>',
+    group: '<path d="M8 2.5l5.5 3-5.5 3-5.5-3zM2.5 8.5l5.5 3 5.5-3"/>',
+    ungroup: '<path d="M8 1.5l5.5 3-5.5 3-5.5-3zM2.5 10.5l5.5 3 5.5-3"/>',
+    chev: '<path d="M4.5 6.5L8 10l3.5-3.5"/>',
+    trash: '<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.2a1 1 0 0 0 1 .8h3.8a1 1 0 0 0 1-.8l.6-8.2"/>',
+    alert: '<path d="M8 2.5l6 10.5H2zM8 6.5v3M8 11.3v.2"/>',
+    style: '<g stroke="none"><circle cx="5" cy="5" r="2.3" style="fill:var(--red)"/><circle cx="11" cy="5" r="2.3" style="fill:var(--green)"/><circle cx="5" cy="11" r="2.3" style="fill:var(--blue)"/><circle cx="11" cy="11" r="2.3" style="fill:var(--yellow)"/></g>',
   };
+  const icon = (name) => `<svg class="draw-ic" viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
+  // Shortcuts are written PC-style; Macs get the symbols
+  const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+  const kbd = (s) =>
+    MAC ? s.replace(/Ctrl\+/g, "⌘").replace(/Alt\+/g, "⌥").replace(/Shift\+/g, "⇧").replace(/^Del$/, "⌫") : s;
+  // Dock: [id, label, key]; null separates groups
   const TOOLS = [
-    ["select", "select", "v"],
-    ["hand", "hand", "h"],
-    ["pen", "draw", "d"],
-    ["highlight", "highlighter", "shift+d"],
-    ["eraser", "eraser", "e"],
-    ["rect", "rectangle", "r"],
-    ["ellipse", "ellipse", "o"],
-    ["diamond", "diamond", "m"],
-    ["line", "line", "l"],
-    ["arrow", "arrow", "a"],
-    ["text", "text", "t"],
+    ["select", "Select", "V"],
+    ["hand", "Hand", "H"],
+    null,
+    ["pen", "Draw", "D"],
+    ["highlight", "Highlighter", "Shift+D"],
+    ["eraser", "Eraser", "E"],
+    null,
+    ["rect", "Rectangle", "R"],
+    ["ellipse", "Ellipse", "O"],
+    ["diamond", "Diamond", "M"],
+    ["line", "Line", "L"],
+    ["arrow", "Arrow", "A"],
+    ["text", "Text", "T"],
   ];
+  const TOOL_LABEL = Object.fromEntries(TOOLS.filter(Boolean).map(([id, label]) => [id, label]));
+  const KIND_LABEL = { r: "Rectangle", e: "Ellipse", m: "Diamond", l: "Line", a: "Arrow", t: "Text", p: "Drawing", h: "Highlight" };
   const PINNED_TOOLS = new Set(["select", "hand"]);
   const TOOL_KEYS = { v: "select", h: "hand", d: "pen", D: "highlight", e: "eraser", r: "rect", o: "ellipse", m: "diamond", l: "line", a: "arrow", t: "text" };
   const TOOL_KIND = { rect: "r", ellipse: "e", diamond: "m", line: "l", arrow: "a", text: "t", pen: "p", highlight: "h" };
   const STYLE_KEY = "notepad_draw_style";
-  // Right-click menu: [action, label, shortcut]; null is a separator
+  // Right-click menu: [action, label, shortcut]; null is a separator. The first four are the Arrange menu.
   const MENU = [
-    ["front", "bring to front", "alt+shift+↑"],
-    ["forward", "bring forward", "alt+↑"],
-    ["backward", "send backward", "alt+↓"],
-    ["back", "send to back", "alt+shift+↓"],
+    ["front", "Bring to front", "Alt+Shift+↑"],
+    ["forward", "Bring forward", "Alt+↑"],
+    ["backward", "Send backward", "Alt+↓"],
+    ["back", "Send to back", "Alt+Shift+↓"],
     null,
-    ["dup", "duplicate", "ctrl+d"],
-    ["group", "group", "ctrl+g"],
-    ["ungroup", "ungroup", "ctrl+shift+g"],
+    ["dup", "Duplicate", "Ctrl+D"],
+    ["group", "Group", "Ctrl+G"],
+    ["ungroup", "Ungroup", "Ctrl+Shift+G"],
     null,
-    ["del", "delete", "del"],
+    ["del", "Delete", "Del"],
   ];
   const ZMIN = 0.1;
   const ZMAX = 8;
 
   const CSS = `
 .draw-host svg.draw-svg{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none}
-.draw-ui button{-webkit-tap-highlight-color:transparent;font-family:var(--font);color:var(--subtext);background:none;border:none;cursor:pointer;border-radius:6px}
-.draw-ui button:hover{color:var(--text);background:var(--overlay)}
-.draw-panel{position:absolute;background:var(--sidebar);border:1px solid var(--border);border-radius:8px;padding:4px}
-.draw-tools{left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:2px;max-width:calc(100% - 16px);overflow-x:auto;scrollbar-width:none}
-.draw-tools button{width:36px;height:36px;flex:none;display:flex;align-items:center;justify-content:center}
-.draw-tools button.active{background:var(--blue);color:var(--bg)}
-.draw-tools svg,.draw-toolgrid svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.draw-ui .draw-tools .draw-tool-more,.draw-toolgrid{display:none}
-.draw-style{top:8px;right:8px;width:176px;display:none;flex-direction:column;gap:6px;padding:8px;max-height:calc(100% - 80px);overflow:auto}
+.draw-ui{font:var(--n-body);color:var(--n-text)}
+.draw-ui button{-webkit-tap-highlight-color:transparent;font:inherit;color:var(--n-text-2);background:none;border:0;margin:0;padding:0;cursor:pointer;border-radius:var(--n-r-md);display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:none}
+.draw-ui button:hover{color:var(--n-text);background:var(--n-hover)}
+.draw-ui button:focus-visible{outline:2px solid var(--n-accent);outline-offset:1px}
+.draw-ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.draw-panel{position:absolute;background:var(--n-raised);box-shadow:var(--n-shadow-1);border-radius:var(--n-r-lg)}
+.draw-sep{width:1px;height:20px;margin:0 4px;flex:none;background:var(--n-line-strong)}
+.draw-tools{left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px;border-radius:var(--n-r-xl);max-width:calc(100% - 16px);overflow-x:auto;scrollbar-width:none}
+.draw-ui .draw-tools button{width:32px;height:32px}
+.draw-ui .draw-tools button.active,.draw-ui .draw-toolgrid button.active{background:var(--n-accent);color:var(--n-on-accent)}
+.draw-ui .draw-tools .draw-tool-more,.draw-ui .draw-tools .draw-undo,.draw-toolgrid{display:none}
+@media (pointer:coarse){.draw-ui .draw-tools .draw-undo{display:flex}}
+.draw-zoom{left:14px;bottom:14px;display:flex;align-items:center;gap:1px;padding:3px}
+.draw-ui .draw-zoom button{width:24px;height:24px;border-radius:var(--n-r-sm)}
+.draw-ui .draw-zoom .draw-pct{width:auto;min-width:46px;font:var(--n-label);font-feature-settings:"tnum"}
+.draw-zoom .draw-ic{width:14px;height:14px}
+.draw-zoom .draw-sep{height:16px;margin:0 3px}
+.draw-ui .draw-zoom button.active{background:var(--n-pressed);color:var(--n-text)}
+.draw-style{top:14px;right:14px;width:216px;display:none;flex-direction:column;gap:12px;padding:10px 12px 12px;border-radius:var(--n-r-xl);max-height:calc(100% - 90px);overflow:auto;box-sizing:border-box}
 .draw-style.visible{display:flex}
-.draw-swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:2px}
-.draw-swatches button{height:26px;display:flex;align-items:center;justify-content:center}
-.draw-swatches span{width:14px;height:14px;border-radius:50%;display:block}
-.draw-swatches button.active{background:var(--overlay);box-shadow:inset 0 0 0 1px var(--subtext)}
-.draw-seg{display:flex;gap:2px}
-.draw-seg button{flex:1;min-width:0;height:26px;font-size:12px;padding:0 2px;display:flex;align-items:center;justify-content:center}
-.draw-seg svg{max-width:100%;height:auto}
-.draw-seg button.active{background:var(--overlay);color:var(--text);box-shadow:inset 0 0 0 1px var(--subtext)}
-.draw-actions{display:flex;flex-wrap:wrap;gap:2px;border-top:1px solid var(--border);padding-top:6px}
-.draw-actions button{font-size:12px;padding:4px 6px}
-.draw-menu{display:none;flex-direction:column;min-width:210px;z-index:5}
-.draw-menu.visible{display:flex}
-.draw-ui .draw-menu button{display:flex;justify-content:space-between;gap:16px;text-align:left;font-size:13px;padding:6px 10px;border-radius:4px}
-.draw-ui .draw-menu button:disabled{opacity:.35;pointer-events:none}
-.draw-menu kbd{color:var(--gutter);font-family:var(--font);font-size:11px}
-.draw-menu hr{border:none;border-top:1px solid var(--border);margin:4px 0}
-.draw-nav{left:8px;top:8px;display:flex;gap:2px;align-items:center}
-.draw-nav button{font-size:13px;height:28px;min-width:28px;padding:0 6px;display:flex;align-items:center;justify-content:center}
-.draw-nav button.active{color:var(--blue)}
-.draw-nav .draw-sep{width:1px;height:16px;background:var(--border);margin:0 2px}
-.draw-ui .draw-badge{position:absolute;top:50px;left:8px;font-size:12px;color:var(--yellow);background:var(--sidebar);border:1px solid var(--border);border-radius:6px;padding:4px 8px;display:none;cursor:pointer}
-.draw-ui .draw-badge.visible{display:block}
-.draw-ui .draw-badge:hover{color:var(--yellow);background:var(--overlay)}
-.draw-hint{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none;color:var(--gutter);font-size:14px;text-align:center;padding:0 24px;line-height:1.8}
+.draw-style-head{display:flex;align-items:center;justify-content:space-between;margin-right:-4px;font:var(--n-title);color:var(--n-text)}
+.draw-ui .draw-style-head button{width:22px;height:22px}
+.draw-style h5{margin:0 0 6px;font:var(--n-label);color:var(--n-text-3)}
+.draw-swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;justify-items:center}
+.draw-ui .draw-swatches button{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px rgb(0 0 0/15%)}
+.draw-ui .draw-swatches button.active{box-shadow:0 0 0 2px var(--n-raised),0 0 0 3.5px var(--n-accent)}
+.draw-seg{display:flex;gap:2px;padding:2px;border-radius:var(--n-r-md);background:var(--n-field);box-shadow:inset 0 0 0 1px var(--n-line)}
+.draw-seg+.draw-seg{margin-top:6px}
+.draw-ui .draw-seg button{flex:1;min-width:0;height:22px;border-radius:var(--n-r-sm);font:var(--n-body-strong)}
+.draw-ui .draw-seg button:hover{background:none}
+.draw-ui .draw-seg button.active{background:var(--n-raised);color:var(--n-text);box-shadow:0 0 0 1px var(--n-line-strong),0 1px 2px rgb(0 0 0/15%)}
+.draw-seg svg{width:24px;height:12px}
+.draw-actions{display:flex;align-items:center;gap:2px;padding-top:10px;border-top:1px solid var(--n-line)}
+.draw-ui .draw-actions button{height:22px;min-width:22px;font:var(--n-label)}
+.draw-ui .draw-actions .draw-arrange-btn{padding:0 4px 0 7px}
+.draw-actions .draw-ic{width:14px;height:14px}
+.draw-ui .draw-actions .draw-del{margin-left:auto;color:var(--n-danger)}
+.draw-ui .draw-style-open{top:14px;right:14px;width:32px;height:32px;display:none;border-radius:var(--n-r-lg)}
+.draw-ui .draw-style-open.visible{display:flex}
+.draw-pop{display:none;flex-direction:column;min-width:200px;padding:4px;z-index:6}
+.draw-pop.visible{display:flex}
+.draw-ui .draw-pop button{justify-content:space-between;gap:16px;height:26px;padding:0 8px;color:var(--n-text);white-space:nowrap}
+.draw-ui .draw-pop button:hover,.draw-ui .draw-pop button:focus-visible{background:var(--n-accent);color:var(--n-on-accent);outline:none}
+.draw-ui .draw-pop .draw-danger{color:var(--n-danger)}
+.draw-ui .draw-pop .draw-danger:hover,.draw-ui .draw-pop .draw-danger:focus-visible{background:var(--n-danger);color:var(--n-on-accent)}
+.draw-ui .draw-pop button:disabled{opacity:.4;pointer-events:none}
+.draw-pop kbd{font:var(--n-caption);font-feature-settings:"tnum";color:var(--n-text-3)}
+.draw-pop button:hover kbd,.draw-pop button:focus-visible kbd{color:inherit}
+.draw-pop hr{border:0;height:1px;margin:4px 8px;background:var(--n-line)}
+.draw-ui .draw-badge{position:absolute;top:14px;left:14px;max-width:calc(100% - 28px);height:30px;padding:0 10px;gap:8px;display:none;border-radius:var(--n-r-lg);background:var(--n-warning-soft);color:var(--n-warning);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--n-warning) 35%,transparent);font:var(--n-body-strong)}
+.draw-ui .draw-badge.visible{display:inline-flex}
+.draw-ui .draw-badge:hover{color:var(--n-warning);background:color-mix(in srgb,var(--n-warning) 22%,transparent)}
+.draw-badge span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.draw-hint{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none;color:var(--n-text-3);text-align:center;padding:0 24px}
 .draw-hint.visible{display:flex}
+.draw-hint>div{display:grid;gap:12px;justify-items:center}
+.draw-hint p{margin:0}
+.draw-keys{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 16px;font:var(--n-caption)}
+.draw-keys kbd{font:var(--n-caption);padding:1px 5px;margin-right:6px;border-radius:var(--n-r-sm);box-shadow:inset 0 0 0 1px var(--n-line-strong)}
+.draw-hint .coarse{display:none}
+@media (pointer:coarse){.draw-hint .fine{display:none}.draw-hint .coarse{display:block}}
 .draw-text{position:absolute;display:none;background:transparent;border:none;outline:none;resize:none;overflow:hidden;padding:0;margin:0;font-family:${FONT};line-height:${LINE_H};transform-origin:center;white-space:pre;caret-color:var(--blue)}
 .draw-text.wrap{white-space:pre-wrap;text-align:center;word-break:break-word}
 .draw-readonly .draw-tools,.draw-readonly .draw-style,.draw-readonly .draw-edit{display:none!important}
-.draw-style-head{display:flex;align-items:center;justify-content:space-between;margin:-4px -4px 0 0;color:var(--gutter);font-size:12px}
-.draw-ui .draw-style-head button{width:24px;height:24px;font-size:16px;line-height:1}
-.draw-nav .draw-style-open{display:none}
-.draw-nav .draw-style-open.visible{display:flex}
 /* Phones: a bottom sheet with finger-sized targets */
 @container (max-width:600px){
-.draw-ui .draw-tools .draw-tool-extra{display:none}
-.draw-ui .draw-tools .draw-tool-more{display:flex}
-.draw-ui .draw-tools button{width:52px;height:48px}
-.draw-tools button.active{background:var(--blue);color:var(--bg)}
-.draw-toolgrid.visible{display:grid;grid-template-columns:repeat(3,76px);gap:6px;padding:8px;left:50%;transform:translateX(-50%);z-index:6;border-radius:12px;bottom:80px;box-shadow:0 -4px 16px rgba(0,0,0,.3)}
-.draw-ui .draw-toolgrid button{height:68px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px}
-.draw-toolgrid svg{width:26px;height:26px}
-.draw-ui .draw-toolgrid button.active{background:var(--blue);color:var(--bg)}
-.draw-style{top:auto;bottom:80px;left:8px;right:8px;width:auto;max-height:50%;padding:8px 12px 12px;gap:8px;border-radius:12px;box-shadow:0 -4px 16px rgba(0,0,0,.3)}
-.draw-style-head{font-size:14px;margin:0 -6px 0 0}
-.draw-ui .draw-style-head button{width:40px;height:40px;font-size:22px}
-.draw-swatches{gap:4px}
-.draw-swatches button{height:44px}
-.draw-swatches span{width:24px;height:24px}
-.draw-seg{gap:4px}
-.draw-seg button{height:44px;font-size:15px}
-.draw-seg svg{width:32px}
-.draw-actions{gap:4px;padding-top:8px}
-.draw-ui .draw-actions button{flex:1 1 30%;height:44px;font-size:14px}
-.draw-ui .draw-nav button{height:36px;min-width:36px}
+.draw-ui .draw-tools .draw-tool-extra:not(.active){display:none}
+.draw-ui .draw-tools .draw-tool-more,.draw-ui .draw-tools .draw-undo{display:flex}
+.draw-ui .draw-tools button{width:44px;height:44px}
+.draw-tools .draw-ic{width:20px;height:20px}
+.draw-zoom{bottom:auto;top:8px;left:8px}
+.draw-ui .draw-zoom button{width:36px;height:36px}
+.draw-ui .draw-badge{top:56px;left:8px;max-width:calc(100% - 16px)}
+.draw-ui .draw-style-open{top:8px;right:8px;width:42px;height:42px}
+.draw-toolgrid.visible{display:grid;grid-template-columns:repeat(3,76px);gap:6px;padding:8px;left:50%;transform:translateX(-50%);bottom:76px;border-radius:var(--n-r-xl);z-index:6}
+.draw-ui .draw-toolgrid button{height:68px;flex-direction:column;gap:6px;font:var(--n-label)}
+.draw-toolgrid .draw-ic{width:22px;height:22px}
+.draw-style{top:auto;bottom:76px;left:8px;right:8px;width:auto;max-height:50%;padding:10px 14px 14px;gap:14px}
+.draw-style-head{font-size:15px;margin-right:-10px}
+.draw-ui .draw-style-head button{width:40px;height:40px}
+.draw-style h5{font-size:12px}
+.draw-swatches{gap:8px}
+.draw-ui .draw-swatches button{width:32px;height:32px}
+.draw-ui .draw-seg button{height:40px;font-size:14px}
+.draw-seg svg{width:32px;height:16px}
+.draw-ui .draw-actions button{height:40px;min-width:40px;font-size:14px}
+.draw-actions .draw-ic{width:18px;height:18px}
+.draw-ui .draw-pop button{height:40px;font-size:14px}
 }`;
 
   const E = {
@@ -1129,88 +1178,97 @@
     const ui = h("div", "draw-ui", host);
     E.ui = ui;
     E.hint = h("div", "draw-hint", ui);
+    E.hint.innerHTML =
+      '<div class="fine"><div class="draw-keys">' +
+      [["D", "Draw"], ["R", "Rectangle"], ["A", "Arrow"], ["T", "Text"]].map(([k, l]) => `<span><kbd>${k}</kbd>${l}</span>`).join("") +
+      '</div><p>Double-click to write anywhere</p></div><p class="coarse">Pick a tool below and start drawing</p>';
     E.badge = h("button", "draw-badge", ui);
     E.badge.dataset.draw = "source";
+    E.badge.innerHTML = icon("alert");
+    E.badgeText = h("span", "", E.badge);
+
+    // Hover label and shortcut come from the app's tooltip
+    const tip = (b, label, key) => {
+      b.dataset.tip = label;
+      if (key) b.dataset.key = kbd(key);
+      b.setAttribute("aria-label", label);
+      return b;
+    };
+    const btn = (parent, draw, label, key, cls, ic = draw.split(":")[1]) => {
+      const b = tip(h("button", cls || "", parent), label, key);
+      b.dataset.draw = draw;
+      b.innerHTML = icon(ic);
+      return b;
+    };
 
     E.toolsEl = h("div", "draw-panel draw-tools", ui);
     E.toolBtns = {};
-    for (const [id, label, key] of TOOLS) {
-      const b = h("button", "", E.toolsEl);
-      b.dataset.draw = "tool:" + id;
-      b.title = `${label} (${key})`;
-      b.setAttribute("aria-label", label);
-      b.innerHTML = `<svg viewBox="0 0 22 22">${ICONS[id]}</svg>`;
-      if (!PINNED_TOOLS.has(id)) b.classList.add("draw-tool-extra");
-      E.toolBtns[id] = b;
+    for (const t of TOOLS) {
+      if (!t) {
+        // Phones keep select and hand; the second group break goes
+        h("span", E.toolsEl.querySelector(".draw-sep") ? "draw-sep draw-tool-extra" : "draw-sep", E.toolsEl);
+        continue;
+      }
+      const [id, label, key] = t;
+      E.toolBtns[id] = btn(E.toolsEl, "tool:" + id, label, key, PINNED_TOOLS.has(id) ? "" : "draw-tool-extra", id);
     }
-    // Phones: select and hand stay, + opens the other tools as a 3×3 grid
-    E.moreBtn = h("button", "draw-tool-more", E.toolsEl);
-    E.moreBtn.dataset.draw = "nav:tools";
-    E.moreBtn.setAttribute("aria-label", "More tools");
+    // Phones: select, hand and the active tool stay, + opens the rest as a 3×3 grid
+    E.moreBtn = btn(E.toolsEl, "nav:tools", "More tools", "", "draw-tool-more", "plus");
+    h("span", "draw-sep draw-undo", E.toolsEl);
+    btn(E.toolsEl, "nav:undo", "Undo", "Ctrl+Z", "draw-undo");
+    btn(E.toolsEl, "nav:redo", "Redo", "Ctrl+Shift+Z", "draw-undo");
     E.toolGrid = h("div", "draw-panel draw-toolgrid", ui);
-    for (const [id, label] of TOOLS) {
-      if (PINNED_TOOLS.has(id)) continue;
-      const b = h("button", "", E.toolGrid);
-      b.dataset.draw = "tool:" + id;
-      b.setAttribute("aria-label", label);
-      b.innerHTML = `<svg viewBox="0 0 22 22">${ICONS[id]}</svg><span>${label}</span>`;
+    for (const t of TOOLS) {
+      if (!t || PINNED_TOOLS.has(t[0])) continue;
+      const b = btn(E.toolGrid, "tool:" + t[0], t[1], "", "", t[0]);
+      h("span", "", b, t[1]);
     }
 
     E.styleEl = h("div", "draw-panel draw-style", ui);
     const head = h("div", "draw-style-head", E.styleEl);
-    h("span", "", head, "style");
-    const close = h("button", "", head, "×");
-    close.dataset.draw = "nav:closestyle";
-    close.title = "close";
-    close.setAttribute("aria-label", "Close style panel");
-    E.swatches = h("div", "draw-swatches", E.styleEl);
-    for (const c of ENUMS.c) {
-      const b = h("button", "", E.swatches);
-      b.dataset.draw = "style:c:" + c;
-      b.title = c;
-      b.setAttribute("aria-label", "color " + c);
-      h("span", "", b).style.background = `var(--draw-${c}, var(--${COLOR_VARS[c]}))`;
-    }
-    const seg = (key, items) => {
-      const row = h("div", "draw-seg", E.styleEl);
-      row.dataset.key = key;
-      for (const [v, label, title] of items) {
-        const b = h("button", "", row, label.startsWith("<") ? null : label);
-        if (label.startsWith("<")) b.innerHTML = `<svg viewBox="0 0 28 14" width="28" height="14">${label}</svg>`;
-        b.dataset.draw = `style:${key}:${v}`;
-        b.title = title;
-        b.setAttribute("aria-label", title);
-      }
-      return row;
+    E.styleTitle = h("span", "", head);
+    btn(head, "nav:closestyle", "Close", "", "", "x").setAttribute("aria-label", "Close style panel");
+    E.rows = [];
+    const row = (label, keys) => {
+      const r = h("div", "", E.styleEl);
+      h("h5", "", r, label);
+      E.rows.push([r, keys]);
+      return r;
     };
+    E.swatches = h("div", "draw-swatches", row("Colour", ["c"]));
+    for (const c of ENUMS.c) {
+      const b = tip(h("button", "", E.swatches), c[0].toUpperCase() + c.slice(1));
+      b.dataset.draw = "style:c:" + c;
+      b.style.background = `var(--draw-${c}, var(--${COLOR_VARS[c]}))`;
+    }
+    // items: [value, label (text or svg), tooltip, shortcut]
+    const seg = (parent, key, items) => {
+      const s = h("div", "draw-seg", parent);
+      s.dataset.key = key;
+      for (const [v, label, title, keys] of items) {
+        const svg = label.startsWith("<");
+        const b = h("button", "", s, svg ? null : label);
+        if (svg) b.innerHTML = `<svg viewBox="0 0 28 14">${label}</svg>`;
+        if (title) tip(b, title, keys);
+        b.dataset.draw = `style:${key}:${v}`;
+      }
+      return s;
+    };
+    const words = (vals, labels) => vals.map((v, i) => [v, labels[i]]);
+    const HEAD_NAMES = { none: "None", open: "Arrow", triangle: "Triangle", dot: "Dot", diamond: "Diamond", bar: "Bar" };
+    let textRow;
     E.segs = {
-      s: seg("s", [["s", "s", "small"], ["m", "m", "medium"], ["l", "l", "large"], ["xl", "xl", "extra large"]]),
-      f: seg("f", [
-        ["none", '<rect x="8" y="2" width="12" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>', "no fill"],
-        ["semi", '<rect x="8" y="2" width="12" height="10" rx="2" fill="currentColor" fill-opacity=".3" stroke="currentColor" stroke-width="1.5"/>', "light fill"],
-        ["solid", '<rect x="8" y="2" width="12" height="10" rx="2" fill="currentColor" stroke="currentColor" stroke-width="1.5"/>', "solid fill"],
-      ]),
-      d: seg("d", [
-        ["solid", '<path d="M3 7h22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>', "solid line"],
-        ["dash", '<path d="M3 7h22" stroke="currentColor" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"/>', "dashed line"],
-        ["dot", '<path d="M3 7h22" stroke="currentColor" stroke-width="2.5" stroke-dasharray="0 5" stroke-linecap="round"/>', "dotted line"],
-      ]),
-      hs: seg("hs", HEADS.map((k) => [k, headIcon(k, true), "start: " + k])),
-      he: seg("he", HEADS.map((k) => [k, headIcon(k, false), "end: " + k])),
-      ta: seg("ta", [
-        ["left", alignIcon("M4 3h16M4 7h10M4 11h13"), "align left"],
-        ["center", alignIcon("M6 3h16M9 7h10M7.5 11h13"), "align center"],
-        ["right", alignIcon("M8 3h16M14 7h10M11 11h13"), "align right"],
-      ]),
-      va: seg("va", [
-        ["top", alignIcon("M5 1.5h18M9 5h10M9 8h10", true), "align top"],
-        ["middle", alignIcon("M9 5.5h10M9 8.5h10", true), "align middle"],
-        ["bottom", alignIcon("M9 6h10M9 9h10M5 12.5h18", true), "align bottom"],
-      ]),
-      st: seg("st", [
-        ["b", "B", "bold (ctrl+b)"],
-        ["i", "I", "italic (ctrl+i)"],
-        ["u", "U", "underline (ctrl+u)"],
+      s: seg(row("Stroke", ["s"]), "s", [["s", "S", "Small"], ["m", "M", "Medium"], ["l", "L", "Large"], ["xl", "XL", "Extra large"]]),
+      f: seg(row("Fill", ["f"]), "f", words(ENUMS.f, ["None", "Semi", "Solid"])),
+      d: seg(row("Line", ["d"]), "d", words(ENUMS.d, ["Solid", "Dashed", "Dotted"])),
+      hs: seg(row("Start", ["hs"]), "hs", HEADS.map((k) => [k, headIcon(k, true), HEAD_NAMES[k]])),
+      he: seg(row("End", ["he"]), "he", HEADS.map((k) => [k, headIcon(k, false), HEAD_NAMES[k]])),
+      ta: seg((textRow = row("Text", ["ta", "va"])), "ta", words(ENUMS.ta, ["Left", "Centre", "Right"])),
+      va: seg(textRow, "va", words(ENUMS.va, ["Top", "Middle", "Bottom"])),
+      st: seg(row("Style", ["st"]), "st", [
+        ["b", "B", "Bold", "Ctrl+B"],
+        ["i", "I", "Italic", "Ctrl+I"],
+        ["u", "U", "Underline", "Ctrl+U"],
       ]),
     };
     const [bold, italic, underline] = E.segs.st.children;
@@ -1218,58 +1276,44 @@
     italic.style.fontStyle = "italic";
     underline.style.textDecoration = "underline";
     E.actionsEl = h("div", "draw-actions", E.styleEl);
-    for (const [act, label, title] of [
-      ["dup", "dup", "duplicate (ctrl+d)"],
-      ["del", "del", "delete (del)"],
-      ["front", "front", "bring to front (alt+shift+↑ or shift+])"],
-      ["forward", "fwd", "bring forward (alt+↑ or ])"],
-      ["backward", "bwd", "send backward (alt+↓ or [)"],
-      ["back", "back", "send to back (alt+shift+↓ or shift+[)"],
-      ["group", "group", "group (ctrl+g)"],
-      ["ungroup", "ungroup", "ungroup (ctrl+shift+g)"],
-    ]) {
-      const b = h("button", "", E.actionsEl, label);
-      b.dataset.draw = "act:" + act;
-      b.title = title;
-    }
+    btn(E.actionsEl, "act:dup", "Duplicate", "Ctrl+D", "", "copy");
+    btn(E.actionsEl, "act:group", "Group", "Ctrl+G", "", "group");
+    btn(E.actionsEl, "act:ungroup", "Ungroup", "Ctrl+Shift+G", "", "ungroup");
+    const arrange = btn(E.actionsEl, "nav:arrange", "Arrange", "", "draw-arrange-btn", "chev");
+    arrange.prepend("Arrange");
+    arrange.setAttribute("aria-haspopup", "menu");
+    delete arrange.dataset.tip;
+    btn(E.actionsEl, "act:del", "Delete", "Del", "draw-del", "trash");
 
-    E.menu = h("div", "draw-panel draw-menu", ui);
-    E.menu.setAttribute("role", "menu");
-    for (const item of MENU) {
-      if (!item) {
-        h("hr", "", E.menu);
-        continue;
+    const menu = (cls, items) => {
+      const m = h("div", "draw-panel draw-pop " + cls, ui);
+      m.setAttribute("role", "menu");
+      for (const item of items) {
+        if (!item) {
+          h("hr", "", m);
+          continue;
+        }
+        const [act, label, keys] = item;
+        const b = h("button", act === "del" ? "draw-danger" : "", m);
+        b.dataset.draw = "act:" + act;
+        b.setAttribute("role", "menuitem");
+        h("span", "", b, label);
+        h("kbd", "", b, kbd(keys));
       }
-      const [act, label, keys] = item;
-      const b = h("button", "", E.menu, label);
-      b.dataset.draw = "act:" + act;
-      b.setAttribute("role", "menuitem");
-      h("kbd", "", b, keys);
-    }
-
-    const nav = h("div", "draw-panel draw-nav", ui);
-    const navBtn = (act, label, title, cls) => {
-      const b = h("button", cls || "", nav, label);
-      b.dataset.draw = "nav:" + act;
-      b.title = title;
-      b.setAttribute("aria-label", title);
-      return b;
+      return m;
     };
-    navBtn("out", "−", "zoom out (-)");
-    E.zoomBtn = navBtn("reset", "100%", "reset zoom (shift+0)");
-    navBtn("in", "+", "zoom in (+)");
-    navBtn("fit", "fit", "zoom to fit (shift+1)");
-    E.styleOpenBtn = navBtn("openstyle", "", "show style panel", "draw-edit draw-style-open");
-    E.styleOpenBtn.innerHTML =
-      '<svg viewBox="0 0 16 16" width="16" height="16"><circle cx="5" cy="5" r="2.3" fill="#f38ba8"/><circle cx="11" cy="5" r="2.3" fill="#a6e3a1"/><circle cx="5" cy="11" r="2.3" fill="#89b4fa"/><circle cx="11" cy="11" r="2.3" fill="#f9e2af"/></svg>';
-    E.gridBtn = navBtn("grid", "", "toggle grid (ctrl+')", "draw-edit");
-    E.gridBtn.innerHTML =
-      '<svg viewBox="0 0 14 14" width="14" height="14" fill="currentColor">' +
-      [2, 7, 12].flatMap((y) => [2, 7, 12].map((x) => `<circle cx="${x}" cy="${y}" r="1.4"/>`)).join("") +
-      "</svg>";
-    h("span", "draw-sep draw-edit", nav);
-    navBtn("undo", "↶", "undo (ctrl+z)", "draw-edit");
-    navBtn("redo", "↷", "redo (ctrl+shift+z)", "draw-edit");
+    E.menu = menu("draw-menu", MENU);
+    E.arrange = menu("draw-arrange", MENU.slice(0, 4));
+
+    E.styleOpenBtn = btn(ui, "nav:openstyle", "Show style panel", "", "draw-panel draw-edit draw-style-open", "style");
+    const zoom = h("div", "draw-panel draw-zoom", ui);
+    btn(zoom, "nav:out", "Zoom out", "", "", "minus");
+    E.zoomBtn = tip(h("button", "draw-pct", zoom, "100%"), "Zoom to 100%", "Shift+0");
+    E.zoomBtn.dataset.draw = "nav:reset";
+    btn(zoom, "nav:in", "Zoom in", "", "", "plus");
+    btn(zoom, "nav:fit", "Fit", "Shift+1", "", "fit");
+    h("span", "draw-sep draw-edit", zoom);
+    E.gridBtn = btn(zoom, "nav:grid", "Grid", "Ctrl+'", "draw-edit");
 
     E.ta = h("textarea", "draw-text", host);
     E.ta.spellcheck = false;
@@ -1671,16 +1715,16 @@
     if (!E.mounted) return;
     for (const [id, b] of Object.entries(E.toolBtns)) b.classList.toggle("active", id === E.tool);
     for (const b of E.toolGrid.children) b.classList.toggle("active", b.dataset.draw === "tool:" + E.tool);
-    const extra = !PINNED_TOOLS.has(E.tool);
-    E.moreBtn.classList.toggle("active", extra);
-    E.moreBtn.innerHTML = `<svg viewBox="0 0 22 22">${extra ? ICONS[E.tool] : '<path d="M11 4v14M4 11h14"/>'}</svg>`;
     const { out, sel } = styleState();
     const wanted = !E.readonly && Object.keys(out).length > 0;
     const show = wanted && !E.styleClosed;
     E.styleEl.classList.toggle("visible", show);
     E.styleOpenBtn.classList.toggle("visible", wanted && !!E.styleClosed);
+    if (!show || !sel.length) E.arrange.classList.remove("visible");
     if (show) {
-      E.swatches.style.display = "c" in out ? "" : "none";
+      E.styleTitle.textContent =
+        sel.length > 1 ? `${sel.length} shapes` : sel.length ? KIND_LABEL[sel[0].k] : TOOL_LABEL[E.tool];
+      for (const [row, keys] of E.rows) row.style.display = keys.some((k) => k in out) ? "" : "none";
       for (const b of E.swatches.children) b.classList.toggle("active", b.dataset.draw === "style:c:" + out.c);
       for (const [key, row] of Object.entries(E.segs)) {
         row.style.display = key in out ? "" : "none";
@@ -1699,17 +1743,13 @@
     E.gridBtn.classList.toggle("active", E.model.grid);
     const empty = !E.model.shapes.some((s) => s.k !== "raw");
     E.hint.classList.toggle("visible", empty && !E.readonly && !E.op);
-    E.hint.textContent = window.matchMedia("(pointer: coarse)").matches
-      ? "pick a tool below and start drawing"
-      : "d draw · r rectangle · a arrow · t text\ndouble-click to write anywhere";
-    E.hint.style.whiteSpace = "pre-line";
     const errs = E.model.errors;
     E.badge.classList.toggle("visible", errs.length > 0);
-    E.badge.title = errs.length ? errs.map((e) => `line ${e.line}: ${e.msg}`).slice(0, 10).join("\n") : "";
+    E.badge.dataset.tip = errs.map((e) => `Line ${e.line}: ${e.msg}`).slice(0, 10).join("\n");
     if (errs.length)
-      E.badge.textContent = E.model.locked
-        ? "read-only: " + errs[errs.length - 1].msg
-        : `${errs.length} line${errs.length > 1 ? "s" : ""} can't be drawn · fix in source`;
+      E.badgeText.textContent = E.model.locked
+        ? "Read-only · " + errs[errs.length - 1].msg
+        : `${errs.length} line${errs.length > 1 ? "s" : ""} can't be drawn · Open source`;
     updateCursor();
   }
 
@@ -1918,14 +1958,11 @@
     const b = e.target.closest("[data-draw]");
     if (!b || !E.mounted) return;
     const [kind, a, v] = b.dataset.draw.split(":");
-    if (kind === "tool") {
-      closeMenu();
-      setTool(a);
-    }
+    if (b !== E.moreBtn && a !== "arrange") closeMenu();
+    if (kind === "tool") setTool(a);
     else if (kind === "style") setStyle(a, v);
     else if (kind === "source") E.opts.onSource?.(E.model.errors[0]?.line || 1);
-    else if (kind === "act") {
-      closeMenu();
+    else if (kind === "act")
       ({
         dup: duplicate,
         del: deleteSelection,
@@ -1936,7 +1973,6 @@
         group,
         ungroup,
       })[a]();
-    }
     else if (kind === "nav")
       ({
         in: () => zoomBy(1.25),
@@ -1945,6 +1981,7 @@
         fit: () => fit(),
         grid: toggleGrid,
         tools: () => E.toolGrid.classList.toggle("visible"),
+        arrange: () => openArrange(b),
         closestyle: () => ((E.styleClosed = true), renderUI()),
         openstyle: () => ((E.styleClosed = false), renderUI()),
         undo: () => E.opts.onUndo?.(),
@@ -2099,7 +2136,22 @@
 
   function closeMenu() {
     E.menu?.classList.remove("visible");
+    E.arrange?.classList.remove("visible");
     E.toolGrid?.classList.remove("visible");
+  }
+
+  // Below the Arrange button, or above it when there's no room (phone sheet)
+  function openArrange(btn) {
+    const m = E.arrange;
+    if (m.classList.contains("visible")) return closeMenu();
+    m.classList.add("visible");
+    const r = btn.getBoundingClientRect();
+    const host = E.host.getBoundingClientRect();
+    const [vw, vh] = viewSize();
+    let top = r.bottom - host.top + 4;
+    if (top + m.offsetHeight > vh - 4) top = r.top - host.top - m.offsetHeight - 4;
+    m.style.left = Math.max(4, Math.min(r.left - host.left, vw - m.offsetWidth - 4)) + "px";
+    m.style.top = Math.max(4, top) + "px";
   }
 
   function onDown(e) {
@@ -2608,7 +2660,7 @@
     }
     if (E.readonly) return;
     if (k === "Escape") {
-      if (E.menu.classList.contains("visible")) closeMenu();
+      if (E.menu.classList.contains("visible") || E.arrange.classList.contains("visible")) closeMenu();
       else if (E.op) cancelOp();
       else if (E.focusGroup) {
         const s = selected()[0];

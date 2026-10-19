@@ -88,14 +88,15 @@ test("format: oversized or newer drawings open read-only", async ({ page }) => {
 
 test("the ▾ menu creates a drawing, + still creates text", async ({ page }) => {
   await openApp(page);
-  await page.click(".sidebar-header .btn-new-more");
-  await page.click('.sidebar-header [data-action="new-drawing-rename"]');
+  await page.click("#btnNewMenu");
+  await page.click('#newMenu [data-action="new-drawing-rename"]');
   await page.waitForFunction(() => window.Draw?.isMounted());
   expect(await page.evaluate(() => getActiveNote().name)).toBe("drawing1.draw");
-  await expect(page.locator("#mdTabView")).toHaveText("draw");
+  await expect(page.locator("#mdTabView")).toHaveText("Canvas");
+  await expect(page.locator("#mdTabEdit")).toHaveText("Source");
   await expect(page).toHaveURL(/view=draw/);
   await page.keyboard.press("Escape");
-  await page.click(".sidebar-header .btn-new");
+  await page.click('.side-head [data-action="new-note-rename"]');
   expect(await page.evaluate(() => getActiveNote().name)).toMatch(/^note\d+\.md$/);
   expect(await page.evaluate(() => mdViewActive)).toBe(false);
 });
@@ -220,15 +221,14 @@ test("grid setting lives in the file", async ({ page }) => {
 
 test("source edits show on the canvas", async ({ page }) => {
   await openDrawing(page, "draw 1\nr a 0 0 10 10\n");
-  await expect(page.locator("#mdTabEdit")).toBeHidden();
-  await page.click("#fileMenuContainer > button");
-  await page.click('#fileMenu [data-action="draw-source"]');
+  await expect(page.locator("#mdTabView")).toHaveAttribute("aria-selected", "true");
+  await page.click("#mdTabEdit");
   await page.locator("#editor").focus();
   await page.keyboard.press("Control+End");
   await page.keyboard.type("bogus line\n");
   await page.click("#mdTabView");
   await page.waitForFunction(() => Draw.isMounted());
-  await expect(page.locator(".draw-badge")).toHaveText("1 line can't be drawn · fix in source");
+  await expect(page.locator(".draw-badge")).toHaveText("1 line can't be drawn · Open source");
   expect(await page.locator("#drawHost [data-id=a]").count()).toBe(1);
 });
 
@@ -236,9 +236,9 @@ test("shared drawing link opens read-only in zen", async ({ page }) => {
   await openApp(page);
   const url = await page.evaluate(async () => {
     const note = { name: "shared.draw", content: "draw 1\nr a 0 0 100 50 \"hi\"\n", updatedAt: 1 };
-    zenModeActive = true;
+    shareMode = "zen";
     const u = await shareUrlFor(note);
-    zenModeActive = false;
+    shareMode = "edit";
     return u;
   });
   expect(url).toContain("?view=zen");
@@ -291,7 +291,7 @@ test("export all adds svg renders that import skips", async ({ page }) => {
     triggerDownload = orig;
     const entries = await readZip(await blob.arrayBuffer());
     const before = state.notes.length;
-    await importZip(new File([blob], "notes.zip"));
+    await importFiles([new File([blob], "notes.zip")]);
     return { names: entries.map((e) => e.name), added: state.notes.length - before };
   });
   expect(names.names).toContain("pic.draw.svg");
@@ -391,11 +391,10 @@ test("back/forward and rename keep the right tab", async ({ page }) => {
   await page.goForward();
   await page.waitForFunction(() => getActiveNote().name === "b.draw" && Draw.isMounted());
   // Renaming to markdown leaves the canvas
-  await page.evaluate(() => {
-    const input = document.querySelector(".note-item.active .note-item-input");
-    input.value = "b.md";
-    input.dispatchEvent(new Event("input"));
-  });
+  await page.keyboard.press("F2");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("b.md");
+  await page.keyboard.press("Enter");
   expect(await page.evaluate(() => Draw.isMounted())).toBe(false);
   await expect(page.locator("#mdTabEdit")).toBeVisible();
 });
@@ -614,7 +613,70 @@ test("phones: + opens the other tools as a grid", async ({ page }) => {
   await page.click('.draw-toolgrid [data-draw="tool:rect"]');
   await expect(page.locator(".draw-toolgrid")).toBeHidden();
   expect(await page.evaluate(() => Draw._state.tool)).toBe("rect");
-  await expect(page.locator('[data-draw="nav:tools"]')).toHaveClass(/active/);
+  // The active tool joins select and hand in the dock
+  await expect(page.locator('.draw-tools [data-draw="tool:rect"]')).toHaveClass(/active/);
+  await expect(page.locator('.draw-tools [data-draw="tool:rect"]')).toBeVisible();
+  await expect(page.locator('.draw-tools [data-draw="tool:ellipse"]')).toBeHidden();
+  await expect(page.locator('.draw-tools [data-draw="nav:undo"]')).toBeVisible();
+});
+
+test("undo and redo buttons: hidden with a fine pointer", async ({ page }) => {
+  await openDrawing(page, "draw 1\nr a 0 0 50 50\n");
+  await expect(page.locator('[data-draw="nav:undo"]')).toBeHidden();
+  await expect(page.locator('[data-draw="nav:redo"]')).toBeHidden();
+});
+
+test.describe("touch", () => {
+  test.use({ hasTouch: true });
+  test("undo and redo buttons show on touch and work", async ({ page }) => {
+    await openDrawing(page, "draw 1\n");
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
+    await page.keyboard.press("r");
+    await drag(page, [0, 0], [100, 60]);
+    expect(await shapes(page)).toHaveLength(1);
+    await page.click('[data-draw="nav:undo"]');
+    expect(await shapes(page)).toHaveLength(0);
+    await page.click('[data-draw="nav:redo"]');
+    expect(await shapes(page)).toHaveLength(1);
+  });
+});
+
+test("inspector: header names the selection, Arrange menu restacks", async ({ page }) => {
+  await openDrawing(page, "draw 1\nr a 0 0 50 50\nr b 20 20 50 50\nr c 40 40 50 50\n");
+  const order = async () => (await shapes(page)).map((s) => s.id).join("");
+  await expect(page.locator(".draw-style")).toBeHidden();
+  await page.keyboard.press("o");
+  await expect(page.locator(".draw-style-head")).toHaveText("Ellipse");
+  await page.keyboard.press("v");
+  await click(page, 5, 5);
+  await expect(page.locator(".draw-style-head")).toHaveText("Rectangle");
+  for (const [act, want] of [["front", "bca"], ["back", "abc"], ["forward", "bac"], ["backward", "abc"]]) {
+    await page.click('.draw-style [data-draw="nav:arrange"]');
+    await expect(page.locator(".draw-arrange")).toBeVisible();
+    await page.click(`.draw-arrange [data-draw="act:${act}"]`);
+    await expect(page.locator(".draw-arrange")).toBeHidden();
+    expect(await order()).toBe(want);
+  }
+  await page.keyboard.press("Control+a");
+  await expect(page.locator(".draw-style-head")).toHaveText("3 shapes");
+  // Escape closes the menu first, keeping the selection
+  await page.click('.draw-style [data-draw="nav:arrange"]');
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".draw-arrange")).toBeHidden();
+  expect(await page.evaluate(() => Draw._state.sel.size)).toBe(3);
+});
+
+test("chrome tooltips use data-tip, not title", async ({ page }) => {
+  await openDrawing(page, "draw 1\nr a 0 0 50 50\n");
+  await click(page, 25, 0);
+  expect(await page.locator("#drawHost [title]").count()).toBe(0);
+  const rect = page.locator('.draw-tools [data-draw="tool:rect"]');
+  await expect(rect).toHaveAttribute("data-tip", "Rectangle");
+  await expect(rect).toHaveAttribute("data-key", "R");
+  await expect(rect).toHaveAttribute("aria-label", "Rectangle");
+  await expect(rect).toHaveText("");
+  await expect(page.locator('[data-draw="nav:reset"]')).toHaveAttribute("data-tip", "Zoom to 100%");
+  await expect(page.locator('.draw-style [data-draw="act:dup"]')).toHaveAttribute("data-tip", "Duplicate");
 });
 
 test("a shared link replacing a drawing shows the new shapes", async ({ page }) => {
@@ -624,9 +686,10 @@ test("a shared link replacing a drawing shows the new shapes", async ({ page }) 
     return shareUrlFor({ name: "pic.draw", content: "draw 1\nr new 0 0 100 50 c=red\n", updatedAt: 1 });
   });
   await page.goto(url.replace(/&ts=\d+/, ""));
-  // The old drawing is on the canvas while the update prompt is open
-  await page.waitForFunction(() => window.Draw?._state.text?.includes("old"));
-  await page.click("#modalConfirm");
+  // The link's version shows under the banner; mine is one click away
+  await page.waitForFunction(() => window.Draw?._state.text?.includes("new"));
+  await page.click('#banner button:has-text("Replace mine")');
+  expect(await page.evaluate(() => state.notes.find((n) => n.name === "pic.draw").content)).toContain("r new");
   const box = await page.locator(".draw-svg rect[stroke]").last().boundingBox();
   const host = await page.locator("#drawHost").boundingBox();
   expect(box.x).toBeGreaterThan(host.x);

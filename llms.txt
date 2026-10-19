@@ -48,7 +48,7 @@ https://note.directory/?view=<view>#name=<filename>&note=<content>&anchor=<headi
 - Everything sensitive lives in the hash, so it is never sent to a server.
 - The whole link must stay under **60,000 characters**. Larger notes can't be shared this way.
 - Older links put `name` and `note` in the query string instead of the hash; read both.
-- Opening a link with `view=zen` shows the note without saving it; other links save it into the reader's local notes (and the address switches to the compressed form).
+- Opening a link shows the note without saving it: `view=zen` read-only, other links under a "Shared with you" banner. It joins the reader's local notes when they save, edit or tick a task (and the address switches to the compressed form).
 
 Decode (Node.js):
 

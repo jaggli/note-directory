@@ -1,10 +1,19 @@
 // Theme before the page is revealed (per browser, synced via Drive settings)
 const THEME_KEY = "notepad_theme";
+const SYSTEM_THEME_KEY = "notepad_theme_system";
 const THEMES = ["mocha", "macchiato", "frappe", "latte", "espresso"];
-try {
-  const t = localStorage.getItem(THEME_KEY);
-  if (THEMES.includes(t)) document.documentElement.dataset.theme = t;
-} catch {}
+const lightQuery = matchMedia("(prefers-color-scheme: light)");
+// Match system: latte by day, the chosen dark theme by night
+function themeToShow() {
+  let t = null;
+  try {
+    t = localStorage.getItem(THEME_KEY);
+    if (localStorage.getItem(SYSTEM_THEME_KEY) === "true")
+      return lightQuery.matches ? "latte" : t && t !== "latte" ? t : "mocha";
+  } catch {}
+  return THEMES.includes(t) ? t : THEMES[0];
+}
+document.documentElement.dataset.theme = themeToShow();
 
 // Clickjacking defense: the page stays hidden (index.html) when framed.
 // Hidden elements can't be clicked, so an overlay attack has nothing to hit.
@@ -301,6 +310,19 @@ const mdTabs = document.getElementById("mdTabs");
 const mdTabEdit = document.getElementById("mdTabEdit");
 const mdTabView = document.getElementById("mdTabView");
 const mdPreview = document.getElementById("mdPreview");
+const mdTabZen = document.getElementById("mdTabZen");
+const crumb = document.getElementById("crumb");
+const crumbBtn = document.getElementById("crumbBtn");
+const crumbName = document.getElementById("crumbName");
+const crumbState = document.getElementById("crumbState");
+const crumbInput = document.getElementById("crumbInput");
+const btnNoteMenu = document.getElementById("btnNoteMenu");
+const banner = document.getElementById("banner");
+const statusbar = document.getElementById("statusbar");
+const statusLang = document.getElementById("statusLang");
+const statusSel = document.getElementById("statusSel");
+const statusHint = document.getElementById("statusHint");
+const vimPill = document.getElementById("vimPill");
 
 // ═══════════════════════════════════════════════════
 //  State & Storage
@@ -310,6 +332,8 @@ const STORAGE_KEY = "notepad_data";
 const SIDEBAR_WIDTH_KEY = "notepad_sidebar_width";
 const WRAP_KEY = "notepad_wrap";
 const VIM_KEY = "notepad_vim";
+const SIDEBAR_HIDDEN_KEY = "notepad_sidebar_hidden";
+const FORMAT_ON_SAVE_KEY = "notepad_format_on_save";
 const SWAP_PREFIX = "notepad_swap_";
 const TAB_LEADER_KEY = "notepad_tab_leader";
 let state = { notes: [], activeId: null, deletedIds: [], deletedAt: {} };
@@ -838,8 +862,13 @@ function deleteSwap(noteId) {
   localStorage.removeItem(swapKey(noteId));
 }
 
+// A note opened from a link stays out of the list until it is saved
+let sharedNote = null;
+
 function getActiveNote() {
-  return state.notes.find((n) => n.id === state.activeId) || null;
+  return (
+    sharedNote || state.notes.find((n) => n.id === state.activeId) || null
+  );
 }
 
 function sortNotes() {
@@ -925,7 +954,6 @@ async function updateUrl() {
   const note = getActiveNote();
   if (!note) {
     history.replaceState(null, "", location.pathname);
-    btnShare.style.display = "";
     return;
   }
   try {
@@ -944,7 +972,7 @@ async function updateUrl() {
     hashMap.set("ts", String(note.updatedAt));
     const full = location.pathname + query + buildHash(hashMap);
     if (full.length > URL_MAX_LENGTH) {
-      // Too long — drop note content from URL, hide share
+      // Too long — drop note content from URL (Share explains why)
       hashMap.delete("note");
       hashMap.delete("ts");
       history.replaceState(
@@ -952,10 +980,8 @@ async function updateUrl() {
         "",
         location.pathname + query + buildHash(hashMap),
       );
-      btnShare.style.display = "none";
     } else {
       history.replaceState({ noteId: note.id, tab: currentTab() }, "", full);
-      btnShare.style.display = "";
     }
   } catch {}
 }
@@ -1018,7 +1044,7 @@ function showModal(text, confirmLabel, cancelLabel, danger) {
     modalCancel.style.display = cancelLabel ? "" : "none";
     modalConfirm.className = danger
       ? "modal-btn modal-btn-danger"
-      : "modal-btn";
+      : "modal-btn primary";
     modalOverlay.classList.add("visible");
 
     let removeTrap;
@@ -1074,9 +1100,9 @@ function showPromptModal(text, defaultValue, confirmLabel) {
     modalText.textContent = text;
     modalInput.style.display = "block";
     modalInput.value = defaultValue || "";
-    modalConfirm.textContent = confirmLabel || "create";
-    modalConfirm.className = "modal-btn";
-    modalCancel.textContent = "cancel";
+    modalConfirm.textContent = confirmLabel || "Create";
+    modalConfirm.className = "modal-btn primary";
+    modalCancel.textContent = "Cancel";
     modalCancel.style.display = "";
     modalOverlay.classList.add("visible");
     modalInput.focus();
@@ -1127,70 +1153,6 @@ function showPromptModal(text, defaultValue, confirmLabel) {
     modalConfirm.addEventListener("click", onConfirm);
     modalCancel.addEventListener("click", onCancel);
     modalOverlay.addEventListener("click", onOverlay);
-  });
-}
-
-function showImportModal(filename) {
-  return queueModal((resolve) => {
-    const previousFocus = document.activeElement;
-    modalText.textContent = '"' + filename + '" already exists.';
-    modalInput.style.display = "none";
-    const actionsDiv = modalOverlay.querySelector(".modal-actions");
-    // Hide (not replace) the shared buttons — modalConfirm/modalCancel
-    // are cached references and must stay attached
-    modalCancel.style.display = "none";
-    modalConfirm.style.display = "none";
-    const btnSkip = document.createElement("button");
-    btnSkip.className = "modal-btn";
-    btnSkip.textContent = "skip";
-    const btnKeep = document.createElement("button");
-    btnKeep.className = "modal-btn";
-    btnKeep.textContent = "keep both";
-    const btnOver = document.createElement("button");
-    btnOver.className = "modal-btn";
-    btnOver.textContent = "override";
-    actionsDiv.append(btnSkip, btnKeep, btnOver);
-    modalOverlay.classList.add("visible");
-
-    let removeTrap;
-    function cleanup() {
-      if (removeTrap) removeTrap();
-      modalOverlay.classList.remove("visible");
-      btnSkip.remove();
-      btnKeep.remove();
-      btnOver.remove();
-      modalConfirm.style.display = "";
-      modalOverlay.removeEventListener("click", onOverlay);
-      if (previousFocus && previousFocus.focus) previousFocus.focus();
-    }
-    function onOverlay(e) {
-      if (e.target === modalOverlay) {
-        cleanup();
-        resolve("skip");
-      }
-    }
-    function onKey(e) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        cleanup();
-        resolve("skip");
-      }
-    }
-    removeTrap = trapFocus(modalOverlay, onKey);
-    btnSkip.addEventListener("click", () => {
-      cleanup();
-      resolve("skip");
-    });
-    btnKeep.addEventListener("click", () => {
-      cleanup();
-      resolve("keep-both");
-    });
-    btnOver.addEventListener("click", () => {
-      cleanup();
-      resolve("override");
-    });
-    modalOverlay.addEventListener("click", onOverlay);
-    btnSkip.focus();
   });
 }
 
@@ -1817,20 +1779,20 @@ function updateStorageUsage() {
   const pct = limit ? Math.min((bytes / limit) * 100, 100) : 0;
   if (bytes < 200 * 1024 || (idb && pct < 50)) {
     storageUsage.innerHTML = "";
-    storageUsage.title = "";
+    storageUsage.removeAttribute("data-tip");
     return;
   }
-  const label =
-    bytes >= 1024 * 1024
-      ? (bytes / (1024 * 1024)).toFixed(1) + "MB"
-      : (bytes / 1024).toFixed(0) + "kB";
   const cls = pct >= 90 ? " critical" : pct >= 70 ? " warn" : "";
-  storageUsage.innerHTML = `<span class="storage-bar"><span class="storage-fill${cls}" style="width:${pct}%"></span></span>${label} (${pct.toFixed(0)}%)`;
-  const of =
-    limit >= 1024 ** 3
-      ? (limit / 1024 ** 3).toFixed(1) + "GB"
-      : (limit / 1024 ** 2).toFixed(0) + "MB";
-  storageUsage.title = `${idb ? "storage" : "localStorage"}: ${label} / ${of}`;
+  const used = sizeLabel(bytes);
+  const of = sizeLabel(limit);
+  storageUsage.innerHTML = `<div><span>Browser storage</span><span>${used} of ${of}</span></div><div class="meter${cls}"><i style="width:${pct}%"></i></div>`;
+  storageUsage.dataset.tip = `${used} of ${of} used by notes in this browser`;
+}
+
+function sizeLabel(bytes) {
+  if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(1) + " GB";
+  if (bytes >= 1024 ** 2) return (bytes / 1024 ** 2).toFixed(1) + " MB";
+  return Math.round(bytes / 1024) + " kB";
 }
 
 /* Selection occurrence markers */
@@ -1967,26 +1929,12 @@ function updateCursorPos() {
   const line = vimLineOf(pos) + 1;
   const col = pos - vimLineStart(line - 1) + 1;
   currentLine = line;
-  if (vimState.enabled) {
-    if (typeof vimCursorMoving === "function") vimCursorMoving();
-    const m = vimState.mode.toUpperCase();
-    const dirty = vimState.bufferDirty
-      ? '<span class="vim-dirty-indicator">[+]</span>'
-      : "";
-    cursorPos.innerHTML =
-      '<span class="vim-mode-' +
-      vimState.mode +
-      '">' +
-      m +
-      "</span>" +
-      dirty +
-      "Ln " +
-      line +
-      ", Col " +
-      col;
-  } else {
-    cursorPos.textContent = "Ln " + line + ", Col " + col;
-  }
+  if (!mdViewActive) cursorPos.textContent = "Ln " + line + ", Col " + col;
+  const selected = Math.abs(editor.selectionEnd - editor.selectionStart);
+  statusSel.textContent = selected ? selected + " selected" : "";
+  if (vimState.enabled && typeof vimCursorMoving === "function")
+    vimCursorMoving();
+  updateVimStatus();
   updateGutterActive();
   if (typeof vimUpdateBlockCursor === "function") vimUpdateBlockCursor();
   scheduleOccurrenceUpdate();
@@ -2055,203 +2003,253 @@ function isMobile() {
   return window.innerWidth <= 900;
 }
 
-function startRename(noteId) {
-  const item = noteList.querySelector(`.note-item[data-id="${noteId}"]`);
-  if (!item) return;
-  const input = item.querySelector(".note-item-input");
-  if (!input) return;
-  input.classList.add("editing");
-  input.focus();
-  const dot = input.value.lastIndexOf(".");
-  if (dot > 0) {
-    input.setSelectionRange(0, dot);
-  } else {
-    input.select();
-  }
+function icon(id, cls = "") {
+  return `<svg class="icon ${cls}"><use href="#i-${id}"/></svg>`;
+}
+
+// Markdown, drawing, code or plain text: icon and colour everywhere a note is listed
+function noteKind(name) {
+  if (isDrawFile(name)) return { cls: "draw", icon: "file-draw" };
+  if (isMarkdownFile(name)) return { cls: "md", icon: "note" };
+  const ext = getExtension(name);
+  if (!ext || ext === "txt" || ext === "text" || ext === "log")
+    return { cls: "", icon: "note" };
+  return { cls: "code", icon: "file-code" };
+}
+
+// "release-notes" with a muted ".md"
+function nameHtml(name) {
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return escapeHtml(name);
+  return (
+    escapeHtml(name.slice(0, dot)) +
+    `<span class="ext">${escapeHtml(name.slice(dot))}</span>`
+  );
+}
+
+function isConflictCopy(name) {
+  return /\(conflict\)\d*(\.[^.]*)?$/.test(name);
+}
+
+// "now", "2m", "3h" — the row's short form; the tooltip has the date
+function shortTime(ts) {
+  const t = relativeTime(ts);
+  return t === "just now" ? "now" : t.replace(" ago", "");
+}
+
+function noteDetail(note) {
+  const when = new Date(note.updatedAt).toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return (
+    "Edited " + when + (note.content ? " · " + formatSize(note.content) : "")
+  );
 }
 
 function renderNoteList() {
   noteList.innerHTML = "";
   sortNotes();
-  for (let ni = 0; ni < state.notes.length; ni++) {
-    const note = state.notes[ni];
-    const div = document.createElement("div");
-    div.className = "note-item" + (note.id === state.activeId ? " active" : "");
-    div.setAttribute("role", "listitem");
-    div.draggable = true;
-    div.dataset.idx = ni;
-    div.dataset.id = note.id;
-
-    // Drag handlers
-    div.addEventListener("dragstart", (e) => {
-      dragSrcIdx = ni;
-      div.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", ni.toString());
-    });
-    div.addEventListener("dragend", () => {
-      div.classList.remove("dragging");
-      dragSrcIdx = null;
-      noteList
-        .querySelectorAll(".drag-over")
-        .forEach((el) => el.classList.remove("drag-over"));
-    });
-    div.addEventListener("dragover", (e) => {
-      if (dragSrcIdx === null) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      noteList
-        .querySelectorAll(".drag-over")
-        .forEach((el) => el.classList.remove("drag-over"));
-      div.classList.add("drag-over");
-    });
-    div.addEventListener("dragleave", () => {
-      div.classList.remove("drag-over");
-    });
-    div.addEventListener("drop", (e) => {
-      e.preventDefault();
-      div.classList.remove("drag-over");
-      const fromIdx = dragSrcIdx;
-      const toIdx = ni;
-      if (fromIdx === null || fromIdx === toIdx) return;
-      const [moved] = state.notes.splice(fromIdx, 1);
-      state.notes.splice(toIdx, 0, moved);
-      saveState();
-      renderNoteList();
-    });
-
-    // Click on row to switch note
-    div.addEventListener("click", (e) => {
-      if (
-        e.target.closest(".btn-pin") ||
-        e.target.closest(".btn-delete") ||
-        e.target.closest(".btn-rename") ||
-        e.target.classList.contains("note-item-input")
-      )
-        return;
-      if (state.activeId !== note.id) {
-        switchNote(note.id);
-      } else if (isMobile()) {
-        sidebar.classList.remove("open");
-        document.querySelector(".app").classList.remove("sidebar-open");
-        editor.focus();
-      } else {
-        startRename(note.id);
-      }
-    });
-
-    // Meta container (name + timestamp)
-    const meta = document.createElement("div");
-    meta.className = "note-item-meta";
-
-    // Hidden input for new-file inline naming
-    const input = document.createElement("input");
-    input.className = "note-item-input";
-    input.name = "filename";
-    input.value = note.name;
-    input.spellcheck = false;
-    input.autocomplete = "off";
-    input.addEventListener("input", () => {
-      note.name = input.value.trim() || "untitled";
-      note.updatedAt = Date.now();
-      scheduleSave();
-      scheduleUrlUpdate();
-      updateHighlight();
-      updateTitle();
-      updateMdTabBar();
-    });
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        input.blur();
-        editor.focus();
-      }
-    });
-    input.addEventListener("blur", () => {
-      input.classList.remove("editing");
-      const name = input.value.trim() || "untitled";
-      if (name === note.name) return renderNoteList();
-      note.name = name;
-      note.updatedAt = Date.now();
-      saveState();
-      scheduleDriveUpload(true);
-      renderNoteList();
-    });
-    meta.appendChild(input);
-
-    // Display name with middle-ellipsis
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "note-item-name";
-    const endLen = 8;
-    const split = Math.max(note.name.length - endLen, 1);
-    const startSpan = document.createElement("span");
-    startSpan.className = "note-item-name-start";
-    startSpan.textContent = note.name.slice(0, split);
-    const endSpan = document.createElement("span");
-    endSpan.className = "note-item-name-end";
-    endSpan.textContent = note.name.slice(split);
-    nameSpan.append(startSpan, endSpan);
-    meta.appendChild(nameSpan);
-
-    // Timestamp
-    const timeEl = document.createElement("div");
-    timeEl.className = "note-item-time";
-    timeEl.textContent = noteMetaText(note);
-    meta.appendChild(timeEl);
-
-    // Pin button
-    const pinBtn = document.createElement("button");
-    pinBtn.className = "btn-pin" + (note.pinned ? " pinned" : "");
-    pinBtn.title = note.pinned ? "Unpin" : "Pin";
-    pinBtn.setAttribute(
-      "aria-label",
-      (note.pinned ? "Unpin " : "Pin ") + note.name,
-    );
-    pinBtn.innerHTML =
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01z"/></svg>';
-    pinBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      note.pinned = !note.pinned;
-      note.updatedAt = Date.now();
-      saveState();
-      renderNoteList();
-    });
-
-    // Rename button (touch devices only via CSS)
-    const renameBtn = document.createElement("button");
-    renameBtn.className = "btn-rename";
-    renameBtn.title = "Rename";
-    renameBtn.setAttribute("aria-label", "Rename " + note.name);
-    renameBtn.innerHTML = "&#9998;";
-    renameBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      startRename(note.id);
-    });
-
-    // Delete button
-    const btn = document.createElement("button");
-    btn.className = "btn-delete";
-    btn.title = "Delete";
-    btn.setAttribute("aria-label", "Delete " + note.name);
-    btn.innerHTML = "&times;";
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      confirmDelete(note.id);
-    });
-
-    div.appendChild(pinBtn);
-    div.appendChild(meta);
-    div.appendChild(renameBtn);
-    div.appendChild(btn);
-    noteList.appendChild(div);
-  }
+  const anyPinned = state.notes.some((n) => n.pinned);
+  state.notes.forEach((note, ni) => {
+    const prev = state.notes[ni - 1];
+    if (anyPinned && (!prev || (prev.pinned && !note.pinned))) {
+      const label = document.createElement("div");
+      label.className = "list-label";
+      label.textContent = note.pinned ? "Pinned" : "Notes";
+      noteList.appendChild(label);
+    }
+    noteList.appendChild(noteRow(note, ni));
+  });
 }
 
-function noteMetaText(note) {
-  return (
-    relativeTime(note.updatedAt) +
-    (note.content ? ", " + formatSize(note.content) : "")
+function noteRow(note, ni) {
+  const div = document.createElement("div");
+  div.className = "note-item" + (note.id === state.activeId ? " active" : "");
+  div.setAttribute("role", "listitem");
+  div.draggable = true;
+  div.dataset.idx = ni;
+  div.dataset.id = note.id;
+  const kind = noteKind(note.name);
+  const pin = note.pinned ? "Unpin" : "Pin";
+  div.innerHTML =
+    icon(kind.icon, "kind " + kind.cls) +
+    `<span class="note-item-name">${nameHtml(note.name)}</span>` +
+    (isConflictCopy(note.name)
+      ? '<span class="badge" data-tip="Edited on two devices" data-sub="This copy holds the other version">Conflict</span>'
+      : "") +
+    (note.pinned ? icon("pin-on", "sm row-pin") : "") +
+    `<span class="note-item-time">${shortTime(note.updatedAt)}</span>` +
+    `<span class="note-item-acts">` +
+    `<button class="btn ghost sm square btn-pin${note.pinned ? " pinned" : ""}" data-tip="${pin}" aria-label="${pin} ${escapeHtml(note.name)}">${icon(note.pinned ? "pin-on" : "pin", "sm")}</button>` +
+    `<button class="btn ghost sm square btn-more" data-tip="More actions" aria-label="More actions for ${escapeHtml(note.name)}">${icon("more", "sm")}</button>` +
+    `</span>`;
+  div.querySelector(".note-item-time").dataset.tip = noteDetail(note);
+
+  div.addEventListener("dragstart", (e) => {
+    dragSrcIdx = ni;
+    div.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", ni.toString());
+  });
+  div.addEventListener("dragend", () => {
+    div.classList.remove("dragging");
+    dragSrcIdx = null;
+    noteList
+      .querySelectorAll(".drag-over")
+      .forEach((el) => el.classList.remove("drag-over"));
+  });
+  div.addEventListener("dragover", (e) => {
+    if (dragSrcIdx === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    noteList
+      .querySelectorAll(".drag-over")
+      .forEach((el) => el.classList.remove("drag-over"));
+    div.classList.add("drag-over");
+  });
+  div.addEventListener("dragleave", () => div.classList.remove("drag-over"));
+  div.addEventListener("drop", (e) => {
+    e.preventDefault();
+    div.classList.remove("drag-over");
+    const fromIdx = dragSrcIdx;
+    if (fromIdx === null || fromIdx === ni) return;
+    const [moved] = state.notes.splice(fromIdx, 1);
+    state.notes.splice(ni, 0, moved);
+    saveState();
+    renderNoteList();
+  });
+
+  div.addEventListener("click", (e) => {
+    if (longPressed) return (longPressed = false);
+    if (e.target.closest(".btn-pin")) return togglePin(note.id);
+    if (e.target.closest(".btn-more"))
+      return openNoteMenu(note, e.target.closest(".btn-more"));
+    if (e.target.closest(".note-item-input")) return;
+    if (state.activeId !== note.id || sharedNote) switchNote(note.id);
+    else if (isMobile()) closeSidebar();
+  });
+  div.addEventListener("dblclick", (e) => {
+    if (!isMobile() && !e.target.closest("button, input")) startRename(note.id);
+  });
+  div.addEventListener("contextmenu", (e) => {
+    if (e.target.closest("input")) return;
+    e.preventDefault();
+    openNoteMenu(note, null, { x: e.clientX, y: e.clientY });
+  });
+  onLongPress(div, () => openNoteMenu(note, div));
+  return div;
+}
+
+// Touch: hold a row for its actions (the click that follows is swallowed)
+let longPressed = false;
+function onLongPress(el, fn) {
+  let timer = null;
+  const cancel = () => clearTimeout(timer);
+  el.addEventListener(
+    "touchstart",
+    () => {
+      longPressed = false;
+      timer = setTimeout(() => {
+        longPressed = true;
+        fn();
+      }, 500);
+    },
+    { passive: true },
   );
+  el.addEventListener("touchmove", cancel, { passive: true });
+  el.addEventListener("touchend", cancel);
+  el.addEventListener("touchcancel", cancel);
+}
+
+// Rename in place. Enter or Tab commits, Esc cancels, a taken name is refused.
+// Returns an error message, or null once renamed (or unchanged)
+function renameNote(note, raw) {
+  const name = raw.trim();
+  if (!name || name === note.name) return null;
+  if (state.notes.some((n) => n !== note && n.name === name))
+    return "A note called " + name + " exists";
+  note.name = name;
+  note.updatedAt = Date.now();
+  saveState();
+  scheduleDriveUpload(true);
+  scheduleUrlUpdate();
+  updateHighlight();
+  updateTitle();
+  updateMdTabBar();
+  return null;
+}
+
+function editName(input, note, done) {
+  input.value = note.name;
+  input.classList.remove("error");
+  input.focus();
+  const dot = note.name.lastIndexOf(".");
+  input.setSelectionRange(0, dot > 0 ? dot : note.name.length);
+  let finished = false;
+  const finish = (commit) => {
+    if (finished) return true;
+    if (commit) {
+      const err = renameNote(note, input.value);
+      if (err) {
+        input.classList.add("error");
+        showTip(input, err);
+        return false;
+      }
+    }
+    finished = true;
+    hideTip();
+    done();
+    return true;
+  };
+  input.onkeydown = (e) => {
+    if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
+      e.preventDefault();
+      if (finish(true)) editor.focus();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      finish(false);
+      editor.focus();
+    }
+  };
+  input.oninput = () => {
+    input.classList.remove("error");
+    hideTip();
+  };
+  // Leaving with a taken name keeps the old one
+  input.onblur = () => finish(true) || finish(false);
+}
+
+// In the list (double-click, row menu)
+function startRename(noteId) {
+  const note = state.notes.find((n) => n.id === noteId);
+  const item = noteList.querySelector(`.note-item[data-id="${noteId}"]`);
+  if (!note || !item) return;
+  const input = document.createElement("input");
+  input.className = "note-item-input";
+  input.spellcheck = false;
+  input.autocomplete = "off";
+  input.setAttribute("aria-label", "Note name");
+  item.querySelector(".note-item-name").replaceWith(input);
+  item.draggable = false;
+  editName(input, note, renderNoteList);
+}
+
+// In the title bar (F2, click the name, a new note)
+function renameInTitle() {
+  const note = getActiveNote();
+  if (!note || sharedNote) return;
+  crumbBtn.hidden = true;
+  crumbInput.hidden = false;
+  editName(crumbInput, note, () => {
+    crumbInput.hidden = true;
+    crumbBtn.hidden = false;
+    renderNoteList();
+    updateTitleBar();
+  });
 }
 
 // Refresh timestamps periodically
@@ -2262,8 +2260,12 @@ function startTimestampRefresh() {
     for (const item of noteList.querySelectorAll(".note-item")) {
       const note = state.notes.find((n) => n.id === item.dataset.id);
       const el = item.querySelector(".note-item-time");
-      if (note && el) el.textContent = noteMetaText(note);
+      if (note && el) {
+        el.textContent = shortTime(note.updatedAt);
+        el.dataset.tip = noteDetail(note);
+      }
     }
+    updateSyncLine();
   }, 30000);
 }
 
@@ -2284,11 +2286,16 @@ function render() {
   updateTitle();
   updateStorageUsage();
   updateMdTabBar();
+  updateBanner();
+  updateStatusBar();
   // Drawings open on the canvas; an open canvas follows outside changes
   const note = getActiveNote();
   if ((note?.id ?? null) !== lastRenderedId) {
     lastRenderedId = note?.id ?? null;
     if (note && isDrawFile(note.name) && !zenModeActive) switchMdTab("view");
+    // Another note under an open preview (delete, undo, import): show it
+    else if (mdViewActive && !zenModeActive)
+      switchMdTab(note && hasViewTab(note.name) ? "view" : "edit");
   } else if (drawActive()) {
     window.Draw?.update(note.content);
   }
@@ -2355,7 +2362,7 @@ function showDraw(note, readonly) {
         key: note.id || "zen:" + note.name,
         content: note.content,
         readonly,
-        onCommit: (content) => drawCommit(note.id, content),
+        onCommit: (content) => drawCommit(note, content),
         onUndo: undo,
         onRedo: redo,
         onSource: (line) => {
@@ -2368,7 +2375,9 @@ function showDraw(note, readonly) {
         },
       });
     })
-    .catch(() => showMdToast("could not load the drawing editor"));
+    .catch(() =>
+      showToast("Couldn't load the drawing editor", { error: true }),
+    );
 }
 
 function hideDraw() {
@@ -2378,8 +2387,13 @@ function hideDraw() {
 }
 
 // A finished canvas gesture: one undo step, then the usual save path
-function drawCommit(id, content) {
-  const note = state.notes.find((n) => n.id === id);
+// `target` is the note object, so a shared drawing saved by its first
+// stroke keeps receiving the strokes after it
+function drawCommit(target, content) {
+  if (target === sharedNote) saveShared(true);
+  const note = state.notes.includes(target)
+    ? target
+    : state.notes.find((n) => n.id === target.id);
   if (!note || note.content === content) return;
   pushHistory(note.id, note.content);
   note.content = content;
@@ -3245,12 +3259,15 @@ function updateMdTabBar() {
   const isMd = note && hasViewTab(note.name);
   const isDraw = isDrawFile(note?.name);
   const zenEphemeral = zenModeActive && zenFromUrl && zenEphemeralNote;
-  mdTabs.classList.toggle("visible", isMd || zenEphemeral);
-  // Drawings reach their source from the file menu
-  mdTabEdit.style.display = isDraw ? "none" : "";
-  mdTabView.textContent = isDraw ? "draw" : "view";
-  fileMenu.classList.toggle("is-draw", isDraw);
-  fileMenu.classList.toggle("is-md", isMarkdownFile(note?.name));
+  mdTabs.classList.toggle("visible", !!(isMd || zenEphemeral));
+  mdTabZen.classList.toggle("visible", !!isMd);
+  // Drawings: Canvas | Source
+  mdTabs.classList.toggle("is-draw", isDraw);
+  mdTabEdit.lastChild.textContent = isDraw ? "Source" : "Edit";
+  mdTabView.lastChild.textContent = isDraw ? "Canvas" : "Preview";
+  mdTabView
+    .querySelector("use")
+    .setAttribute("href", isDraw ? "#i-file-draw" : "#i-eye");
   if (!isMd && !zenEphemeral && mdViewActive) {
     switchMdTab("edit");
   } else if (
@@ -3262,6 +3279,7 @@ function updateMdTabBar() {
     switchMdTab("view");
   }
   mdTabsKind = isDraw ? "draw" : "md";
+  updateTitleBar();
 }
 
 function currentTab() {
@@ -3285,18 +3303,12 @@ function switchMdTab(tab, pushHistory) {
   }
   zenModeActive = tab === "zen";
   mdViewActive = tab === "view" || tab === "zen";
-  mdTabEdit.classList.toggle("active", tab === "edit");
-  mdTabView.classList.toggle("active", tab === "view");
-  document.getElementById("mdTabZen").classList.toggle("active", tab === "zen");
   mdTabEdit.setAttribute("aria-selected", tab === "edit");
-  mdTabView.setAttribute("aria-selected", tab === "view");
-  document
-    .getElementById("mdTabZen")
-    .setAttribute("aria-selected", tab === "zen");
+  mdTabView.setAttribute("aria-selected", tab !== "edit");
+  closeFindReplace(false);
 
   const appEl = document.querySelector(".app");
   const zenBar = document.getElementById("zenBar");
-  const btnReplace = document.getElementById("btnReplace");
 
   // Task checkbox handler shared by view and zen
   function attachCheckboxHandler() {
@@ -3313,6 +3325,8 @@ function switchMdTab(tab, pushHistory) {
       if (zenModeActive && zenFromUrl && zenEphemeralNote) {
         persistZenNote();
       }
+      // Ticking a task in a shared note keeps it
+      if (sharedNote) saveShared(true);
 
       const note = getActiveNote();
       if (!note) return;
@@ -3421,27 +3435,19 @@ function switchMdTab(tab, pushHistory) {
       (zenFromUrl && zenEphemeralNote
         ? zenEphemeralNote.name
         : getActiveNote()?.name) || "untitled";
-    const zenEl = document.getElementById("zenBarFilename");
-    const zenEndLen = 8;
-    const zenSplit = Math.max(zenName.length - zenEndLen, 1);
-    zenEl.querySelector(".zen-bar-filename-start").textContent = zenName.slice(
-      0,
-      zenSplit,
-    );
-    zenEl.querySelector(".zen-bar-filename-end").textContent =
-      zenName.slice(zenSplit);
+    document.getElementById("zenBarFilename").innerHTML = nameHtml(zenName);
     zenBar.style.display = "";
     document.getElementById("zenActions").style.display = "";
+    document.getElementById("zenSave").hidden = !(
+      zenFromUrl && zenEphemeralNote
+    );
+    wakeZenBar();
   } else if (tab === "view" && showsDrawing) {
     gutter.style.display = "none";
     editorArea.style.display = "none";
     emptyState.style.display = "none";
     mdPreview.classList.remove("visible");
     mdPreview.innerHTML = "";
-    btnReplace.style.display = "none";
-    btnWrap.style.display = "none";
-    cursorPos.style.display = "none";
-    btnVim.style.display = "none";
     appEl.classList.remove("zen-mode");
     zenBar.style.display = "none";
     document.getElementById("zenActions").style.display = "none";
@@ -3464,10 +3470,6 @@ function switchMdTab(tab, pushHistory) {
     editorArea.style.display = "none";
     emptyState.style.display = "none";
     mdPreview.classList.add("visible");
-    btnReplace.style.display = "none";
-    btnWrap.style.display = "none";
-    cursorPos.style.display = "none";
-    btnVim.style.display = "none";
     appEl.classList.remove("zen-mode");
     zenBar.style.display = "none";
     document.getElementById("zenActions").style.display = "none";
@@ -3493,10 +3495,6 @@ function switchMdTab(tab, pushHistory) {
     editorArea.style.display = "";
     mdPreview.classList.remove("visible");
     mdPreview.innerHTML = "";
-    btnReplace.style.display = "";
-    btnWrap.style.display = "";
-    cursorPos.style.display = "";
-    btnVim.style.display = "";
     appEl.classList.remove("zen-mode");
     zenBar.style.display = "none";
     document.getElementById("zenActions").style.display = "none";
@@ -3538,6 +3536,8 @@ function switchMdTab(tab, pushHistory) {
     updateCursorPos();
     updateLineNumbers();
   }
+  updateStatusBar();
+  updateTitleBar();
   updateMdViewUrl();
 }
 
@@ -3578,29 +3578,165 @@ function persistZenNote() {
   return getActiveNote();
 }
 
+// Leaving a zen link shows the note under the shared banner, not saved
 function exitZenMode() {
-  persistZenNote();
-  // Drawings go back to the canvas, markdown to the editor
-  switchMdTab(isDrawFile(getActiveNote()?.name) ? "view" : "edit", true);
+  if (zenFromUrl && zenEphemeralNote) {
+    const { name, content } = zenEphemeralNote;
+    zenFromUrl = false;
+    zenEphemeralNote = null;
+    const existing = state.notes.find((n) => n.name === name);
+    if (existing && existing.content === content) state.activeId = existing.id;
+    else openShared(name, content, Date.now(), existing);
+  }
+  const note = getActiveNote();
+  const toView = note && hasViewTab(note.name) && (sharedNote || isDrawFile(note.name));
+  switchMdTab(toView ? "view" : "edit", true);
   render();
   updateUrl();
 }
 
-async function zenShare() {
-  try {
-    const note =
-      zenFromUrl && zenEphemeralNote ? zenEphemeralNote : getActiveNote();
-    if (!note) return;
-    const shareUrl = await shareUrlFor(note);
-    if (!shareUrl)
-      return showModal("Note is too large to share via URL.", "ok", null);
-    await navigator.clipboard.writeText(shareUrl);
-    const label = document.getElementById("zenCopied");
-    label.classList.add("visible");
-    setTimeout(() => label.classList.remove("visible"), 2000);
-  } catch (err) {
-    console.error("Share failed:", err);
+function zenSave() {
+  persistZenNote();
+  document.getElementById("zenSave").hidden = true;
+  showToast("Saved to your notes", { ic: "check" });
+  renderNoteList();
+}
+
+// ── Shared links ───────────────────────────────────
+
+function openShared(name, content, ts, existing) {
+  sharedNote = {
+    id: "shared",
+    name,
+    content,
+    updatedAt: ts || Date.now(),
+    clashId: existing?.id ?? null,
+  };
+}
+
+function sharedClash() {
+  return !!sharedNote?.clashId;
+}
+
+// Markdown and drawings from a link open for reading
+function showSharedView() {
+  if (sharedNote && hasViewTab(sharedNote.name) && !mdViewActive)
+    switchMdTab("view");
+}
+
+// Save to my notes, Keep both, or the first edit: it becomes a real note
+function saveShared(fromEdit = false) {
+  const n = sharedNote;
+  if (!n) return;
+  sharedNote = null;
+  if (n.clashId || state.notes.some((x) => x.name === n.name))
+    n.name = uniqueName(n.name);
+  delete n.clashId;
+  n.id = crypto.randomUUID();
+  n.updatedAt = Date.now();
+  state.notes.unshift(n);
+  state.activeId = n.id;
+  saveState();
+  scheduleDriveUpload(true);
+  if (fromEdit) {
+    renderNoteList();
+    updateBanner();
+    updateTitleBar();
+  } else render();
+  updateUrl();
+  showToast("Saved to your notes as " + n.name, { ic: "check" });
+}
+
+function dismissShared(rerender = true) {
+  const clashId = sharedNote?.clashId;
+  sharedNote = null;
+  if (clashId && rerender) state.activeId = clashId;
+  if (!rerender) return;
+  render();
+  updateUrl();
+}
+
+// The copy's text goes into the original (⌘Z there brings it back), the copy goes
+function useConflictCopy(copy, original) {
+  pushHistory(original.id, original.content);
+  original.content = copy.content;
+  original.updatedAt = Date.now();
+  deleteNote(copy.id);
+  state.activeId = original.id;
+  saveState();
+  render();
+  updateUrl();
+}
+
+function replaceWithShared() {
+  const n = sharedNote;
+  const mine = n && state.notes.find((x) => x.id === n.clashId);
+  if (!mine) return;
+  sharedNote = null;
+  pushHistory(mine.id, mine.content);
+  mine.content = n.content;
+  mine.updatedAt = Date.now();
+  state.activeId = mine.id;
+  saveState();
+  scheduleDriveUpload(true);
+  render();
+  updateUrl();
+  showToast("Replaced your " + mine.name, { action: "Undo", onAction: undo });
+}
+
+// The original a "name (conflict).md" copy belongs to
+function conflictOriginal(copy) {
+  const name = copy.name.replace(/ \(conflict\)\d*(?=(\.[^.]*)?$)/, "");
+  return state.notes.find((n) => n.name === name && n !== copy) || null;
+}
+
+function updateBanner() {
+  const n = sharedNote;
+  const active = getActiveNote();
+  if (!n && active && isConflictCopy(active.name)) {
+    const original = conflictOriginal(active);
+    return setBanner(
+      "warning",
+      "conflict",
+      `<b>Edited on two devices</b> <span class="sub">· this is the other version${original ? " of " + escapeHtml(original.name) : ""}</span>`,
+      original
+        ? [
+            ["Open " + original.name, () => switchNote(original.id), "ghost"],
+            ["Use this one", () => useConflictCopy(active, original)],
+            ["Delete this copy", () => deleteNote(active.id)],
+          ]
+        : [["Delete this copy", () => deleteNote(active.id)]],
+    );
   }
+  if (!n) return setBanner(null);
+  const name = escapeHtml(n.name);
+  if (n.clashId)
+    setBanner(
+      "warning",
+      "alert",
+      `<b>You have a different ${name}</b> <span class="sub">· this is the version from the link</span>`,
+      [
+        ["Show mine", () => dismissShared(), "ghost"],
+        ["Keep both", () => saveShared()],
+        ["Replace mine", replaceWithShared],
+      ],
+    );
+  else
+    setBanner(
+      "info",
+      "link",
+      `<b>Shared with you</b> <span class="sub">· not in your notes yet</span>`,
+      [
+        ["Dismiss", () => dismissShared(), "ghost"],
+        ["Save to my notes", () => saveShared(), "primary"],
+      ],
+    );
+}
+
+// Zen shares what it shows: the shared note itself when opened from a link
+function zenShare() {
+  if (zenFromUrl && zenEphemeralNote) return copyLink(zenEphemeralNote);
+  openShare(actionEl);
 }
 
 function updateMdViewUrl() {
@@ -3668,15 +3804,7 @@ function navigateToNote(id, viewMd, skipUrlUpdate) {
   syncOccurrenceScroll();
 }
 
-// Toast helper for markdown preview
 const mdToast = document.getElementById("mdToast");
-let mdToastTimer = null;
-function showMdToast(msg) {
-  mdToast.textContent = msg;
-  mdToast.classList.add("visible");
-  clearTimeout(mdToastTimer);
-  mdToastTimer = setTimeout(() => mdToast.classList.remove("visible"), 2000);
-}
 
 // Heading anchor click handler
 mdPreview.addEventListener("click", (e) => {
@@ -3697,7 +3825,12 @@ mdPreview.addEventListener("click", (e) => {
   const fullUrl =
     location.origin + location.pathname + location.search + newHash;
   navigator.clipboard.writeText(fullUrl).then(() => {
-    showMdToast("copied to clipboard");
+    const title = [...(heading?.childNodes || [])]
+      .filter((n) => n !== anchor)
+      .map((n) => n.textContent)
+      .join("")
+      .trim();
+    showToast("Link to “" + (title || "heading") + "” copied", { ic: "check" });
   });
 });
 
@@ -3712,7 +3845,7 @@ mdPreview.addEventListener("click", (e) => {
     ? Array.from(cts, (c) => c.textContent).join("\n")
     : pre.querySelector("code")?.textContent || "";
   navigator.clipboard.writeText(text).then(() => {
-    showMdToast("copied to clipboard");
+    showToast("Code copied", { ic: "check" });
     btn.textContent = "copied";
     setTimeout(() => {
       btn.textContent = "copy";
@@ -3836,6 +3969,7 @@ window.addEventListener("popstate", async (e) => {
     if (loaded) {
       render();
       checkMdViewParam();
+      showSharedView();
     }
   }
 });
@@ -3862,19 +3996,13 @@ function uniqueName(name) {
 }
 
 async function createNote(name, content, focusName, ext) {
-  if (!name && isMobile()) {
-    const result = await showPromptModal("Filename:", nextNoteName(ext));
-    if (!result) return null;
-    name = result;
-  }
+  sharedNote = null;
   const contentStr = content || "";
   const estimatedBytes = (name || "").length * 2 + contentStr.length * 2 + 200;
   if (wouldExceedStorage(estimatedBytes)) {
-    showModal(
-      "Not enough storage space. Delete some notes to free up space.",
-      "ok",
-      null,
-    );
+    showToast("Not enough storage space — delete or export some notes", {
+      error: true,
+    });
     return null;
   }
   const note = {
@@ -3893,54 +4021,55 @@ async function createNote(name, content, focusName, ext) {
   if (mdViewActive) switchMdTab("edit");
   render();
   updateUrl();
-  if (focusName && !isMobile()) {
-    const input = noteList.querySelector(".note-item.active .note-item-input");
-    if (input) {
-      input.classList.add("editing");
-      input.focus();
-      const dot = input.value.lastIndexOf(".");
-      if (dot > 0) {
-        input.setSelectionRange(0, dot);
-      } else {
-        input.select();
-      }
-    }
-  } else {
-    editor.focus();
-  }
+  closeSidebar();
+  // Its name first: Enter or Tab drops into the text, Esc keeps the default
+  if (focusName) renameInTitle();
+  else editor.focus();
   return note;
 }
 
-async function confirmDelete(id) {
-  const note = state.notes.find((n) => n.id === id);
-  if (!note) return;
-  if (note.content) {
-    const confirmed = await showModal(
-      `Delete "${note.name}"?`,
-      "delete",
-      "cancel",
-      true,
-    );
-    if (!confirmed) return;
-  }
+// Immediate everywhere, undoable from the toast (or ⌘Z while it shows)
+function deleteNote(id) {
   const idx = state.notes.findIndex((n) => n.id === id);
   if (idx === -1) return;
+  const note = state.notes[idx];
+  const wasActive = state.activeId === id;
+  if (wasActive && vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
+  const undoStack = histories[id];
   deleteSwap(id);
   delete histories[id];
   state.deletedIds.push(id);
   state.deletedAt[id] = Date.now();
   state.notes.splice(idx, 1);
-  if (state.activeId === id) {
-    state.activeId = state.notes.length ? state.notes[0].id : null;
+  if (wasActive) {
+    state.activeId = state.notes.length
+      ? state.notes[Math.min(idx, state.notes.length - 1)].id
+      : null;
     vimState.bufferDirty = false;
   }
   saveState();
   scheduleDriveUpload(true);
   render();
   updateUrl();
+  showToast("Deleted " + note.name, {
+    action: "Undo",
+    undo: true,
+    // Back under a new id: other tabs and Drive already hold the tombstone
+    onAction: () => {
+      const back = { ...note, id: crypto.randomUUID() };
+      if (undoStack) histories[back.id] = undoStack;
+      state.notes.splice(Math.min(idx, state.notes.length), 0, back);
+      if (wasActive) state.activeId = back.id;
+      saveState();
+      scheduleDriveUpload(true);
+      render();
+      updateUrl();
+    },
+  });
 }
 
 function switchNote(id) {
+  if (sharedNote) dismissShared(false);
   if (vimState.enabled && vimState.bufferDirty) {
     vimWriteBuffer();
   }
@@ -3969,8 +4098,7 @@ function switchNote(id) {
   saveState();
   render();
   updateUrl();
-  sidebar.classList.remove("open");
-  document.querySelector(".app").classList.remove("sidebar-open");
+  closeSidebar();
   // Scroll cursor into view (renderEditor restored cursorPos)
   editor.focus();
   requestAnimationFrame(() => {
@@ -4002,6 +4130,15 @@ document
   .addEventListener("mousedown", (e) => e.preventDefault());
 
 function toggleSidebar() {
+  // Desktop: the sidebar folds away and the title bar gets a button back
+  if (!isMobile()) {
+    const hidden = document
+      .querySelector(".app")
+      .classList.toggle("sidebar-hidden");
+    localStorage.setItem(SIDEBAR_HIDDEN_KEY, hidden);
+    if (hidden) editor.focus();
+    return;
+  }
   const open = sidebar.classList.toggle("open");
   document.querySelector(".app").classList.toggle("sidebar-open", open);
   // On mobile the list covers the editor: close the keyboard so nothing is
@@ -4015,6 +4152,7 @@ function togglePin(id) {
   const note = state.notes.find((n) => n.id === id);
   if (!note) return;
   note.pinned = !note.pinned;
+  note.updatedAt = Date.now();
   saveState();
   renderNoteList();
 }
@@ -4031,37 +4169,39 @@ let searchDebounce = null;
 let searchPreviousFocus = null;
 let searchRemoveTrap = null;
 
-// Two scopes: "note" (Ctrl+F, one row per matching line) and "all" (Ctrl+P)
+// The palette (⌘P): notes by name and lines in every note; Tab narrows it to
+// lines in this note; a leading ">" lists commands instead
 let searchScope = "all";
-const searchAll = document.getElementById("searchAll");
+const searchScopeEl = document.getElementById("searchScope");
 const NOTE_RESULTS_MAX = 200;
 
 function setSearchScope(scope) {
   searchScope = scope === "note" && getActiveNote() ? "note" : "all";
-  searchAll.checked = searchScope === "all";
-  searchInput.placeholder =
-    searchScope === "all" ? "search all notes..." : "search this note...";
-  searchInput.setAttribute("aria-label", searchInput.placeholder.slice(0, -3));
-  if (searchInput.value.trim()) searchNotes(searchInput.value);
+  const note = searchScope === "note" ? getActiveNote() : null;
+  searchScopeEl.hidden = !note;
+  if (note)
+    searchScopeEl.innerHTML =
+      icon(noteKind(note.name).icon, "sm") + nameHtml(note.name);
+  searchInput.placeholder = note
+    ? "Search this note"
+    : "Search notes, or > for commands";
+  searchInput.setAttribute("aria-label", searchInput.placeholder);
+  document.getElementById("searchHint").textContent = note
+    ? "Tab: all notes"
+    : "Tab: this note";
+  searchNotes(searchInput.value);
 }
 
-searchAll.addEventListener("change", () => {
-  setSearchScope(searchAll.checked ? "all" : "note");
-  searchInput.focus();
-});
-// Keep focus in the input while clicking the toggle
-searchAll.parentElement.addEventListener("mousedown", (e) =>
-  e.preventDefault(),
-);
-
-function openSearch(scope = "all") {
-  searchPreviousFocus = document.activeElement;
-  setSearchScope(scope);
+function openSearch(scope = "all", initial = "") {
+  if (!searchResults.classList.contains("visible"))
+    searchPreviousFocus = document.activeElement;
+  closeAllMenus();
+  closeSidebar();
   searchResults.classList.add("visible");
   searchBackdrop.classList.add("visible");
-  searchInput.value = "";
-  searchCount.textContent = "";
-  searchResultsList.innerHTML = "";
+  searchInput.value = typeof initial === "string" ? initial : "";
+  lastSearchKey = null;
+  setSearchScope(scope);
   searchInput.focus();
   if (searchRemoveTrap) searchRemoveTrap();
   searchRemoveTrap = trapFocus(searchResults);
@@ -4140,11 +4280,20 @@ function highlightFuzzy(text, indices) {
   return result;
 }
 
+// The same query in the same scope keeps the list (and the selection)
+let lastSearchKey = null;
+
 function searchNotes(query) {
+  const key = searchScope + "\n" + query;
+  if (key === lastSearchKey) return;
+  lastSearchKey = key;
+  if (searchScope === "all" && query.trimStart().startsWith(">"))
+    return showCommands(query.trimStart().slice(1).trim());
   if (!query.trim()) {
     searchCount.textContent = "";
     searchResultsList.innerHTML = "";
     searchSelectedIdx = -1;
+    if (searchScope === "all") showRecent();
     return;
   }
   if (searchScope === "note") return searchActiveNote(query);
@@ -4232,7 +4381,6 @@ function searchActiveNote(query) {
 function searchSnippet(lm) {
   const snippetDiv = document.createElement("div");
   snippetDiv.className = "search-result-snippet";
-  const prefix = lm.lineNum + ": ";
   const maxLen = 120;
   let snippetText = lm.line;
   let indices = lm.lineIndices;
@@ -4247,18 +4395,16 @@ function searchSnippet(lm) {
     }
     let end = Math.min(snippetText.length, start + maxLen);
     snippetText =
-      (start > 0 ? "\u2026" : "") +
+      (start > 0 ? "…" : "") +
       snippetText.slice(start, end) +
-      (end < lm.line.length ? "\u2026" : "");
+      (end < lm.line.length ? "…" : "");
     // Shift indices to match the sliced text
     indices = indices
       .map((i) => i - start + (start > 0 ? 1 : 0))
       .filter((i) => i >= 0 && i < snippetText.length);
   }
   snippetDiv.innerHTML =
-    '<span style="color:var(--gutter)">' +
-    escapeHtml(prefix) +
-    "</span>" +
+    `<span class="ln">${lm.lineNum}</span>` +
     highlightFuzzy(snippetText, indices);
   return snippetDiv;
 }
@@ -4277,6 +4423,48 @@ function adoptSearchQuery(query) {
   updateCursorPos();
 }
 
+function searchGroup(label) {
+  const div = document.createElement("div");
+  div.className = "search-group";
+  div.textContent = label;
+  searchResultsList.appendChild(div);
+}
+
+function searchRow(cls, html, onPick) {
+  const div = document.createElement("div");
+  div.className = "search-result-item" + (cls ? " " + cls : "");
+  div.innerHTML = html;
+  div.addEventListener("click", onPick);
+  searchResultsList.appendChild(div);
+  return div;
+}
+
+function noSearchResults(query) {
+  const div = document.createElement("div");
+  div.className = "search-no-results";
+  div.innerHTML = `<span></span>`;
+  div.firstChild.textContent =
+    searchScope === "note" ? "No matches" : `No notes match “${query.trim()}”`;
+  if (searchScope === "all") {
+    const name = query.trim().replace(/[\\/:*?"<>|]/g, "");
+    const b = document.createElement("button");
+    b.className = "btn";
+    b.innerHTML = icon("plus", "sm") + "<span></span>";
+    b.lastChild.textContent = `New note “${name}.md”`;
+    b.addEventListener("click", () => {
+      closeSearch();
+      searchInput.value = "";
+      createNote(uniqueOrSame(name + ".md"));
+    });
+    div.appendChild(b);
+  }
+  searchResultsList.appendChild(div);
+}
+
+function uniqueOrSame(name) {
+  return state.notes.some((n) => n.name === name) ? uniqueName(name) : name;
+}
+
 function showNoteResults(note, hits) {
   searchCount.textContent =
     hits.length +
@@ -4285,17 +4473,9 @@ function showNoteResults(note, hits) {
     (hits.length !== 1 ? "s" : "");
   searchResultsList.innerHTML = "";
   searchSelectedIdx = -1;
-  if (!hits.length) {
-    searchResultsList.innerHTML =
-      '<div class="search-no-results">no matches</div>';
-    return;
-  }
-  hits.forEach((hit, i) => {
-    const div = document.createElement("div");
-    div.className = "search-result-item search-result-line";
-    div.dataset.idx = i;
-    div.appendChild(searchSnippet(hit));
-    div.addEventListener("click", () => {
+  if (!hits.length) return noSearchResults(searchInput.value);
+  hits.forEach((hit) => {
+    const div = searchRow("search-result-line", "", () => {
       const query = searchInput.value.trim();
       closeSearch();
       searchInput.value = "";
@@ -4310,55 +4490,155 @@ function showNoteResults(note, hits) {
       adoptSearchQuery(query);
       ensureCursorScrolloff();
     });
-    searchResultsList.appendChild(div);
+    div.appendChild(searchSnippet(hit));
   });
   searchSelectedIdx = 0;
   updateSearchSelection();
 }
 
+function openSearchResult(note, target, query) {
+  // Auto-save dirty vim buffer before switching
+  if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
+  closeSearch();
+  switchNote(note.id);
+  searchInput.value = "";
+  editor.focus();
+  if (target && target.charOffset > 0)
+    editor.setSelectionRange(target.charOffset, target.charOffset);
+  // Populate find state like vim / search so n/N work
+  adoptSearchQuery(query);
+}
+
+function noteResultHead(note, nameIndices, aside) {
+  const kind = noteKind(note.name);
+  const name = nameIndices
+    ? highlightFuzzy(note.name, nameIndices)
+    : nameHtml(note.name);
+  return (
+    icon(kind.icon, "kind " + kind.cls) +
+    `<span class="search-result-name">${name}</span>` +
+    `<span class="search-result-aside">${escapeHtml(aside)}</span>`
+  );
+}
+
+// Names first, then lines — each under its own label, so you see why
 function showSearchResults(results) {
-  searchResults.classList.add("visible");
-  searchBackdrop.classList.add("visible");
   searchCount.textContent =
     results.length + " result" + (results.length !== 1 ? "s" : "");
   searchResultsList.innerHTML = "";
   searchSelectedIdx = -1;
-  if (results.length === 0) {
-    searchResultsList.innerHTML =
-      '<div class="search-no-results">no matches</div>';
+  if (results.length === 0) return noSearchResults(searchInput.value);
+  const query = searchInput.value.trim();
+  let group = null;
+  for (const r of results) {
+    const g = r.nameMatch ? "Notes" : "In notes";
+    if (g !== group) searchGroup((group = g));
+    const aside = r.nameMatch
+      ? shortTime(r.note.updatedAt)
+      : r.lines.length + (r.lines.length === 1 ? " line" : " lines");
+    const div = searchRow(
+      "",
+      noteResultHead(r.note, r.nameMatch?.indices, aside),
+      () => openSearchResult(r.note, r.lines[0] || null, query),
+    );
+    for (const lm of r.lines) div.appendChild(searchSnippet(lm));
+  }
+  searchSelectedIdx = 0;
+  updateSearchSelection();
+}
+
+// Empty palette: the notes you were just in, so ⌘P ↵ flips back
+function showRecent() {
+  const recent = state.notes
+    .filter((n) => n.id !== state.activeId)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 8);
+  if (!recent.length) return;
+  searchGroup("Recent");
+  for (const note of recent)
+    searchRow("", noteResultHead(note, null, shortTime(note.updatedAt)), () =>
+      openSearchResult(note, null, ""),
+    );
+  searchSelectedIdx = 0;
+  updateSearchSelection();
+}
+
+const THEME_LABELS = {
+  mocha: "Mocha",
+  macchiato: "Macchiato",
+  frappe: "Frappé",
+  latte: "Latte",
+  espresso: "Espresso",
+};
+
+// Every action has a name here — including the ones only vim could reach
+function paletteCommands() {
+  const note = getActiveNote();
+  const md = note && isMarkdownFile(note.name);
+  const draw = note && isDrawFile(note.name);
+  const view = note && hasViewTab(note.name);
+  const saved = note && !sharedNote;
+  return [
+    ["note", "New note", "new", () => createNote(undefined, undefined, true)],
+    ["file-draw", "New drawing", "", () =>
+      createNote(undefined, undefined, true, "draw")],
+    ["import", "Import files…", "", openImport],
+    ["archive", "Export all as ZIP", "", downloadAll],
+    saved && ["pencil", "Rename note", "F2", renameInTitle],
+    saved && [note.pinned ? "pin-on" : "pin", note.pinned ? "Unpin note" : "Pin note", "", () => togglePin(note.id)],
+    note && ["share", "Share…", "", () => openShare()],
+    note && ["link", "Copy link", "", () => copyLink(note)],
+    note && ["download", "Download", "", () => downloadNote(note)],
+    md && ["download", "Download as HTML", "", () => downloadHtml(note)],
+    draw && ["download", "Download as SVG", "", () => drawDownloadSvg(note)],
+    draw && ["image", "Copy as PNG", "", () => drawCopyPng(note)],
+    md && ["format", "Format markdown", "⌥⇧F", () => formatNote(note)],
+    view && [mdViewActive ? "code" : "eye", mdViewActive ? (draw ? "Show source" : "Edit") : draw ? "Show canvas" : "Preview", "⌘E", toggleView],
+    view && ["zen", "Zen", "", () => switchMdTab("zen", true)],
+    note && ["search", "Find", "⌘F", () => openFindReplace()],
+    note && ["search", "Find and replace", "⌘⌥F", () => openFindReplace(true)],
+    ["wrap", "Word wrap", "", toggleWrap],
+    !touchOnly.matches && ["keyboard", "Vim keys", "⌃⇧M", toggleVim],
+    saved && ["trash", "Delete note", "⌘⇧D", () => deleteNote(note.id)],
+    ["sidebar", "Show or hide sidebar", "⌘\\", toggleSidebar],
+    ["settings", "Settings…", "", () => openSettings()],
+    ["contrast", "Theme: match system", "", toggleSystemTheme],
+    ...THEMES.map((t) => ["contrast", "Theme: " + THEME_LABELS[t], "", () => setTheme(t)]),
+    gdriveConnected
+      ? ["cloud", "Sync now", "⌘S", driveSync]
+      : ["cloud", "Sync with Google Drive…", "", driveSync],
+    ["help", "Help", "", openHelp],
+    ["note", "Markdown guide", "", openMdDemo],
+  ].filter(Boolean);
+}
+
+function showCommands(query) {
+  searchResultsList.innerHTML = "";
+  searchSelectedIdx = -1;
+  let cmds = paletteCommands().map(([ic, label, key, run]) => ({
+    ic, label, key, run, m: query ? fuzzyMatch(label, query) : { indices: [], score: 0 },
+  }));
+  if (query) cmds = cmds.filter((c) => c.m).sort((a, b) => b.m.score - a.m.score);
+  searchCount.textContent = cmds.length + (cmds.length === 1 ? " command" : " commands");
+  if (!cmds.length) {
+    const div = document.createElement("div");
+    div.className = "search-no-results";
+    div.textContent = "No command matches";
+    searchResultsList.appendChild(div);
     return;
   }
-  for (let ri = 0; ri < results.length; ri++) {
-    const r = results[ri];
-    const div = document.createElement("div");
-    div.className = "search-result-item";
-    div.dataset.idx = ri;
-    const nameDiv = document.createElement("div");
-    nameDiv.className = "search-result-name";
-    if (r.nameMatch) {
-      nameDiv.innerHTML = highlightFuzzy(r.note.name, r.nameMatch.indices);
-    } else {
-      nameDiv.textContent = r.note.name;
-    }
-    div.appendChild(nameDiv);
-    for (const lm of r.lines) div.appendChild(searchSnippet(lm));
-    const target = r.lines[0] || null;
-    div.addEventListener("click", () => {
-      const query = searchInput.value.trim();
-      // Auto-save dirty vim buffer before switching
-      if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
-      switchNote(r.note.id);
-      closeSearch();
-      searchInput.value = "";
-      editor.focus();
-      if (target && target.charOffset > 0) {
-        editor.setSelectionRange(target.charOffset, target.charOffset);
-      }
-      // Populate find state like vim / search so n/N work
-      adoptSearchQuery(query);
-    });
-    searchResultsList.appendChild(div);
-  }
+  for (const c of cmds)
+    searchRow(
+      "search-command",
+      icon(c.ic) +
+        `<span class="search-result-name">${highlightFuzzy(c.label, c.m.indices)}</span>` +
+        (c.key ? `<span class="kbd">${escapeHtml(keyLabel(c.key))}</span>` : "<span></span>"),
+      () => {
+        closeSearch();
+        searchInput.value = "";
+        c.run();
+      },
+    );
   searchSelectedIdx = 0;
   updateSearchSelection();
 }
@@ -4380,15 +4660,35 @@ searchBackdrop.addEventListener("click", () => {
 
 searchInput.addEventListener("input", () => {
   clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(() => searchNotes(searchInput.value), 150);
+  searchDebounce = setTimeout(() => {
+    searchDebounce = null;
+    searchNotes(searchInput.value);
+  }, 120);
 });
 
 searchInput.addEventListener("keydown", (e) => {
   const items = searchResultsList.querySelectorAll(".search-result-item");
-  // Ctrl+F / Ctrl+P switch scope while the dialog is open
-  if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "p")) {
+  // Tab narrows to this note and back; ⌘P widens, ⌘F hands over to find
+  if (e.key === "Tab" && !searchInput.value.trimStart().startsWith(">")) {
     e.preventDefault();
-    setSearchScope(e.key === "f" ? "note" : "all");
+    setSearchScope(searchScope === "all" ? "note" : "all");
+    return;
+  }
+  if (e.key === "Backspace" && !searchInput.value && searchScope === "note") {
+    e.preventDefault();
+    setSearchScope("all");
+    return;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+    e.preventDefault();
+    setSearchScope("all");
+    return;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+    e.preventDefault();
+    closeSearch();
+    searchInput.value = "";
+    openFindReplace();
     return;
   }
   if (e.key === "ArrowDown") {
@@ -4416,7 +4716,14 @@ searchInput.addEventListener("keydown", (e) => {
   }
   if (e.key === "Enter") {
     e.preventDefault();
-    const selected = items[searchSelectedIdx] || items[0];
+    // Typed faster than the debounce: search what is in the box now
+    if (searchDebounce) {
+      clearTimeout(searchDebounce);
+      searchDebounce = null;
+      searchNotes(searchInput.value);
+    }
+    const now = searchResultsList.querySelectorAll(".search-result-item");
+    const selected = now[searchSelectedIdx] || now[0];
     if (selected) selected.click();
   }
 });
@@ -4445,11 +4752,22 @@ function isFindMatchSelected() {
   );
 }
 
-function openFindReplace() {
+// ⌘F finds; ⌘⌥F / Ctrl+H (or the chevron) adds the replace row
+function openFindReplace(withReplace = false) {
+  if (!getActiveNote()) return;
+  if (mdViewActive) switchMdTab("edit", true);
+  if (withReplace === true) findReplaceBar.classList.add("replace");
+  else if (!findReplaceBar.classList.contains("visible"))
+    findReplaceBar.classList.remove("replace");
+  if (findReplaceBar.classList.contains("visible")) {
+    (withReplace === true ? replaceInput : findInput).focus();
+    findInput.select();
+    return;
+  }
   findReplaceBar.classList.add("visible");
   findInput.value = "";
   replaceInput.value = "";
-  findReplaceCount.textContent = "";
+  setFindCount("");
   findMatches = [];
   findMatchIdx = -1;
   findInput.focus();
@@ -4465,12 +4783,23 @@ function openFindReplace() {
   }
 }
 
-function closeFindReplace() {
+function closeFindReplace(focus = true) {
+  if (!findReplaceBar.classList.contains("visible")) return;
   findReplaceBar.classList.remove("visible");
   findMatches = [];
   findMatchIdx = -1;
-  findReplaceCount.textContent = "";
-  editor.focus();
+  setFindCount("");
+  if (focus) editor.focus();
+}
+
+function toggleReplace() {
+  findReplaceBar.classList.toggle("replace");
+  (findReplaceBar.classList.contains("replace") ? replaceInput : findInput).focus();
+}
+
+function setFindCount(text, none = false) {
+  findReplaceCount.textContent = text;
+  findReplaceCount.classList.toggle("none", none);
 }
 
 // select=false only refreshes offsets (after edits) without moving the cursor
@@ -4479,12 +4808,12 @@ function updateFindMatches(select = true) {
   findMatches = [];
   findMatchIdx = -1;
   if (!query) {
-    findReplaceCount.textContent = "";
+    setFindCount("");
     return;
   }
   findMatches = findAll(editor.value, query);
   if (findMatches.length === 0) {
-    findReplaceCount.textContent = "0 matches";
+    setFindCount("No results", true);
     return;
   }
   // Find nearest match to cursor
@@ -4497,7 +4826,10 @@ function updateFindMatches(select = true) {
     }
   }
   if (select) selectFindMatch();
-  else findReplaceCount.textContent = findMatches.length + " matches";
+  else
+    setFindCount(
+      findMatches.length + (findMatches.length === 1 ? " match" : " matches"),
+    );
 }
 
 function selectFindMatch(focusEditor) {
@@ -4517,7 +4849,7 @@ function selectFindMatch(focusEditor) {
   highlightLayer.scrollTop = editor.scrollTop;
   syncOccurrenceScroll();
   if (!focusEditor) findInput.focus();
-  findReplaceCount.textContent = findMatchIdx + 1 + " of " + findMatches.length;
+  setFindCount(findMatchIdx + 1 + " of " + findMatches.length);
 }
 
 function findNext() {
@@ -4540,12 +4872,16 @@ function findPrev() {
   selectFindMatch(true);
 }
 
+// Replaces the current match and moves on to the next
 function replaceCurrent() {
   updateFindMatches(false);
-  // Only replace what the user can see selected; otherwise select it first
+  if (!findMatches.length) return;
   if (!isFindMatchSelected()) {
-    if (findMatches.length) selectFindMatch(true);
-    return;
+    const cursor = editor.selectionStart;
+    findMatchIdx = Math.max(
+      0,
+      findMatches.findIndex((m) => m.end > cursor),
+    );
   }
   const m = findMatches[findMatchIdx];
   const replacement = replaceInput.value;
@@ -4585,6 +4921,7 @@ function replaceAll() {
   const text = editor.value;
   const matches = findAll(text, query);
   if (!matches.length) return;
+  pushHistory(note.id, text);
   let result = "";
   let pos = 0;
   for (const m of matches) {
@@ -4604,13 +4941,18 @@ function replaceAll() {
   }
   refreshEditor();
   updateFindMatches();
+  showToast("Replaced " + matches.length, {
+    action: "Undo",
+    onAction: undo,
+  });
 }
 
 findInput.addEventListener("input", () => updateFindMatches());
 findInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
-    findNext();
+    if (e.shiftKey) findPrev();
+    else findNext();
   }
   if (e.key === "Escape") {
     e.preventDefault();
@@ -4636,9 +4978,9 @@ function loadWrap() {
   const saved = localStorage.getItem(WRAP_KEY);
   const wrapOn =
     saved === "true" || (saved === null && window.innerWidth <= 900);
+  btnWrap.setAttribute("aria-pressed", wrapOn);
   if (wrapOn) {
     editorArea.classList.add("wrap");
-    btnWrap.classList.add("active");
     requestAnimationFrame(syncScrollbarGap);
   }
 }
@@ -4647,16 +4989,28 @@ function currentTheme() {
   return document.documentElement.dataset.theme || THEMES[0];
 }
 
+function followsSystem() {
+  return localStorage.getItem(SYSTEM_THEME_KEY) === "true";
+}
+
+// Shows `name`, or what Match system picks; ticks follow the stored choice
 function applyTheme(name) {
   if (!THEMES.includes(name)) name = THEMES[0];
+  if (followsSystem()) name = themeToShow();
   document.documentElement.dataset.theme = name;
+  const chosen = localStorage.getItem(THEME_KEY) || THEMES[0];
+  for (const b of document.querySelectorAll("[data-action=set-theme]"))
+    b.querySelector(".tick").innerHTML =
+      b.dataset.value === chosen ? icon("check", "sm") : "";
+  document.getElementById("btnSystemTheme").querySelector(".tick").innerHTML =
+    followsSystem() ? icon("check", "sm") : "";
   document.querySelector('meta[name="theme-color"]').content = getComputedStyle(
     document.documentElement,
   )
     .getPropertyValue("--bg")
     .trim();
   for (const b of document.querySelectorAll("[data-action=set-theme]"))
-    b.setAttribute("aria-checked", b.dataset.value === name);
+    b.setAttribute("aria-checked", b.dataset.value === chosen);
   // Drawings are painted with hex colours, so repaint them
   if (window.Draw) {
     Draw.setTheme();
@@ -4664,14 +5018,27 @@ function applyTheme(name) {
   }
 }
 
-function setTheme() {
-  localStorage.setItem(THEME_KEY, actionEl.dataset.value);
-  applyTheme(actionEl.dataset.value);
+function setTheme(value = actionEl.dataset.value) {
+  localStorage.setItem(THEME_KEY, value);
+  // Picking latte while matching the system would never show a dark theme
+  if (followsSystem() && value === "latte")
+    localStorage.removeItem(SYSTEM_THEME_KEY);
+  applyTheme(value);
 }
+
+function toggleSystemTheme() {
+  if (followsSystem()) localStorage.removeItem(SYSTEM_THEME_KEY);
+  else localStorage.setItem(SYSTEM_THEME_KEY, "true");
+  applyTheme(localStorage.getItem(THEME_KEY));
+}
+
+lightQuery.addEventListener("change", () => {
+  if (followsSystem()) applyTheme(localStorage.getItem(THEME_KEY));
+});
 
 function toggleWrap() {
   const isWrap = editorArea.classList.toggle("wrap");
-  btnWrap.classList.toggle("active", isWrap);
+  btnWrap.setAttribute("aria-pressed", isWrap);
   localStorage.setItem(WRAP_KEY, isWrap ? "true" : "false");
   if (isWrap) {
     syncScrollbarGap();
@@ -6643,7 +7010,7 @@ function vimExecCommand(cmd) {
       updateLineNumbers();
       updateHighlight();
       updateCursorPos();
-      showMdToast("formatted");
+      showToast("Formatted", { ic: "format" });
     } else {
       vimShowError("format: markdown files only");
     }
@@ -6802,58 +7169,739 @@ function vimHandleKeydown(e) {
 }
 
 // ═══════════════════════════════════════════════════
-//  File Menu
+//  Chrome: keys, menus, title bar, status bar, tooltip, toast
 // ═══════════════════════════════════════════════════
 
-const fileMenu = document.getElementById("fileMenu");
-const syncMenu = document.getElementById("syncMenu");
-const themeMenu = document.getElementById("themeMenu");
+const IS_MAC = /mac|iphone|ipad/i.test(
+  navigator.userAgentData?.platform || navigator.platform || "",
+);
 
-function toggleFileMenu() {
-  syncMenu.classList.remove("visible");
-  fileMenu.classList.toggle("visible");
+// Keys are written the Mac way; elsewhere ⌘ and ⌃ read Ctrl, ⌥ reads Alt.
+// "new" is the new-note key: Chrome on Windows never hands Ctrl+N to a page.
+function keyLabel(k) {
+  if (k === "new") return IS_MAC ? "⌃N" : "Alt+N";
+  if (IS_MAC) return k;
+  return k
+    .replace(/[⌘⌃]/g, "Ctrl+")
+    .replace(/⌥/g, "Alt+")
+    .replace(/⇧/g, "Shift+");
 }
 
-function closeFileMenu() {
-  fileMenu.classList.remove("visible");
-  themeMenu.classList.remove("visible");
+for (const el of document.querySelectorAll("[data-k]"))
+  el.textContent = keyLabel(el.dataset.k);
+
+// ── Menus ──────────────────────────────────────────
+
+const appMenu = document.getElementById("appMenu");
+const themeMenu = document.getElementById("themeMenu");
+const newMenu = document.getElementById("newMenu");
+const noteMenu = document.getElementById("noteMenu");
+const syncMenu = document.getElementById("syncMenu");
+const sharePop = document.getElementById("sharePop");
+let menuScrim = null;
+
+// Opens next to `anchor` (or at a point); clicking the same anchor closes it
+function openMenu(menu, anchor, opts = {}) {
+  const wasOpen = menu.classList.contains("visible") && menu._anchor === anchor;
+  closeAllMenus(opts.keep);
+  if (wasOpen && anchor) return;
+  menu._anchor = anchor;
+  anchor?.setAttribute("aria-expanded", "true");
+  menu.classList.add("visible");
+  if (isMobile() && !menuScrim) {
+    menuScrim = document.createElement("div");
+    menuScrim.className = "menu-scrim";
+    menuScrim.addEventListener("click", () => closeAllMenus());
+    document.body.appendChild(menuScrim);
+  }
+  placeMenu(menu, anchor, opts);
+  if (opts.focus) menu.querySelector(".menu-item:not([hidden])")?.focus();
+}
+
+function placeMenu(menu, anchor, { at, side, alignRight } = {}) {
+  if (isMobile()) return; // a sheet, placed by CSS
+  menu.style.left = menu.style.top = "0px";
+  const m = menu.getBoundingClientRect();
+  const vw = innerWidth;
+  const vh = innerHeight;
+  let x;
+  let y;
+  if (at) {
+    x = at.x;
+    y = at.y;
+  } else {
+    const r = anchor.getBoundingClientRect();
+    if (side) {
+      x = r.right + 4 + m.width > vw ? r.left - m.width - 4 : r.right + 4;
+      y = r.top - 4;
+    } else {
+      x = alignRight ? r.right - m.width : r.left;
+      y = r.bottom + 4;
+      if (y + m.height > vh - 8 && r.top - m.height - 4 > 8)
+        y = r.top - m.height - 4;
+    }
+  }
+  menu.style.left = Math.max(8, Math.min(x, vw - m.width - 8)) + "px";
+  menu.style.top = Math.max(8, Math.min(y, vh - m.height - 8)) + "px";
+}
+
+function closeAllMenus(keep) {
+  for (const m of document.querySelectorAll(".menu.visible")) {
+    if (m === keep) continue;
+    m.classList.remove("visible");
+    m._anchor?.setAttribute("aria-expanded", "false");
+    m._anchor = null;
+  }
+  for (const el of document.querySelectorAll(".menu-item.open"))
+    el.classList.remove("open");
+  if (menuScrim && !keep) {
+    menuScrim.remove();
+    menuScrim = null;
+  }
+}
+
+// Kept for code that closed the old menus by name
+const closeFileMenu = () => closeAllMenus();
+const closeSyncMenu = () => closeAllMenus();
+
+function toggleAppMenu() {
+  openMenu(appMenu, document.getElementById("btnAppMenu"), {
+    focus: event?.detail === 0,
+  });
+}
+
+function toggleNewMenu() {
+  openMenu(newMenu, document.getElementById("btnNewMenu"), {
+    alignRight: true,
+  });
 }
 
 function toggleSyncMenu() {
-  fileMenu.classList.remove("visible");
-  syncMenu.classList.toggle("visible");
+  openMenu(syncMenu, document.getElementById("syncButton"));
 }
 
-function closeSyncMenu() {
-  syncMenu.classList.remove("visible");
+function openThemeMenu() {
+  const btn = document.getElementById("btnThemeMenu");
+  if (themeMenu.classList.contains("visible")) return;
+  btn.classList.add("open");
+  themeMenu._anchor = null;
+  themeMenu.classList.add("visible");
+  if (isMobile()) appMenu.classList.remove("visible");
+  placeMenu(themeMenu, btn, { side: true });
 }
 
-// The ▾ next to + / new: pick the kind of note
-function toggleNewMenu() {
-  const menu = actionEl.closest(".new-split").querySelector(".new-menu");
-  const open = !menu.classList.contains("visible");
-  closeAllMenus();
-  menu.classList.toggle("visible", open);
-}
+document.getElementById("btnThemeMenu").addEventListener("pointerenter", (e) => {
+  if (e.pointerType === "mouse") openThemeMenu();
+});
+for (const item of appMenu.querySelectorAll(".menu-item:not(#btnThemeMenu)"))
+  item.addEventListener("pointerenter", () => {
+    themeMenu.classList.remove("visible");
+    document.getElementById("btnThemeMenu").classList.remove("open");
+  });
 
-function closeAllMenus() {
-  closeFileMenu();
-  closeSyncMenu();
-  for (const m of document.querySelectorAll(".new-menu.visible"))
-    m.classList.remove("visible");
-}
-
-document.addEventListener("click", (e) => {
-  if (
-    !e.target.closest(".file-menu-container") &&
-    !e.target.closest("#syncMenuContainer") &&
-    !e.target.closest(".new-split")
-  ) {
-    closeAllMenus();
-  }
+document.addEventListener("pointerdown", (e) => {
+  if (!e.target.closest(".menu, [aria-haspopup], .menu-scrim")) closeAllMenus();
 });
 
-editor.addEventListener("focus", closeAllMenus);
+// Arrow keys walk the open menu; Esc closes it and returns to its button
+document.addEventListener("keydown", (e) => {
+  const menus = [...document.querySelectorAll(".menu.visible")];
+  if (!menus.length) return;
+  const menu = menus.find((m) => m.contains(document.activeElement)) || menus[0];
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const anchor = menu._anchor;
+    closeAllMenus();
+    anchor?.focus();
+    return;
+  }
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  if (menu === sharePop) return;
+  const items = [...menu.querySelectorAll(".menu-item")].filter(
+    (b) => b.offsetParent,
+  );
+  if (!items.length) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const i = items.indexOf(document.activeElement);
+  const next =
+    e.key === "ArrowDown"
+      ? items[(i + 1) % items.length]
+      : items[(i - 1 + items.length) % items.length];
+  next.focus();
+}, true);
+
+editor.addEventListener("focus", () => closeAllMenus());
+
+// The ⋯ menu: the title bar's, a row's, and right-click on a row
+function openNoteMenu(note, anchor, at) {
+  const md = isMarkdownFile(note.name);
+  const draw = isDrawFile(note.name);
+  const active = note === getActiveNote();
+  const kind = noteKind(note.name);
+  const item = (ic, label, act, key = "", cls = "") =>
+    `<button class="menu-item ${cls}" role="menuitem" data-note-act="${act}">${icon(ic)}<span class="label">${label}</span>${key ? `<span class="kbd">${keyLabel(key)}</span>` : ""}</button>`;
+  const sep = '<div class="menu-sep"></div>';
+  noteMenu.innerHTML =
+    `<div class="menu-title">${icon(kind.icon, "kind " + kind.cls)}<span>${nameHtml(note.name)}</span></div>` +
+    (sharedNote && active
+      ? ""
+      : item("pencil", "Rename", "rename", "F2") +
+        item(note.pinned ? "pin-on" : "pin", note.pinned ? "Unpin" : "Pin", "pin") +
+        sep) +
+    item("link", "Copy link", "copy-link") +
+    (draw ? item("image", "Copy as PNG", "png") : "") +
+    item("download", "Download", "download") +
+    (md ? item("download", "Download as HTML", "html") : "") +
+    (draw ? item("download", "Download as SVG", "svg") : "") +
+    (md ? sep + item("format", "Format markdown", "format", "⌥⇧F") : "") +
+    (isMobile() && active && hasViewTab(note.name)
+      ? sep + item("zen", "Zen", "zen")
+      : "") +
+    (isMobile() && active && !draw
+      ? item(
+          "wrap",
+          editorArea.classList.contains("wrap")
+            ? "Word wrap: on"
+            : "Word wrap: off",
+          "wrap",
+        )
+      : "") +
+    (sharedNote && active
+      ? ""
+      : sep + item("trash", "Delete", "delete", "⌘⇧D", "danger"));
+  noteMenu.onclick = (e) => {
+    const b = e.target.closest("[data-note-act]");
+    if (!b) return;
+    closeAllMenus();
+    runNoteAction(note, b.dataset.noteAct, anchor);
+  };
+  openMenu(noteMenu, anchor, {
+    at,
+    alignRight: anchor === btnNoteMenu,
+    focus: event?.detail === 0,
+  });
+}
+
+function toggleNoteMenu() {
+  const note = getActiveNote();
+  if (note) openNoteMenu(note, btnNoteMenu);
+}
+
+function runNoteAction(note, act, anchor) {
+  const fromRow = anchor && anchor.closest?.(".note-list");
+  switch (act) {
+    case "rename":
+      if (note === getActiveNote() && !fromRow) renameInTitle();
+      else startRename(note.id);
+      break;
+    case "pin":
+      return togglePin(note.id);
+    case "copy-link":
+      return copyLink(note);
+    case "png":
+      return drawCopyPng(note);
+    case "download":
+      return downloadNote(note);
+    case "html":
+      return downloadHtml(note);
+    case "svg":
+      return drawDownloadSvg(note);
+    case "format":
+      return formatNote(note);
+    case "zen":
+      return switchMdTab("zen", true);
+    case "wrap":
+      return toggleWrap();
+    case "delete":
+      return deleteNote(note.id);
+  }
+}
+
+// ── Title bar ──────────────────────────────────────
+
+function noteState(note) {
+  if (sharedNote)
+    return {
+      label: sharedClash() ? "Shared version" : "Shared · not saved",
+      detail: "Opened from a link — not in your notes yet",
+    };
+  if (vimState.enabled && vimState.bufferDirty)
+    return { label: "Edited", detail: "Vim buffer not written yet — :w to save" };
+  const at = new Date(note.updatedAt).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  if (gdriveConnected && syncDotCount > 0)
+    return { label: "Syncing…", detail: "Saving to Google Drive" };
+  if (gdriveConnected && !syncFailedState)
+    return { label: "Synced", detail: "In this browser and Google Drive" };
+  return { label: "Saved", detail: "In this browser at " + at };
+}
+
+let titleBarKey = "";
+function updateTitleBar() {
+  const note = getActiveNote();
+  const st = note ? noteState(note) : null;
+  const key = note ? note.name + "\n" + st.label + "\n" + st.detail : "";
+  btnShare.disabled = !note;
+  btnNoteMenu.disabled = !note;
+  if (key === titleBarKey) return;
+  titleBarKey = key;
+  crumb.style.visibility = note ? "" : "hidden";
+  if (!note) return;
+  crumbName.innerHTML = nameHtml(note.name);
+  crumbState.textContent = st.label;
+  crumbBtn.dataset.tip = st.label;
+  crumbBtn.dataset.sub = st.detail;
+}
+
+// ── Status bar ─────────────────────────────────────
+
+const LANG_NAMES = {
+  md: "Markdown",
+  markdown: "Markdown",
+  draw: "Drawing",
+  js: "JavaScript",
+  mjs: "JavaScript",
+  cjs: "JavaScript",
+  jsx: "JavaScript",
+  ts: "TypeScript",
+  tsx: "TypeScript",
+  py: "Python",
+  rs: "Rust",
+  go: "Go",
+  css: "CSS",
+  scss: "SCSS",
+  less: "Less",
+  html: "HTML",
+  htm: "HTML",
+  xml: "XML",
+  svg: "SVG",
+  json: "JSON",
+  yaml: "YAML",
+  yml: "YAML",
+  toml: "TOML",
+  sh: "Shell",
+  bash: "Shell",
+  zsh: "Shell",
+  fish: "Shell",
+  sql: "SQL",
+  txt: "Plain text",
+  "": "Plain text",
+};
+
+function langName(name) {
+  const ext = getExtension(name);
+  return LANG_NAMES[ext] ?? ext.toUpperCase();
+}
+
+// What the bar shows changes with the view; the bar itself never jumps
+function updateStatusBar() {
+  const note = getActiveNote();
+  const editing = !!note && !mdViewActive;
+  statusLang.textContent = note ? langName(note.name) : "";
+  btnWrap.hidden = !editing;
+  btnVim.hidden = !editing;
+  statusSel.hidden = !editing;
+  statusHint.textContent = "";
+  if (!note || editing) return updateCursorPos();
+  if (isDrawFile(note.name)) {
+    cursorPos.textContent = "";
+    return;
+  }
+  const words = (note.content.match(/[\p{L}\p{N}]+/gu) || []).length;
+  cursorPos.textContent =
+    words.toLocaleString() +
+    (words === 1 ? " word" : " words") +
+    " · " +
+    Math.max(1, Math.round(words / 230)) +
+    " min read";
+  if (!zenModeActive)
+    statusHint.innerHTML = 'Press <span class="hint-key">E</span> to edit';
+}
+
+function updateVimStatus() {
+  btnVim.setAttribute("aria-pressed", vimState.enabled);
+  vimPill.textContent = vimState.enabled
+    ? vimState.mode.toUpperCase() + (vimState.bufferDirty ? " +" : "")
+    : "";
+  vimPill.className = "vim-pill " + vimState.mode;
+  updateTitleBar();
+  updateKeybar();
+}
+
+// Tapping the status bar must not move focus. Blurring the editor closes
+// the mobile keyboard, the page grows into its space, and the click then
+// lands on the editor (keyboard back up) instead of the button. Keeping
+// focus where it is leaves the keyboard as it was and the layout still.
+for (const bar of [statusbar, document.getElementById("keybar")])
+  bar.addEventListener("mousedown", (e) => e.preventDefault());
+
+// ── Tooltip ────────────────────────────────────────
+// Icon buttons, short states and disabled reasons: data-tip, data-key, data-sub
+
+const tip = document.getElementById("tip");
+let tipTimer = null;
+let tipFor = null;
+let tipHiddenAt = 0;
+
+function showTip(el, text) {
+  const label = text ?? el.dataset.tip;
+  if (!label || !el.isConnected) return;
+  tip.innerHTML =
+    el.dataset.sub && !text
+      ? `<b>${escapeHtml(label)}</b><span class="sub">${escapeHtml(el.dataset.sub)}</span>`
+      : escapeHtml(label) +
+        (el.dataset.key && !text
+          ? `<span class="kbd">${escapeHtml(keyLabel(el.dataset.key))}</span>`
+          : "");
+  tip.classList.add("visible");
+  tipFor = el;
+  const r = el.getBoundingClientRect();
+  const t = tip.getBoundingClientRect();
+  let y = r.bottom + 6;
+  if (y + t.height > innerHeight - 4) y = r.top - t.height - 6;
+  const x = r.left + r.width / 2 - t.width / 2;
+  tip.style.left = Math.max(4, Math.min(x, innerWidth - t.width - 4)) + "px";
+  tip.style.top = y + "px";
+}
+
+function hideTip() {
+  clearTimeout(tipTimer);
+  if (tip.classList.contains("visible")) tipHiddenAt = Date.now();
+  tip.classList.remove("visible");
+  tipFor = null;
+}
+
+document.addEventListener("pointerover", (e) => {
+  if (e.pointerType !== "mouse") return;
+  const el = e.target.closest("[data-tip]");
+  if (el === tipFor) return;
+  hideTip();
+  if (!el) return;
+  tipFor = el;
+  // Moving between neighbours shows the next one at once
+  tipTimer = setTimeout(
+    () => showTip(el),
+    Date.now() - tipHiddenAt < 400 ? 0 : 500,
+  );
+});
+document.addEventListener("pointerdown", hideTip, true);
+document.addEventListener("keydown", hideTip, true);
+document.addEventListener("scroll", hideTip, true);
+
+// ── Toast ──────────────────────────────────────────
+// Something happened: bottom centre, one at a time, an optional action
+
+let toastTimer = null;
+let toastUndo = null;
+
+function showToast(msg, opts = {}) {
+  const { action, onAction, ic, error, undo } = opts;
+  mdToast.className = "toast visible" + (error ? " error" : "");
+  mdToast.innerHTML =
+    (error ? icon("alert") : ic ? icon(ic) : "") +
+    '<span class="toast-msg"></span><button class="toast-act" hidden></button>';
+  mdToast.querySelector(".toast-msg").textContent = msg;
+  const act = mdToast.querySelector(".toast-act");
+  toastUndo = undo ? onAction : null;
+  if (action) {
+    act.hidden = false;
+    act.textContent = action;
+    act.onclick = () => {
+      hideToast();
+      onAction();
+    };
+  }
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, action ? 10000 : 4000);
+}
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  mdToast.classList.remove("visible");
+  toastUndo = null;
+}
+
+const showMdToast = (msg) => showToast(msg);
+
+// ── Sidebar ────────────────────────────────────────
+
+function closeSidebar() {
+  sidebar.classList.remove("open");
+  document.querySelector(".app").classList.remove("sidebar-open");
+}
+
+// ── Share ──────────────────────────────────────────
+
+let shareMode = "edit";
+
+async function openShare(anchor = btnShare) {
+  const note = getActiveNote();
+  if (!note) return;
+  if (sharePop.classList.contains("visible")) return closeAllMenus();
+  const url = await shareLink(note, shareMode);
+  const kb = (n) => Math.max(1, Math.round(n / 1000)) + " kB";
+  const fits = url.length <= URL_MAX_LENGTH;
+  const pct = Math.min(100, (url.length / URL_MAX_LENGTH) * 100);
+  const draw = isDrawFile(note.name);
+  sharePop.innerHTML =
+    `<h4>Share ${nameHtml(note.name)}</h4>` +
+    (fits
+      ? `<div class="seg"><button data-mode="edit" aria-pressed="${shareMode === "edit"}">Editable</button><button data-mode="zen" aria-pressed="${shareMode === "zen"}">${icon("lock", "sm")}Read-only</button></div>` +
+        `<p class="hint">${shareMode === "zen" ? "Opens in zen. They can still save a copy." : "They get their own copy to edit."}</p>` +
+        `<label class="field mono"><input readonly aria-label="Link" /></label>`
+      : `<p>This note is too large for a link: ${kb(url.length)}, the limit is ${kb(URL_MAX_LENGTH)}.</p>`) +
+    `<div class="share-size"><span>Link size</span><span>${kb(url.length)} of ${kb(URL_MAX_LENGTH)}</span></div>` +
+    `<div class="meter${fits ? "" : " critical"}"><i style="width:${pct}%"></i></div>` +
+    (fits
+      ? `<button class="btn primary" data-share="copy">${icon("link", "sm")}Copy link</button><p class="hint">The note lives in the link. Nothing is uploaded; anyone with it can read it.</p>`
+      : `<div class="share-row"><button class="btn" data-share="download">${icon("download", "sm")}Download</button>${draw ? `<button class="btn" data-share="png">${icon("image", "sm")}Copy as PNG</button>` : ""}</div>`);
+  const input = sharePop.querySelector("input");
+  if (input) input.value = url;
+  sharePop.onclick = async (e) => {
+    const mode = e.target.closest("[data-mode]")?.dataset.mode;
+    if (mode && mode !== shareMode) {
+      shareMode = mode;
+      closeAllMenus();
+      return openShare(anchor);
+    }
+    const act = e.target.closest("[data-share]")?.dataset.share;
+    if (!act) return;
+    closeAllMenus();
+    if (act === "copy") copyLink(note);
+    if (act === "download") downloadNote(note);
+    if (act === "png") drawCopyPng(note);
+  };
+  openMenu(sharePop, anchor, { alignRight: true });
+  sharePop.querySelector("[data-share]")?.focus();
+}
+
+// ── Banner: a state of this note that lasts until you act ──
+
+function setBanner(kind, ic, html, actions = []) {
+  if (!kind) {
+    banner.hidden = true;
+    banner.innerHTML = "";
+    return;
+  }
+  banner.hidden = false;
+  banner.className = "banner" + (kind === "warning" ? " warning" : "");
+  banner.innerHTML =
+    icon(ic) +
+    `<span class="banner-text">${html}</span><span class="banner-acts"></span>`;
+  const acts = banner.querySelector(".banner-acts");
+  for (const [label, fn, cls = ""] of actions) {
+    const b = document.createElement("button");
+    b.className = "btn sm " + cls;
+    b.textContent = label;
+    b.addEventListener("click", fn);
+    acts.appendChild(b);
+  }
+}
+
+// ── Phone key bar: keys a phone keyboard doesn't have ──
+
+const keybar = document.getElementById("keybar");
+const touchOnly = matchMedia("(pointer: coarse)");
+
+function updateKeybar() {
+  document.body.classList.toggle(
+    "keybar-on",
+    touchOnly.matches &&
+      document.activeElement === editor &&
+      !mdViewActive &&
+      !(vimState.enabled && vimState.mode !== "insert"),
+  );
+}
+editor.addEventListener("focus", updateKeybar);
+editor.addEventListener("blur", () =>
+  setTimeout(() => {
+    if (document.activeElement !== editor) updateKeybar();
+  }, 0),
+);
+
+keybar.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-key-action]");
+  if (!b) return;
+  const act = b.dataset.keyAction;
+  if (act === "indent" || act === "outdent") indentAtCursor(act === "outdent");
+  else if (act === "task") toggleTaskMarker();
+  else if (act === "insert") insertAtCursor(b.dataset.text);
+  else if (act === "undo") undo();
+  else if (act === "redo") redo();
+  else if (act === "find") openFindReplace();
+});
+
+function insertAtCursor(text) {
+  const s = editor.selectionStart;
+  editor.setRangeText(text, s, editor.selectionEnd, "end");
+  // Pairs land with the cursor between them
+  if (text === "[]") editor.setSelectionRange(s + 1, s + 1);
+  editor.dispatchEvent(new Event("input"));
+}
+
+// A plain line becomes a task; a list item gets a checkbox
+function toggleTaskMarker() {
+  const val = editor.value;
+  const pos = editor.selectionStart;
+  const start = val.lastIndexOf("\n", pos - 1) + 1;
+  const nl = val.indexOf("\n", start);
+  const line = val.slice(start, nl === -1 ? val.length : nl);
+  const m = line.match(LIST_RE);
+  if (m && m[6]) return;
+  const at = m ? start + m[0].length : start + line.match(/^\s*/)[0].length;
+  const text = m ? "[ ] " : "- [ ] ";
+  editor.setRangeText(text, at, at);
+  editor.setSelectionRange(pos + text.length, pos + text.length);
+  editor.dispatchEvent(new Event("input"));
+}
+
+// ── Settings: every setting in one place; the quick toggles stay where used ──
+
+function formatOnSave() {
+  return localStorage.getItem(FORMAT_ON_SAVE_KEY) !== "false";
+}
+
+function openSettings(section) {
+  if (typeof section !== "string") section = actionEl?.dataset.section;
+  const sw = (on) => `<span class="switch" aria-checked="${!!on}"></span>`;
+  const row = (set, ic, title, small, end) =>
+    `<button class="set-row" data-set="${set}">${ic ? icon(ic) : ""}<span class="set-text">${title}<small>${small}</small></span>${end}</button>`;
+  const chosen = localStorage.getItem(THEME_KEY) || THEMES[0];
+  const card = (t) =>
+    `<button class="theme-card" data-set="theme" data-value="${t}" data-theme="${t}" aria-checked="${t === chosen}"><span class="pv"><span><i style="background:var(--blue)"></i><i style="background:var(--overlay)"></i></span><span><i style="background:var(--mauve);width:50%"></i><i style="background:var(--text);width:80%"></i><i style="background:var(--green);width:60%"></i></span></span>${THEME_LABELS[t]}</button>`;
+  const bytes = getStorageUsed();
+  const limit = idb ? storageQuota : STORAGE_LIMIT;
+  const pct = limit ? Math.min((bytes / limit) * 100, 100) : 0;
+  const largest = [...state.notes]
+    .sort((a, b) => b.content.length - a.content.length)
+    .slice(0, 3)
+    .map((n) => escapeHtml(n.name) + " " + formatSize(n.content))
+    .join(" · ");
+  const drive = gdriveConnected
+    ? `<div class="set-row">${icon("cloud")}<span class="set-text">Google Drive<small>${syncFailedState ? "Sync paused" : lastSyncAt ? "Synced " + relativeTime(lastSyncAt) : "Connected"} · in Drive's hidden app folder</small></span><button class="btn sm" data-set="sync">${syncFailedState ? "Reconnect" : "Sync now"}</button><button class="btn ghost sm" data-set="disconnect">Disconnect</button></div>`
+    : `<div class="set-row">${icon("cloud")}<span class="set-text">Google Drive<small>Keep notes in sync across devices, in Drive's hidden app folder</small></span><button class="btn sm" data-set="sync">Connect…</button></div>`;
+  const dlg = openDialog(
+    `<div class="settings-head"><h2>Settings</h2><button class="btn ghost square" data-set="close" aria-label="Close">${icon("x")}</button></div>` +
+      `<div class="set-group" id="set-appearance"><h3>Theme</h3>` +
+      row("system", "", "Match system", "Latte by day, your dark theme by night", sw(followsSystem())) +
+      `<div class="themes">${THEMES.map(card).join("")}</div></div>` +
+      `<div class="set-group" id="set-editor"><h3>Editor</h3>` +
+      row("wrap", "", "Wrap long lines", "Also in the status bar", sw(editorArea.classList.contains("wrap"))) +
+      (touchOnly.matches ? "" : row("vim", "", "Vim keys", keyLabel("⌃⇧M"), sw(vimState.enabled))) +
+      row("format", "", "Format markdown on save", "Headings, lists and tables, on " + keyLabel("⌘S"), sw(formatOnSave())) +
+      `</div>` +
+      `<div class="set-group" id="set-sync"><h3>Sync and backup</h3>${drive}` +
+      `<div class="set-row">${icon("archive")}<span class="set-text">Export all as ZIP<small>Every note, drawings as SVG too, re-importable</small></span><button class="btn sm" data-set="export">Export</button></div>` +
+      `<div class="set-row">${icon("import")}<span class="set-text">Import files<small>Text files or a ZIP from Export</small></span><button class="btn sm" data-set="import">Choose…</button></div></div>` +
+      `<div class="set-group" id="set-storage"><h3>Storage</h3>` +
+      `<div class="storage"><div><span>Browser storage</span><span>${sizeLabel(bytes)}${limit ? " of " + sizeLabel(limit) : ""}</span></div><div class="meter${pct >= 90 ? " critical" : pct >= 70 ? " warn" : ""}"><i style="width:${pct}%"></i></div></div>` +
+      (largest ? `<div class="set-row"><span class="set-text">Largest notes<small>${largest}</small></span></div>` : "") +
+      `<div class="set-row"><span class="set-text">Browsers may clear storage without warning<small>Turn on Google Drive or export now and then</small></span></div></div>` +
+      `<p class="settings-note">Notes never pass through note.directory's server. Sign-in uses a small worker that only holds Google's token.</p>`,
+    (e, close) => {
+      const b = e.target.closest("[data-set]");
+      if (!b) return;
+      const set = b.dataset.set;
+      if (set === "close") return close();
+      if (set === "export") return downloadAll();
+      if (set === "import") {
+        close();
+        return openImport();
+      }
+      if (set === "sync") {
+        close();
+        return driveSync();
+      }
+      if (set === "disconnect") {
+        close();
+        return driveSignOut();
+      }
+      if (set === "theme") setTheme(b.dataset.value);
+      if (set === "system") toggleSystemTheme();
+      if (set === "wrap") toggleWrap();
+      if (set === "vim") toggleVim();
+      if (set === "format")
+        localStorage.setItem(FORMAT_ON_SAVE_KEY, !formatOnSave());
+      // Repaint the switches and cards in place
+      const now = localStorage.getItem(THEME_KEY) || THEMES[0];
+      for (const c of dlg.querySelectorAll(".theme-card"))
+        c.setAttribute("aria-checked", c.dataset.value === now);
+      const state = {
+        system: followsSystem(),
+        wrap: editorArea.classList.contains("wrap"),
+        vim: vimState.enabled,
+        format: formatOnSave(),
+      };
+      for (const [k, v] of Object.entries(state))
+        dlg
+          .querySelector(`[data-set=${k}] .switch`)
+          ?.setAttribute("aria-checked", v);
+    },
+    () => {},
+    "settings",
+  );
+  if (section) dlg.querySelector("#set-" + section)?.scrollIntoView();
+  dlg.querySelector("[data-set=close]").focus();
+}
+
+// ⌥⇧F, ⋯ › Format markdown, :fmt
+function formatNote(note = getActiveNote()) {
+  if (!note) return;
+  if (!isMarkdownFile(note.name))
+    return showToast("Format works on markdown notes", { error: true });
+  if (note !== getActiveNote()) {
+    pushHistory(note.id, note.content);
+    note.content = formatMarkdown(note.content);
+    note.updatedAt = Date.now();
+    saveState();
+    return showToast("Formatted " + note.name, { ic: "format" });
+  }
+  const pos = editor.selectionStart;
+  pushHistory(note.id, editor.value);
+  editor.value = formatMarkdown(editor.value);
+  if (vimState.enabled) {
+    vimState.bufferDirty = true;
+    saveSwap(note.id, editor.value);
+  } else {
+    note.content = editor.value;
+    note.updatedAt = Date.now();
+    scheduleSave();
+  }
+  editor.selectionStart = editor.selectionEnd = Math.min(
+    pos,
+    editor.value.length,
+  );
+  updateLineNumbers();
+  updateHighlight();
+  updateCursorPos();
+  if (mdViewActive) switchMdTab("view");
+  showToast("Formatted", { ic: "format" });
+}
+
+// ⌘E: Edit ⇄ Preview, Canvas ⇄ Source
+function toggleView() {
+  const note = getActiveNote();
+  if (!note || !hasViewTab(note.name) || zenModeActive) return;
+  switchMdTab(mdViewActive ? "edit" : "view", true);
+}
+
+// Zen's top line fades while you read and comes back when the pointer moves
+let zenFadeTimer = null;
+function wakeZenBar() {
+  const bar = document.getElementById("zenBar");
+  bar.classList.remove("faded");
+  clearTimeout(zenFadeTimer);
+  zenFadeTimer = setTimeout(() => {
+    if (zenModeActive && !bar.matches(":hover")) bar.classList.add("faded");
+  }, 2000);
+}
+document.addEventListener("pointermove", () => {
+  if (zenModeActive) wakeZenBar();
+});
 
 // ═══════════════════════════════════════════════════
 //  Sharing & Download
@@ -6870,32 +7918,30 @@ function triggerDownload(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
-function downloadNote() {
-  const note = getActiveNote();
+function downloadNote(note = getActiveNote()) {
   if (!note) return;
   triggerDownload(new Blob([note.content], { type: "text/plain" }), note.name);
 }
 
 // Drawing as an image: the clipboard gets a PNG, the download an SVG
-function drawCopyPng() {
-  const note = getActiveNote();
+function drawCopyPng(note = getActiveNote()) {
   if (!note || !isDrawFile(note.name)) return;
   const png = loadDraw().then(() => Draw.pngBlob(note.content));
   // Safari needs the clipboard write to start inside the click
   navigator.clipboard
     .write([new ClipboardItem({ "image/png": png })])
-    .then(() => showMdToast("copied as png"))
+    .then(() => showToast("Copied as PNG", { ic: "check" }))
     .catch(async () => {
       try {
         triggerDownload(await png, note.name.replace(/\.draw$/i, "") + ".png");
+        showToast("Couldn't copy as PNG — downloaded instead", { error: true });
       } catch {
-        showMdToast("png export failed");
+        showToast("Couldn't make a PNG of this drawing", { error: true });
       }
     });
 }
 
-async function drawDownloadSvg() {
-  const note = getActiveNote();
+async function drawDownloadSvg(note = getActiveNote()) {
   if (!note || !isDrawFile(note.name)) return;
   await loadDraw();
   triggerDownload(
@@ -6946,7 +7992,7 @@ async function noteHtml(note) {
     a.replaceWith(span);
   }
   // The page's own rules for the preview, so the file looks like zen
-  const wanted = /md-preview|zen-wrap|zen-mode|draw-embed|\.hl-|:root/;
+  const wanted = /md-preview|zen-wrap|zen-mode|draw-embed|\.hl-|:root|data-theme=/;
   const css = [];
   for (const sheet of document.styleSheets) {
     let rules;
@@ -7045,38 +8091,33 @@ async function downloadAll() {
 }
 
 // Share link for a note, built from its content (never from location,
-// which may still show the previous note). null if too long for a URL.
-async function shareUrlFor(note) {
-  const query = viewQuery() ? "?view=" + viewQuery() : "";
+// which may still show the previous note). Read-only links open in zen.
+// May be longer than URL_MAX_LENGTH — Share says so instead of hiding.
+async function shareLink(note, mode = "edit") {
+  const view = mode === "zen" ? "zen" : viewQuery() === "zen" ? "" : viewQuery();
+  const query = view ? "?view=" + view : "";
   const hashMap = new Map([
     ["name", note.name],
     ["note", await compress(note.content)],
     ["ts", String(note.updatedAt || Date.now())],
   ]);
-  const url = location.origin + location.pathname + query + buildHash(hashMap);
+  return location.origin + location.pathname + query + buildHash(hashMap);
+}
+
+async function shareUrlFor(note) {
+  const url = await shareLink(note, shareMode);
   return url.length > URL_MAX_LENGTH ? null : url;
 }
 
-async function shareNote() {
-  const note = getActiveNote();
+async function copyLink(note = getActiveNote()) {
   if (!note) return;
+  const url = await shareUrlFor(note);
+  if (!url) return openShare();
   try {
-    const url = await shareUrlFor(note);
-    if (!url) {
-      showModal("Note is too large to share via URL.", "ok", null);
-      closeFileMenu();
-      return;
-    }
     await navigator.clipboard.writeText(url);
-    btnShare.textContent = "copied!";
-    btnShare.classList.add("copied");
-    setTimeout(() => {
-      btnShare.textContent = "share";
-      btnShare.classList.remove("copied");
-      closeFileMenu();
-    }, 2000);
-  } catch (err) {
-    console.error("Share failed:", err);
+    showToast("Link copied", { ic: "check" });
+  } catch {
+    showToast("Couldn't copy the link", { error: true });
   }
 }
 
@@ -7136,6 +8177,7 @@ async function loadFromUrl() {
     const existing = state.notes.find((n) => n.name === name);
     if (existing) {
       if (existing.content === content) {
+        sharedNote = null;
         state.activeId = existing.id;
         saveState();
         if (fromOldFormat) await updateUrl();
@@ -7145,27 +8187,14 @@ async function loadFromUrl() {
       // Why: updateUrl() is async and may not complete before the tab
       // closes, so on reopen the URL can contain a pre-save snapshot.
       if (urlTs && existing.updatedAt >= urlTs) {
+        sharedNote = null;
         state.activeId = existing.id;
         saveState();
         return true;
       }
-      render();
-      const update = await showModal(
-        `"${name}" already exists with different content.`,
-        "update",
-        "new file",
-      );
-      if (update) {
-        existing.content = content;
-        existing.updatedAt = Date.now();
-        state.activeId = existing.id;
-        saveState();
-      } else {
-        createNote(undefined, content);
-      }
-    } else {
-      createNote(name, content);
     }
+    // Shown, not saved: the list only changes when the user says so
+    openShared(name, content, urlTs, existing);
     if (fromOldFormat) await updateUrl();
     return true;
   } catch (err) {
@@ -7222,7 +8251,9 @@ document.addEventListener("dragleave", () => {
   }
 });
 
-async function importZip(file) {
+// A note export (or any zip): its text entries, with ids and dates when the
+// export's .note.directory has them
+async function readZipEntries(file) {
   const arrayBuffer = await file.arrayBuffer();
   const header = new Uint8Array(arrayBuffer, 0, 4);
   if (
@@ -7230,19 +8261,15 @@ async function importZip(file) {
     header[1] !== 0x4b ||
     header[2] !== 0x03 ||
     header[3] !== 0x04
-  ) {
-    showModal("Invalid zip file.", "ok", null);
-    return;
-  }
+  )
+    return { error: "not a zip file" };
   let entries;
   try {
     entries = await readZip(arrayBuffer);
   } catch (e) {
-    showModal("Could not read zip file: " + e.message, "ok", null);
-    return;
+    return { error: "couldn't read it: " + e.message };
   }
 
-  // Parse .note.directory metadata
   const dirEntry = entries.find((e) => e.name === ".note.directory");
   let metadata = null;
   if (dirEntry) {
@@ -7269,184 +8296,249 @@ async function importZip(file) {
   const renders = new Set(
     Array.isArray(metadata?.renders) ? metadata.renders : [],
   );
-  const importable = entries.filter(
-    (e) => e.name !== ".note.directory" && !renders.has(e.name),
-  );
-  const skipped = [];
-
-  for (const entry of importable) {
-    let name = entry.name;
+  const out = [];
+  for (const entry of entries) {
+    if (entry.name === ".note.directory" || renders.has(entry.name)) continue;
     // Strip control characters, limit length
-    name = name.replace(/[\x00-\x1f\x7f]/g, "");
+    let name = entry.name.replace(/[\x00-\x1f\x7f]/g, "");
     if (name.length > 255) name = name.slice(0, 255);
     if (!name) continue;
-
-    const content = new TextDecoder().decode(entry.data);
-
-    // Binary file detection: check for null bytes in first 8KB
-    const check = content.slice(0, 8192);
-    if (check.includes("\x00")) {
-      skipped.push(entry.name);
-      continue;
-    }
-
-    if (wouldExceedStorage(content.length * 2 + name.length * 2 + 200)) {
-      await showModal(
-        '"' + name + '" is too large. Delete some notes to free up space.',
-        "ok",
-        null,
-      );
-      continue;
-    }
-
-    const meta = metadata ? metadata.notes.find((n) => n.name === name) : null;
-    const existing = state.notes.find((n) => n.name === name);
-
-    if (meta && existing && meta.id === existing.id) {
-      // Same ID: auto-merge by updatedAt
-      if (meta.updatedAt > existing.updatedAt) {
-        existing.content = content;
-        existing.updatedAt = meta.updatedAt;
-        state.activeId = existing.id;
-        saveState();
-        render();
-      }
-    } else if (existing) {
-      // Same filename, different ID or no metadata
-      const action = await showImportModal(name);
-      if (action === "override") {
-        existing.content = content;
-        existing.updatedAt = meta ? meta.updatedAt : Date.now();
-        state.activeId = existing.id;
-        saveState();
-        render();
-      } else if (action === "keep-both") {
-        createNote(uniqueName(name), content);
-      }
-      // "skip": do nothing
-    } else {
-      // No conflict
-      if (meta) {
-        // The id may belong to a renamed or deleted note — don't reuse it
-        const idTaken =
-          state.notes.some((n) => n.id === meta.id) ||
-          state.deletedIds.includes(meta.id);
-        const note = {
-          id: idTaken ? crypto.randomUUID() : meta.id,
-          name: name,
-          content: content,
-          updatedAt: meta.updatedAt,
-        };
-        state.notes.unshift(note);
-        state.activeId = note.id;
-        saveState();
-        scheduleDriveUpload(true);
-        render();
-      } else {
-        createNote(name, content);
-      }
-    }
+    out.push({
+      name,
+      content: new TextDecoder().decode(entry.data),
+      meta: metadata ? metadata.notes.find((n) => n.name === name) : null,
+    });
   }
-
-  if (skipped.length) {
-    showModal(
-      "Skipped binary file" +
-        (skipped.length > 1 ? "s" : "") +
-        ": " +
-        skipped.join(", "),
-      "ok",
-      null,
-    );
-  }
+  return { entries: out };
 }
 
-document.addEventListener("drop", async (e) => {
+function isZipFile(file) {
+  return (
+    file.name.toLowerCase().endsWith(".zip") || file.type === "application/zip"
+  );
+}
+
+// Dropped or picked files: everything in, then one dialog for every clash
+async function importFiles(files) {
+  if (!files.length) return;
+  if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
+  const wasInView = mdViewActive;
+  const incoming = [];
+  const skipped = [];
+  for (const file of files) {
+    if (isZipFile(file)) {
+      const r = await readZipEntries(file);
+      if (r.error) skipped.push(`${file.name} — ${r.error}`);
+      else incoming.push(...r.entries);
+    } else if (file.type.startsWith("text/") || isTextFilename(file.name)) {
+      incoming.push({ name: file.name, content: await file.text(), meta: null });
+    } else skipped.push(`${file.name} — not a text file`);
+  }
+
+  const ready = [];
+  const clashes = [];
+  let merged = 0;
+  for (const it of incoming) {
+    // Binary file detection: null bytes in the first 8KB
+    if (it.content.slice(0, 8192).includes("\x00")) {
+      skipped.push(`${it.name} — not a text file`);
+      continue;
+    }
+    const existing = state.notes.find((n) => n.name === it.name);
+    if (existing && it.meta && it.meta.id === existing.id) {
+      // The same note exported earlier: the newer one wins, no question
+      if (it.meta.updatedAt > existing.updatedAt) {
+        existing.content = it.content;
+        existing.updatedAt = it.meta.updatedAt;
+        merged++;
+      }
+    } else if (existing) {
+      const theirsNewer = it.meta && it.meta.updatedAt > existing.updatedAt;
+      clashes.push({
+        ...it,
+        existing,
+        theirsNewer,
+        choice: theirsNewer ? "replace" : "keep",
+      });
+    } else ready.push(it);
+  }
+
+  if (clashes.length && !(await importDialog(ready, clashes, skipped))) return;
+
+  let last = null;
+  let added = 0;
+  const add = (it, name) => {
+    if (wouldExceedStorage(it.content.length * 2 + name.length * 2 + 200)) {
+      skipped.push(`${name} — not enough storage space`);
+      return;
+    }
+    // The id may belong to a renamed or deleted note — don't reuse it
+    const idTaken =
+      !it.meta ||
+      state.notes.some((n) => n.id === it.meta.id) ||
+      state.deletedIds.includes(it.meta.id);
+    last = {
+      id: idTaken ? crypto.randomUUID() : it.meta.id,
+      name,
+      content: it.content,
+      updatedAt: it.meta?.updatedAt ?? Date.now(),
+      cursorPos: 0,
+    };
+    state.notes.unshift(last);
+    added++;
+  };
+  for (const it of ready) add(it, it.name);
+  for (const c of clashes) {
+    if (c.choice === "replace") {
+      pushHistory(c.existing.id, c.existing.content);
+      c.existing.content = c.content;
+      c.existing.updatedAt = c.meta?.updatedAt ?? Date.now();
+      last = c.existing;
+      added++;
+    } else if (c.choice === "keep") add(c, uniqueName(c.name));
+  }
+  if (last) {
+    sharedNote = null;
+    state.activeId = last.id;
+  }
+  if (last || merged) {
+    saveState();
+    scheduleDriveUpload(true);
+    if (mdViewActive) switchMdTab("edit");
+    render();
+    updateUrl();
+    const note = getActiveNote();
+    if (wasInView && note && hasViewTab(note.name)) switchMdTab("view");
+  }
+  const total = added + merged;
+  if (skipped.length && !clashes.length)
+    showToast(
+      (total ? `Imported ${total}, skipped ` : "Skipped ") +
+        skipped.map((s) => s.split(" — ")[0]).join(", ") +
+        " — " +
+        skipped[0].split(" — ")[1],
+      { error: true },
+    );
+  else if (total)
+    showToast(total === 1 ? "Imported " + (last?.name ?? "1 note") : `Imported ${total} notes`, {
+      ic: "check",
+    });
+}
+
+function importDialog(ready, clashes, skipped) {
+  return new Promise((resolve) => {
+    const count = () =>
+      ready.length + clashes.filter((c) => c.choice !== "skip").length;
+    const seg = (c, i) =>
+      `<div class="seg">${[
+        ["replace", "Replace"],
+        ["keep", "Keep both"],
+        ["skip", "Skip"],
+      ]
+        .map(
+          ([v, l]) =>
+            `<button data-row="${i}" data-choice="${v}" aria-pressed="${c.choice === v}">${l}</button>`,
+        )
+        .join("")}</div>`;
+    const row = (name, aside, extra = "") => {
+      const kind = noteKind(name);
+      return `<div class="import-row">${icon(kind.icon, "kind " + kind.cls)}<span class="note-item-name">${nameHtml(name)}</span>${aside ? `<span class="note-item-time">${aside}</span>` : ""}${extra}</div>`;
+    };
+    const total = ready.length + clashes.length;
+    const dlg = openDialog(
+      `<h2>Import ${total} ${total === 1 ? "note" : "notes"}</h2>` +
+        `<p>${clashes.length} already ${clashes.length === 1 ? "exists" : "exist"}. Choose what to do with each.</p>` +
+        `<div class="import-rows">` +
+        clashes
+          .map((c, i) =>
+            row(c.name, c.theirsNewer ? "theirs is newer" : c.meta ? "yours is newer" : "", seg(c, i)),
+          )
+          .join("") +
+        ready.map((r) => row(r.name, "New")).join("") +
+        skipped.map((s) => row(s.split(" — ")[0], "Skipped: " + s.split(" — ")[1])).join("") +
+        `</div>` +
+        `<div class="dialog-actions"><label class="same"><span class="check" role="checkbox" aria-checked="false" tabindex="0"></span>Same for all</label>` +
+        `<button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" data-dlg="ok">Import ${count()}</button></div>`,
+      (e, close) => {
+        const same = dlg.querySelector(".check");
+        const b = e.target.closest("[data-choice]");
+        if (b) {
+          const targets = same.getAttribute("aria-checked") === "true"
+            ? clashes
+            : [clashes[b.dataset.row]];
+          for (const c of targets) c.choice = b.dataset.choice;
+          for (const btn of dlg.querySelectorAll("[data-choice]"))
+            btn.setAttribute(
+              "aria-pressed",
+              clashes[btn.dataset.row].choice === btn.dataset.choice,
+            );
+          dlg.querySelector("[data-dlg=ok]").textContent = "Import " + count();
+          return;
+        }
+        if (e.target.closest("label.same")) {
+          e.preventDefault();
+          same.setAttribute(
+            "aria-checked",
+            same.getAttribute("aria-checked") !== "true",
+          );
+          return;
+        }
+        const act = e.target.closest("[data-dlg]")?.dataset.dlg;
+        if (act) close(act === "ok");
+      },
+      resolve,
+    );
+    dlg.querySelector("[data-dlg=ok]").focus();
+  });
+}
+
+// One dialog at a time in #dialogOverlay; Esc and the scrim cancel
+function openDialog(html, onClick, onClose = () => {}, cls = "") {
+  const overlay = document.getElementById("dialogOverlay");
+  const previousFocus = document.activeElement;
+  overlay.innerHTML = `<div class="dialog ${cls}" role="document">${html}</div>`;
+  overlay.classList.add("visible");
+  const dlg = overlay.firstElementChild;
+  let done = false;
+  const close = (result) => {
+    if (done) return;
+    done = true;
+    removeTrap();
+    overlay.classList.remove("visible");
+    overlay.innerHTML = "";
+    overlay.onclick = null;
+    previousFocus?.focus?.();
+    onClose(result);
+  };
+  const removeTrap = trapFocus(overlay, (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      close(false);
+    }
+  });
+  overlay.onclick = (e) => {
+    if (e.target === overlay) return close(false);
+    onClick(e, close);
+  };
+  return dlg;
+}
+
+const importInput = document.getElementById("importInput");
+function openImport() {
+  importInput.click();
+}
+importInput.addEventListener("change", () => {
+  importFiles([...importInput.files]);
+  importInput.value = "";
+});
+
+document.addEventListener("drop", (e) => {
   e.preventDefault();
   dragCounter = 0;
   dropOverlay.classList.remove("visible");
   if (zenModeActive) return;
-  const files = e.dataTransfer.files;
-  if (!files.length) return;
-  // Save vim buffer before switching
-  if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
-  const wasInView = mdViewActive;
-
-  // Separate zip files from text files
-  const zipFiles = [];
-  const textFiles = [];
-  const unsupported = [];
-  for (const file of files) {
-    if (
-      file.name.toLowerCase().endsWith(".zip") ||
-      file.type === "application/zip"
-    ) {
-      zipFiles.push(file);
-    } else if (file.type.startsWith("text/") || isTextFilename(file.name)) {
-      textFiles.push(file);
-    } else {
-      unsupported.push(file.name);
-    }
-  }
-
-  // Handle zip files
-  for (const zip of zipFiles) {
-    await importZip(zip);
-  }
-
-  // Handle text files (existing logic)
-  let remaining = textFiles.length;
-  for (const file of textFiles) {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      if (wouldExceedStorage(reader.result.length * 2)) {
-        showModal(
-          `"${file.name}" is too large. Delete some notes to free up space.`,
-          "ok",
-          null,
-        );
-        remaining--;
-        return;
-      }
-      const existing = state.notes.find((n) => n.name === file.name);
-      if (existing) {
-        const update = await showModal(
-          `"${file.name}" already exists.`,
-          "update",
-          "new file",
-        );
-        if (update) {
-          existing.content = reader.result;
-          existing.updatedAt = Date.now();
-          state.activeId = existing.id;
-          saveState();
-          render();
-        } else {
-          createNote(uniqueName(file.name), reader.result);
-        }
-      } else {
-        createNote(file.name, reader.result);
-      }
-      remaining--;
-      if (remaining === 0 && wasInView) {
-        const note = getActiveNote();
-        if (note && hasViewTab(note.name)) {
-          switchMdTab("view");
-        }
-      }
-    };
-    reader.readAsText(file);
-  }
-  if (unsupported.length) {
-    showModal(
-      "Unsupported file" +
-        (unsupported.length > 1 ? "s" : "") +
-        ": " +
-        unsupported.join(", ") +
-        ". Only text files are supported.",
-      "ok",
-      null,
-    );
-  }
+  importFiles([...e.dataTransfer.files]);
 });
 
 // ═══════════════════════════════════════════════════
@@ -7594,6 +8686,10 @@ window.addEventListener("pagehide", flushMirror);
 editor.addEventListener("input", () => {
   lastOccurrenceQuery = "";
   occurrenceOverlay.innerHTML = "";
+  if (sharedNote) {
+    sharedNote.content = editor.value;
+    saveShared(true);
+  }
   const note = getActiveNote();
   if (!note) return;
   // In vim mode, skip automatic history — vim commands handle their own undo
@@ -7818,59 +8914,65 @@ editor.addEventListener("keydown", (e) => {
   // Tab / Shift+Tab for indent/dedent
   if (e.key === "Tab") {
     e.preventDefault();
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const val = editor.value;
-    const lineStart = val.lastIndexOf("\n", start - 1) + 1;
-    const nl = val.indexOf("\n", lineStart);
-    const line = val.slice(lineStart, nl === -1 ? val.length : nl);
-    const listMarker =
-      start === end &&
-      isMarkdownFile(getActiveNote()?.name || "") &&
-      line.match(LIST_RE);
-
-    if (
-      listMarker &&
-      start <= lineStart + listMarker[0].length &&
-      !inCodeFence(val, lineStart)
-    ) {
-      // Cursor at the start of a list item: change its nesting level
-      const lead = line.match(/^(?:\t| {1,2})?/)[0];
-      if (!e.shiftKey) {
-        editor.setRangeText("  ", lineStart, lineStart, "preserve");
-        editor.setSelectionRange(start + 2, start + 2);
-      } else if (lead) {
-        editor.setRangeText("", lineStart, lineStart + lead.length, "preserve");
-        const pos = Math.max(lineStart, start - lead.length);
-        editor.setSelectionRange(pos, pos);
-      }
-    } else if (start === end && !e.shiftKey) {
-      // No selection: insert 2 spaces
-      editor.setRangeText("  ", start, end, "end");
-    } else {
-      // Selection: indent/dedent all selected lines
-      const lineEnd = val.indexOf("\n", end);
-      const actualEnd = lineEnd === -1 ? val.length : lineEnd;
-      const block = val.substring(lineStart, actualEnd);
-      const lines = block.split("\n");
-      let newLines;
-      if (e.shiftKey) {
-        newLines = lines.map((l) => {
-          if (l.startsWith("  ")) return l.slice(2);
-          if (l.startsWith("\t")) return l.slice(1);
-          return l;
-        });
-      } else {
-        newLines = lines.map((l) => "  " + l);
-      }
-      const newBlock = newLines.join("\n");
-      editor.setRangeText(newBlock, lineStart, actualEnd, "select");
-      editor.selectionStart = lineStart;
-      editor.selectionEnd = lineStart + newBlock.length;
-    }
-    editor.dispatchEvent(new Event("input"));
+    indentAtCursor(e.shiftKey);
   }
 });
+
+// At the start of a list item: change its nesting; with a selection: indent
+// or dedent its lines; otherwise insert two spaces
+function indentAtCursor(shift) {
+  const start = editor.selectionStart;
+  const end = editor.selectionEnd;
+  const val = editor.value;
+  const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+  const nl = val.indexOf("\n", lineStart);
+  const line = val.slice(lineStart, nl === -1 ? val.length : nl);
+  const listMarker =
+    start === end &&
+    isMarkdownFile(getActiveNote()?.name || "") &&
+    line.match(LIST_RE);
+
+  if (
+    listMarker &&
+    start <= lineStart + listMarker[0].length &&
+    !inCodeFence(val, lineStart)
+  ) {
+    // Cursor at the start of a list item: change its nesting level
+    const lead = line.match(/^(?:\t| {1,2})?/)[0];
+    if (!shift) {
+      editor.setRangeText("  ", lineStart, lineStart, "preserve");
+      editor.setSelectionRange(start + 2, start + 2);
+    } else if (lead) {
+      editor.setRangeText("", lineStart, lineStart + lead.length, "preserve");
+      const pos = Math.max(lineStart, start - lead.length);
+      editor.setSelectionRange(pos, pos);
+    }
+  } else if (start === end && !shift) {
+    // No selection: insert 2 spaces
+    editor.setRangeText("  ", start, end, "end");
+  } else {
+    // Selection: indent/dedent all selected lines
+    const lineEnd = val.indexOf("\n", end);
+    const actualEnd = lineEnd === -1 ? val.length : lineEnd;
+    const block = val.substring(lineStart, actualEnd);
+    const lines = block.split("\n");
+    let newLines;
+    if (shift) {
+      newLines = lines.map((l) => {
+        if (l.startsWith("  ")) return l.slice(2);
+        if (l.startsWith("\t")) return l.slice(1);
+        return l;
+      });
+    } else {
+      newLines = lines.map((l) => "  " + l);
+    }
+    const newBlock = newLines.join("\n");
+    editor.setRangeText(newBlock, lineStart, actualEnd, "select");
+    editor.selectionStart = lineStart;
+    editor.selectionEnd = lineStart + newBlock.length;
+  }
+  editor.dispatchEvent(new Event("input"));
+}
 
 document.addEventListener("keydown", (e) => {
   const inInput =
@@ -7878,6 +8980,15 @@ document.addEventListener("keydown", (e) => {
     document.activeElement !== editor &&
     (document.activeElement.tagName === "INPUT" ||
       document.activeElement.tagName === "TEXTAREA");
+  const mod = e.metaKey || e.ctrlKey;
+  const key = e.key.toLowerCase();
+
+  // Dialogs keep their own keys
+  if (
+    modalOverlay.classList.contains("visible") ||
+    document.getElementById("dialogOverlay").classList.contains("visible")
+  )
+    return;
 
   // In zen mode, block all shortcuts except "e", Escape, and Cmd/Ctrl+A
   if (zenModeActive) {
@@ -7887,11 +8998,7 @@ document.addEventListener("keydown", (e) => {
     } else if (e.key === "Escape") {
       e.preventDefault();
       exitZenMode();
-    } else if (
-      !inInput &&
-      (e.metaKey || e.ctrlKey) &&
-      (e.key === "a" || e.key === "A")
-    ) {
+    } else if (!inInput && mod && key === "a") {
       e.preventDefault();
       const sel = window.getSelection();
       const range = document.createRange();
@@ -7901,44 +9008,70 @@ document.addEventListener("keydown", (e) => {
     }
     return;
   }
-  // Switch from view to edit tab with "e" (on the canvas, e is the eraser)
+  // Switch from preview to edit with "e" (on the canvas, e is the eraser)
   if (
     !inInput &&
     mdViewActive &&
     !drawActive() &&
     e.key === "e" &&
-    !e.metaKey &&
-    !e.ctrlKey &&
+    !mod &&
     !e.altKey
   ) {
     e.preventDefault();
     switchMdTab("edit", true);
     return;
   }
-  // Find & Replace (skip if typing in an input)
-  if (!inInput && !mdViewActive && (e.metaKey || e.ctrlKey) && e.key === "h") {
+  // ⌘E: Edit ⇄ Preview, Canvas ⇄ Source
+  if (mod && !e.shiftKey && !e.altKey && key === "e") {
     e.preventDefault();
-    openFindReplace();
+    toggleView();
     return;
   }
-  // Search: Ctrl+F this note, Ctrl+P all notes (skip if typing in an input)
+  // Find and replace: ⌘⌥F, Ctrl+H
   if (
-    !inInput &&
-    (e.metaKey || e.ctrlKey) &&
-    (e.key === "p" || e.key === "f")
+    (mod && e.altKey && !e.shiftKey && e.code === "KeyF") ||
+    (e.ctrlKey && !e.metaKey && !e.shiftKey && key === "h")
   ) {
     e.preventDefault();
-    openSearch(e.key === "f" ? "note" : "all");
-    searchInput.select();
+    openFindReplace(true);
     return;
   }
-  // Close find replace
+  // Find: ⌘F (on the canvas it searches the shapes' text)
+  if (mod && !e.shiftKey && !e.altKey && key === "f") {
+    e.preventDefault();
+    if (drawActive()) openSearch("note");
+    else openFindReplace();
+    return;
+  }
+  // Palette: ⌘P notes, ⌘⇧P and ⌘/ commands
+  if (mod && !e.altKey && key === "p") {
+    e.preventDefault();
+    openSearch("all", e.shiftKey ? "> " : "");
+    return;
+  }
+  if (mod && e.key === "/") {
+    e.preventDefault();
+    openSearch("all", "> ");
+    return;
+  }
+  // ⌘\: sidebar
+  if (mod && e.key === "\\") {
+    e.preventDefault();
+    toggleSidebar();
+    return;
+  }
+  // F2: rename this note
+  if (e.key === "F2" && !inInput) {
+    e.preventDefault();
+    renameInTitle();
+    return;
+  }
+  // Escape closes the topmost layer only
   if (e.key === "Escape" && findReplaceBar.classList.contains("visible")) {
     e.preventDefault();
     closeFindReplace();
     return;
   }
-  // Close search
   if (e.key === "Escape" && searchResults.classList.contains("visible")) {
     e.preventDefault();
     closeSearch();
@@ -7946,51 +9079,45 @@ document.addEventListener("keydown", (e) => {
     editor.focus();
     return;
   }
-  // Close sidebar
   if (e.key === "Escape" && sidebar.classList.contains("open")) {
     e.preventDefault();
-    sidebar.classList.remove("open");
-    document.querySelector(".app").classList.remove("sidebar-open");
+    closeSidebar();
     editor.focus();
     return;
   }
   // Delete note
-  if (
-    (e.metaKey || e.ctrlKey) &&
-    e.shiftKey &&
-    (e.key === "d" || e.key === "D")
-  ) {
+  if (mod && e.shiftKey && key === "d") {
     e.preventDefault();
     const note = getActiveNote();
-    if (note) confirmDelete(note.id);
+    if (note && !sharedNote) deleteNote(note.id);
     return;
   }
-  // Undo
-  const key = e.key.toLowerCase();
-  if (!inInput && (e.metaKey || e.ctrlKey) && key === "z" && !e.shiftKey) {
+  // Undo — a just-deleted note first
+  if (!inInput && mod && key === "z" && !e.shiftKey) {
     e.preventDefault();
-    undo();
+    if (toastUndo) {
+      const fn = toastUndo;
+      hideToast();
+      fn();
+    } else undo();
     return;
   }
   // Redo
   if (
     !inInput &&
-    (((e.metaKey || e.ctrlKey) && e.shiftKey && key === "z") ||
+    ((mod && e.shiftKey && key === "z") ||
       (e.ctrlKey && !e.metaKey && key === "y"))
   ) {
     e.preventDefault();
     redo();
     return;
   }
-  // Ctrl+S: suppress browser save
-  if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+  // ⌘S: suppress the browser's save; format markdown if set, save and sync
+  if (mod && key === "s") {
     e.preventDefault();
     // Vim mode: do nothing (use :w)
     if (vimState.enabled) return;
-    // Zen mode: do nothing
-    if (zenModeActive) return;
-    // Edit mode (non-vim): autoformat markdown, then save + sync
-    if (!mdViewActive) {
+    if (!mdViewActive && formatOnSave()) {
       const note = getActiveNote();
       if (note && isMarkdownFile(note.name)) {
         const pos = editor.selectionStart;
@@ -8007,52 +9134,33 @@ document.addEventListener("keydown", (e) => {
         updateCursorPos();
       }
     }
-    // Save + sync (edit mode and view mode, not zen)
     saveState();
     scheduleUrlUpdate();
     if (gdriveConnected) driveSync();
     return;
   }
-  // New note
-  if (e.ctrlKey && !e.metaKey && !e.shiftKey && e.key === "n") {
+  // New note: ⌃N (Chrome keeps ⌘N and, on Windows, Ctrl+N), Alt+N elsewhere
+  if (
+    (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && key === "n") ||
+    (!IS_MAC && e.altKey && !mod && !e.shiftKey && e.code === "KeyN")
+  ) {
     e.preventDefault();
-    createNote();
+    createNote(undefined, undefined, true);
+    return;
   }
   // Toggle vim mode
-  if (e.ctrlKey && !e.metaKey && e.shiftKey && e.key === "M") {
+  if (e.ctrlKey && !e.metaKey && e.shiftKey && key === "m") {
     e.preventDefault();
     toggleVim();
+    return;
   }
-  // Format markdown (Ctrl+Shift+F)
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "F") {
+  // Format markdown: ⌥⇧F (and the old Ctrl+Shift+F)
+  if (
+    (e.altKey && e.shiftKey && !mod && e.code === "KeyF") ||
+    (mod && e.shiftKey && !e.altKey && key === "f")
+  ) {
     e.preventDefault();
-    const note = getActiveNote();
-    if (!note) return;
-    if (!isMarkdownFile(note.name)) {
-      showMdToast("format: markdown files only");
-      return;
-    }
-    const pos = editor.selectionStart;
-    pushHistory(note.id, editor.value);
-    const formatted = formatMarkdown(editor.value);
-    if (vimState.enabled) {
-      editor.value = formatted;
-      vimState.bufferDirty = true;
-      saveSwap(note.id, editor.value);
-    } else {
-      editor.value = formatted;
-      note.content = editor.value;
-      note.updatedAt = Date.now();
-      scheduleSave();
-    }
-    editor.selectionStart = editor.selectionEnd = Math.min(
-      pos,
-      editor.value.length,
-    );
-    updateLineNumbers();
-    updateHighlight();
-    updateCursorPos();
-    showMdToast("formatted");
+    formatNote();
   }
 });
 
@@ -8103,34 +9211,63 @@ function clearToken() {
   localStorage.removeItem(GDRIVE_TOKEN_KEY);
 }
 
+// The sidebar footer: sync state for all notes, with the fix when it fails
+let syncFailedState = false;
+let lastSyncAt = 0;
+const syncLabel = document.getElementById("syncLabel");
+const syncDot = document.getElementById("syncDot");
+
+function showSyncLine(on) {
+  document.getElementById("syncMenuContainer").style.display = on ? "" : "none";
+  document.getElementById("syncLocal").style.display = on ? "none" : "";
+  document.getElementById("btnDriveSync").hidden = on;
+}
+
 function showSyncConnected() {
-  document.getElementById("syncMenuContainer").style.display = "";
-  document.getElementById("btnDriveSync").style.display = "none";
-  document.querySelector(".sync-dot").classList.remove("disconnected");
-  document.getElementById("syncLabel").textContent = "sync";
+  syncFailedState = false;
+  showSyncLine(true);
+  syncDot.classList.remove("disconnected");
   document.getElementById("syncMenuConnected").style.display = "";
   document.getElementById("syncMenuFailed").style.display = "none";
-  document.getElementById("syncMenuDisconnected").style.display = "none";
+  updateSyncLine();
 }
 
 function showSyncFailed() {
-  document.getElementById("syncMenuContainer").style.display = "";
-  document.getElementById("btnDriveSync").style.display = "none";
-  document.querySelector(".sync-dot").classList.add("disconnected");
-  document.getElementById("syncLabel").textContent = "sync failed";
+  syncFailedState = true;
+  showSyncLine(true);
+  syncDot.classList.remove("syncing");
+  syncDot.classList.add("disconnected");
   document.getElementById("syncMenuConnected").style.display = "none";
   document.getElementById("syncMenuFailed").style.display = "";
-  document.getElementById("syncMenuDisconnected").style.display = "none";
   // Offline needs no action; a missing or revoked sign-in does
   document.getElementById("syncSignedOutHint").style.display = gdriveSignedOut
     ? ""
     : "none";
+  updateSyncLine();
 }
 
 function hideSyncConnected() {
-  document.getElementById("syncMenuContainer").style.display = "none";
-  document.getElementById("btnDriveSync").style.display = "";
-  document.querySelector(".sync-dot").classList.remove("disconnected");
+  syncFailedState = false;
+  showSyncLine(false);
+  syncDot.classList.remove("disconnected");
+  updateTitleBar();
+}
+
+function updateSyncLine() {
+  const when = document.getElementById("syncWhen");
+  if (syncDotCount > 0) {
+    syncLabel.textContent = "Syncing…";
+    when.textContent = "";
+  } else if (syncFailedState) {
+    syncLabel.innerHTML = gdriveSignedOut
+      ? "<b>Sync paused</b> · sign-in expired"
+      : "<b>Sync paused</b> · will retry";
+    when.textContent = "";
+  } else {
+    syncLabel.textContent = "Synced to Google Drive";
+    when.textContent = lastSyncAt ? relativeTime(lastSyncAt) : "";
+  }
+  updateTitleBar();
 }
 
 let gdriveRefreshTimer = null;
@@ -8315,7 +9452,7 @@ function applyDriveSettings(settings) {
     localStorage.setItem(WRAP_KEY, settings.wrap);
     const wrapOn = settings.wrap === "true";
     editorArea.classList.toggle("wrap", wrapOn);
-    btnWrap.classList.toggle("active", wrapOn);
+    btnWrap.setAttribute("aria-pressed", wrapOn);
     if (wrapOn) {
       requestAnimationFrame(syncScrollbarGap);
     } else {
@@ -8529,7 +9666,11 @@ async function runSync() {
       // Pick up edits other tabs saved, then merge with Drive
       mergeFromStorage();
       const before = activeNoteVersion();
+      const copiesBefore = new Set(
+        state.notes.filter((n) => isConflictCopy(n.name)).map((n) => n.id),
+      );
       const needsUpload = mergeDriveState(remote, base);
+      announceConflicts(copiesBefore);
       saveState();
       if (activeNoteVersion() !== before) render();
       else renderNoteList();
@@ -8587,6 +9728,20 @@ async function runSync() {
   }
 }
 
+// Both sides changed a note: the merge kept both — now say so, once
+function announceConflicts(before) {
+  const fresh = state.notes.filter(
+    (n) => isConflictCopy(n.name) && !before.has(n.id),
+  );
+  if (!fresh.length) return;
+  showToast(
+    fresh.length === 1
+      ? "1 note changed on two devices — both kept"
+      : fresh.length + " notes changed on two devices — both kept",
+    { action: "Show", onAction: () => switchNote(fresh[0].id) },
+  );
+}
+
 // User-initiated (menu, Ctrl+S): may go to Google's sign-in page
 async function driveSync() {
   closeAllMenus();
@@ -8607,22 +9762,19 @@ let syncDotCount = 0;
 let syncDotTimer = null;
 let syncOkTimer = null;
 function setSyncDotSyncing(on) {
-  const dot = document.querySelector(".sync-dot");
-  const label = document.getElementById("syncLabel");
-  if (!dot || !label) return;
   if (on) {
     syncDotCount++;
     clearTimeout(syncDotTimer);
-    clearTimeout(syncOkTimer);
-    dot.classList.add("syncing");
-    dot.classList.remove("disconnected");
-    label.textContent = "syncing";
+    syncDot.classList.add("syncing");
+    syncDot.classList.remove("disconnected");
+    updateSyncLine();
   } else {
     syncDotCount = Math.max(0, syncDotCount - 1);
     if (syncDotCount === 0) {
-      // Keep blinking for at least one full cycle (1.4s)
+      updateSyncLine();
+      // Keep pulsing for at least one full cycle
       syncDotTimer = setTimeout(() => {
-        if (syncDotCount === 0) dot.classList.remove("syncing");
+        if (syncDotCount === 0) syncDot.classList.remove("syncing");
       }, 900);
     }
   }
@@ -8631,15 +9783,9 @@ function setSyncResult(success) {
   clearTimeout(syncOkTimer);
   clearTimeout(syncDotTimer);
   if (success) {
+    lastSyncAt = Date.now();
+    syncDot.classList.remove("syncing");
     showSyncConnected();
-    const dot = document.querySelector(".sync-dot");
-    if (dot) {
-      dot.classList.remove("syncing");
-      dot.textContent = "✔";
-      syncOkTimer = setTimeout(() => {
-        dot.textContent = "●";
-      }, 2000);
-    }
   } else {
     showSyncFailed();
   }
@@ -8673,45 +9819,58 @@ const HELP_DESKTOP = [
   "",
   "A private, local-first editor for text and drawings.",
   "No data is collected, transmitted, or stored on any server.",
-  "Your notes stay in your browser — always.",
+  "Your notes stay in your browser — nothing is sent anywhere.",
+  "",
+  "## Start",
+  "",
+  "- **+** at the top left, or ⌃N (Alt+N on Windows and Linux) — a new note",
+  "- **⌘P** (Ctrl+P) finds any note, any line, and with `>` any command",
+  "- **Share** at the top right puts the whole note in a link",
   "",
   "## Share via URL",
   "",
-  "Pick **menu → share** to embed a note directly in the URL.",
   "No server, no upload — the entire note lives in the link.",
-  "Anyone with the link can read it instantly (~60kB limit).",
+  "Pick *Editable* or *Read-only*; anyone with the link can read it",
+  "instantly (~60kB limit). A link someone sends you opens for",
+  "reading first, and joins your notes only when you save it.",
+  "",
+  "## Keep it safe",
+  "",
+  "Browsers can clear their storage without warning.",
+  "Turn on Google Drive sync or export a ZIP now and then —",
+  "both in **note ▾ › Settings**.",
   "",
   "## Tips",
   "",
-  "Browsers can clear their storage without warning.",
-  "Bookmark your notes (URL updates as you type)",
-  "or enable Drive sync so nothing gets lost.",
-  "",
-  "- Click a file to open, click again to rename",
-  "- Drag to reorder, pin to keep on top",
-  "- Drop files to import, download zip to backup",
-  "- Word wrap and vim mode in the status bar",
-  "- .md files get edit/view tabs for markdown preview",
-  "- .draw files open on a drawing canvas (▾ next to +)",
+  "- Double-click a note to rename it, or F2 for the open one",
+  "- Right-click a note for everything else; drag to reorder",
+  "- Pin notes to keep them on top",
+  "- Deleting shows Undo for a few seconds",
+  "- Drop files anywhere, or **note ▾ › Import files…**",
+  "- Word wrap and vim keys in the status bar",
+  "- .md files switch between Edit and Preview, .draw files",
+  "  between Canvas and Source",
   "- Link between notes: [label](other.md)",
   "- Syncs across tabs automatically",
   "",
   "## Shortcuts",
   "",
-  "- Ctrl+N — new note",
-  "- Ctrl+F — search this note · Ctrl+P — search all notes",
-  "- Ctrl+H — find & replace",
-  "- Ctrl+Shift+D — delete note",
-  "- Ctrl+Shift+F — format markdown",
-  "- Tab / Shift+Tab — indent / dedent",
+  "On Windows and Linux, ⌘ is Ctrl, ⌥ is Alt and ⇧ is Shift.",
+  "",
+  "- ⌃N (Alt+N) — new note",
+  "- ⌘P — search notes · ⌘⇧P or ⌘/ — all commands",
+  "- ⌘F — find · ⌘⌥F or Ctrl+H — find and replace",
+  "- ⌘E — Edit ⇄ Preview (or E in Preview)",
+  "- F2 — rename · ⌘\\ — show or hide the sidebar",
+  "- ⌘⇧D — delete note (with Undo)",
+  "- ⌥⇧F — format markdown (⌘S does too, see Settings)",
+  "- Tab / ⇧Tab — indent / dedent; at a list item, its nesting",
   "- Enter in a list continues it, on an empty item ends it",
-  "- Alt+↑ / Alt+↓ — move line up / down",
-  "- e — switch from view to edit (in markdown preview)",
+  "- ⌥↑ / ⌥↓ — move line up / down",
   "",
   "## Markdown preview",
   "",
-  ".md files have edit/view tabs. The view tab renders",
-  "your markdown with these interactive features:",
+  "Preview renders your markdown with these interactive features:",
   "",
   "- **Heading anchors** — hover a heading to reveal a #",
   "  link. Click it to copy a shareable URL with the",
@@ -8732,8 +9891,8 @@ const HELP_DESKTOP = [
   "",
   "## Drawings",
   "",
-  "Pick **drawing** from the ▾ next to + (or :draw in vim).",
-  "A drawing is text too: file → source shows one line per",
+  "Pick **New drawing** from the ▾ next to + (or :draw in vim).",
+  "A drawing is text too: **Source** shows one line per",
   "shape, so it syncs, shares and searches like any note.",
   "",
   "```draw",
@@ -8754,11 +9913,11 @@ const HELP_DESKTOP = [
   "- Space+drag or scroll to pan · Ctrl+scroll to zoom",
   "- Shift+1 fit · Shift+0 100% · Ctrl+' grid",
   "- Ctrl+B / Ctrl+I / Ctrl+U bold, italic, underline",
-  "- File menu: copy as png, download svg",
+  "- ⋯ menu: Copy as PNG, Download as SVG",
   "",
   "## Vim",
   "",
-  "Toggle from the status bar.",
+  "Toggle from the status bar, or ⌃⇧M.",
   "Keys do different things depending on the mode.",
   "",
   "### Modes",
@@ -8833,33 +9992,37 @@ const HELP_MOBILE = [
   "",
   "A private, local-first editor for text and drawings.",
   "No data is collected, transmitted, or stored on any server.",
-  "Your notes stay in your browser — always.",
+  "Your notes stay in your browser — nothing is sent anywhere.",
+  "",
+  "## Start",
+  "",
+  "- Tap **‹** at the top left for your notes, **+** for a new one",
+  "- Tap a note's name at the top for rename, pin, zen and more",
+  "- Hold a note in the list for the same actions",
+  "- The key bar above the keyboard has Tab, ⇧Tab, tasks and undo",
   "",
   "## Share via URL",
   "",
-  "Tap **menu → share** to embed a note directly in the URL.",
-  "No server, no upload — the entire note lives in the link.",
-  "Anyone with the link can read it instantly (~60kB limit).",
+  "Tap **Share** to embed a note in a link. No server, no upload —",
+  "the entire note lives in the link (~60kB limit). A link someone",
+  "sends you opens for reading first, and joins your notes only",
+  "when you save it.",
+  "",
+  "## Keep it safe",
+  "",
+  "Browsers can clear their storage without warning.",
+  "Turn on Google Drive sync or export a ZIP now and then —",
+  "both in **note ▾ › Settings**.",
   "",
   "## Tips",
   "",
-  "Browsers can clear their storage without warning.",
-  "Bookmark your notes (URL updates as you type)",
-  "or enable Drive sync so nothing gets lost.",
-  "",
-  "- Download zip to backup",
-  "- .md files get edit/view tabs for markdown preview",
-  "- Tap ▾ next to + for a drawing: one finger draws,",
-  "  two fingers pan and zoom, a two-finger tap undoes",
+  "- **note ▾ › Import files…** brings in text files or a ZIP",
+  "- Deleting shows Undo for a few seconds",
+  "- .md files switch between Edit and Preview",
+  "- Drawings: one finger draws, two fingers pan and zoom,",
+  "  a two-finger tap undoes",
   "- Link between notes: [label](other.md)",
   "- Syncs across tabs automatically",
-  "",
-  "## Getting started",
-  "",
-  '- Tap "notes" to open the sidebar',
-  "- Tap + to create a new note",
-  "- Tap a file to open, tap again to rename",
-  "- Long press to pin or delete",
 ].join("\n");
 
 const MD_DEMO = [
@@ -9012,6 +10175,8 @@ async function openHelp() {
 
 async function init() {
   const isFirstVisit = !(await loadState());
+  if (localStorage.getItem(SIDEBAR_HIDDEN_KEY) === "true" && !isMobile())
+    document.querySelector(".app").classList.add("sidebar-hidden");
   loadWrap();
   applyTheme(currentTheme());
   loadVim();
@@ -9054,7 +10219,9 @@ async function init() {
   }
   render();
   checkMdViewParam();
+  showSharedView();
   updateUrl();
+  updateSyncLine();
   startTimestampRefresh();
   if (getActiveNote() && !zenModeActive) {
     const note = getActiveNote();
@@ -9083,26 +10250,29 @@ const clickActions = {
   "new-drawing": () => createNote(undefined, undefined, false, "draw"),
   "new-drawing-rename": () => createNote(undefined, undefined, true, "draw"),
   "toggle-new-menu": toggleNewMenu,
-  "draw-source": () => switchMdTab("edit", true),
-  "download-html": () => downloadHtml(getActiveNote()),
+  "toggle-app-menu": toggleAppMenu,
+  "toggle-note-menu": toggleNoteMenu,
+  "toggle-sync-menu": toggleSyncMenu,
+  "toggle-theme-menu": openThemeMenu,
+  "toggle-system-theme": toggleSystemTheme,
+  "toggle-share": () => openShare(),
+  "rename-active": renameInTitle,
   "zen-download": zenDownload,
-  "draw-copy-png": drawCopyPng,
-  "draw-download-svg": drawDownloadSvg,
+  "zen-save": zenSave,
   "toggle-sidebar": toggleSidebar,
   "find-next": findNext,
   "find-prev": findPrev,
   "replace-current": replaceCurrent,
   "replace-all": replaceAll,
-  "close-find-replace": closeFindReplace,
-  "find-replace": openFindReplace,
-  "toggle-file-menu": toggleFileMenu,
-  "toggle-sync-menu": toggleSyncMenu,
-  share: shareNote,
-  download: downloadNote,
+  "close-find-replace": () => closeFindReplace(),
+  "toggle-replace": toggleReplace,
   "download-all": downloadAll,
-  search: openSearch,
-  "close-search": closeSearch,
+  import: openImport,
+  settings: () => openSettings(),
+  shortcuts: () => openSearch("all", "> "),
+  search: () => openSearch(),
   help: openHelp,
+  "md-demo": openMdDemo,
   "drive-sync": driveSync,
   "drive-sign-out": () => driveSignOut(),
   "tab-edit": () => switchMdTab("edit", true),
@@ -9112,8 +10282,7 @@ const clickActions = {
   "zen-share": zenShare,
   "toggle-vim": toggleVim,
   "toggle-wrap": toggleWrap,
-  "set-theme": setTheme,
-  "toggle-theme-menu": () => themeMenu.classList.toggle("visible"),
+  "set-theme": () => setTheme(),
 };
 let actionEl = null;
 document.addEventListener("click", (e) => {

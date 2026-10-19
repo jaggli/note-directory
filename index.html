@@ -104,8 +104,10 @@
         box-sizing: border-box;
       }
 
-      /* Catppuccin flavours; mocha is the default, latte is brightened to white */
-      :root {
+      /* Catppuccin flavours; mocha is the default, latte is brightened to white.
+         Any element can carry data-theme (settings previews) */
+      :root,
+      [data-theme="mocha"] {
         --bg: #1e1e2e;
         --sidebar: #181825;
         --surface: #1e1e2e;
@@ -132,7 +134,7 @@
           "Courier New", monospace;
       }
 
-      :root[data-theme="macchiato"] {
+      [data-theme="macchiato"] {
         --bg: #24273a;
         --sidebar: #1e2030;
         --surface: #24273a;
@@ -156,7 +158,7 @@
         --pink: #f5bde6;
       }
 
-      :root[data-theme="frappe"] {
+      [data-theme="frappe"] {
         --bg: #303446;
         --sidebar: #292c3c;
         --surface: #303446;
@@ -180,7 +182,7 @@
         --pink: #f4b8e4;
       }
 
-      :root[data-theme="latte"] {
+      [data-theme="latte"] {
         --bg: #ffffff;
         --sidebar: #f5f6f9;
         --surface: #ffffff;
@@ -207,7 +209,7 @@
       }
 
       /* VS Code Dark Modern, with Dark+ syntax colours */
-      :root[data-theme="espresso"] {
+      [data-theme="espresso"] {
         --bg: #1f1f1f;
         --sidebar: #181818;
         --surface: #1f1f1f;
@@ -259,457 +261,6 @@
         color: var(--text);
         display: flex;
         flex-direction: column;
-      }
-
-      .app {
-        display: flex;
-        flex: 1;
-        overflow: hidden;
-      }
-
-      /* Sidebar */
-      .sidebar {
-        width: var(--sidebar-width, 200px);
-        min-width: 120px;
-        max-width: 50vw;
-        background: var(--sidebar);
-        border-right: 1px solid var(--border);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        position: relative;
-      }
-
-      .sidebar-resize {
-        position: absolute;
-        top: 0;
-        right: -4px;
-        width: 8px;
-        height: 100%;
-        cursor: col-resize;
-        z-index: 10;
-      }
-
-      .sidebar-resize:hover,
-      .sidebar-resize.active {
-        background: var(--blue);
-        opacity: 0.4;
-      }
-
-      .sidebar-header {
-        padding: 12px 14px 8px;
-        font-size: 20px;
-        letter-spacing: 1px;
-        color: var(--subtext);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .btn-new {
-        background: none;
-        border: none;
-        color: var(--subtext);
-        cursor: pointer;
-        font-size: 18px;
-        line-height: 1;
-        padding: 4px 0;
-        width: 36px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 3px;
-      }
-
-      .btn-new:hover {
-        color: var(--text);
-        background: var(--overlay);
-      }
-
-      .search-input {
-        width: 100%;
-        background: var(--overlay);
-        border: none;
-        border-bottom: 1px solid var(--border);
-        border-radius: 0;
-        color: var(--text);
-        font-family: var(--font);
-        font-size: 13px;
-        padding: 6px 14px;
-        outline: none;
-      }
-
-      .search-input::placeholder {
-        color: var(--gutter);
-      }
-
-      .search-input:focus {
-        background: var(--surface);
-      }
-
-      /* Focus shows as the background; an outline gets clipped by the box */
-      .search-input:focus-visible {
-        outline: none;
-      }
-
-      .search-results {
-        display: none;
-        position: fixed;
-        top: 10%;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 500px;
-        max-width: 90%;
-        max-height: 70vh;
-        background: var(--sidebar);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        z-index: 210;
-        flex-direction: column;
-        overflow: hidden;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      }
-
-      .search-results .search-results-header {
-        padding: 0;
-        gap: 0;
-        border-bottom: 1px solid var(--border);
-      }
-
-      .search-results .search-results-header .search-input {
-        border: none;
-        border-radius: 8px 0 0 0;
-        padding: 10px 14px;
-        background: var(--overlay);
-      }
-
-      .search-results .search-results-header .search-input:focus {
-        background: var(--surface);
-      }
-
-      .search-results.visible {
-        display: flex;
-      }
-
-      .search-scope {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 0 10px;
-        font-size: 12px;
-        color: var(--subtext);
-        white-space: nowrap;
-        cursor: pointer;
-        user-select: none;
-      }
-
-      .search-scope input {
-        appearance: none;
-        -webkit-appearance: none;
-        width: 14px;
-        height: 14px;
-        margin: 0;
-        border: 2px solid var(--blue);
-        border-radius: 3px;
-        position: relative;
-        cursor: pointer;
-      }
-
-      .search-scope input:checked {
-        background: var(--blue);
-      }
-
-      .search-scope input:checked::after {
-        content: "\2714";
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        font-size: 10px;
-        color: var(--bg);
-        font-weight: bold;
-      }
-
-      .search-backdrop {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.3);
-        z-index: 209;
-      }
-
-      .search-backdrop.visible {
-        display: block;
-      }
-
-      .search-results-header {
-        display: flex;
-        align-items: center;
-        padding: 8px;
-        gap: 8px;
-        border-bottom: 1px solid var(--border);
-      }
-
-      .search-results-header .search-input {
-        flex: 1;
-        border-bottom: 1px solid var(--border);
-        border-radius: 4px;
-      }
-
-      .search-results-count {
-        font-size: 11px;
-        color: var(--gutter);
-        white-space: nowrap;
-        padding-left: 4px;
-      }
-
-      .search-results-list {
-        overflow-y: auto;
-        padding: 4px 0;
-      }
-
-      .search-results-list:empty {
-        display: none;
-      }
-
-      .search-result-item {
-        padding: 6px 14px;
-        cursor: pointer;
-        font-size: 13px;
-        color: var(--subtext);
-      }
-
-      .search-result-item:hover,
-      .search-result-item.selected {
-        background: var(--overlay);
-        color: var(--text);
-      }
-
-      .search-result-name {
-        color: var(--blue);
-        font-size: 12px;
-        margin-bottom: 2px;
-      }
-
-      .search-result-name mark {
-        background: none;
-        color: var(--green);
-      }
-
-      .search-result-snippet {
-        font-size: 12px;
-        color: var(--subtext);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .search-result-snippet mark {
-        background: none;
-        color: var(--blue);
-      }
-
-      .search-no-results {
-        padding: 16px 14px;
-        font-size: 13px;
-        color: var(--gutter);
-      }
-
-      .btn-search-close {
-        background: none;
-        border: none;
-        color: var(--subtext);
-        cursor: pointer;
-        font-size: 16px;
-        line-height: 1;
-        padding: 4px 10px;
-        border-radius: 3px;
-      }
-
-      .btn-search-close:hover {
-        color: var(--text);
-        background: var(--overlay);
-      }
-
-      .note-list {
-        flex: 1;
-        overflow-y: auto;
-        padding: 0 0 4px;
-      }
-
-      .note-item {
-        display: flex;
-        align-items: flex-start;
-        padding: 6px 14px 6px 0;
-        margin: 2px 0;
-        cursor: pointer;
-        font-size: 14px;
-        color: var(--subtext);
-        position: relative;
-      }
-
-      .note-item:hover {
-        background: var(--overlay);
-        color: var(--text);
-      }
-
-      .note-item.active {
-        background: var(--overlay);
-        color: var(--text);
-      }
-
-      .note-item-name {
-        display: flex;
-        flex: 1;
-        min-width: 0;
-        font-family: var(--font);
-        font-size: 14px;
-        cursor: pointer;
-        overflow: hidden;
-      }
-
-      .note-item-name-start {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        flex-shrink: 1;
-      }
-
-      .note-item-name-end {
-        white-space: nowrap;
-        flex-shrink: 0;
-      }
-
-      .note-item-input {
-        display: none;
-        flex: 1;
-        background: none;
-        border: none;
-        color: inherit;
-        font-family: var(--font);
-        font-size: 14px;
-        padding: 0 4px;
-        margin: 0 -4px;
-        outline: none;
-        min-width: 0;
-        cursor: text;
-      }
-
-      .note-item-input.editing {
-        display: block;
-      }
-
-      .note-item-input.editing + .note-item-name {
-        display: none;
-      }
-
-      .note-item .btn-delete {
-        background: none;
-        border: none;
-        color: var(--gutter);
-        cursor: pointer;
-        font-size: 18px;
-        width: 36px;
-        line-height: 1;
-        border-radius: 3px;
-        flex-shrink: 0;
-        align-self: stretch;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .note-item .btn-rename {
-        display: flex;
-        background: none;
-        border: none;
-        color: var(--gutter);
-        cursor: pointer;
-        font-size: 16px;
-        width: 36px;
-        line-height: 1;
-        border-radius: 3px;
-        flex-shrink: 0;
-        align-self: stretch;
-        align-items: center;
-        justify-content: center;
-      }
-
-      /* Note pin */
-      .note-item .btn-pin {
-        background: none;
-        border: none;
-        color: var(--gutter);
-        cursor: pointer;
-        font-size: 14px;
-        width: 36px;
-        text-align: center;
-        line-height: 1;
-        border-radius: 3px;
-        flex-shrink: 0;
-        align-self: stretch;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .note-item .btn-pin.pinned {
-        color: var(--blue);
-      }
-
-      /* Pointer: fine (mouse) — hide icons, reveal on hover */
-      @media (pointer: fine) {
-        .note-item .btn-delete,
-        .note-item .btn-pin:not(.pinned) {
-          color: transparent;
-        }
-        .note-item .btn-rename {
-          display: none;
-        }
-        .note-item:hover .btn-delete {
-          color: var(--gutter);
-        }
-        .note-item .btn-delete:hover {
-          color: var(--red);
-        }
-        .note-item:hover .btn-pin:not(.pinned) {
-          color: var(--gutter);
-        }
-        .note-item .btn-pin:hover {
-          color: var(--subtext);
-        }
-        .note-item .btn-pin.pinned:hover {
-          color: var(--blue);
-        }
-      }
-
-      /* Note metadata (name + timestamp) */
-      .note-item-meta {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        min-width: 0;
-      }
-
-      .note-item-time {
-        font-size: 12px;
-        color: var(--gutter);
-        line-height: 1.3;
-      }
-
-      .note-item.active .note-item-time {
-        color: var(--subtext);
-      }
-
-      /* Drag reorder */
-      .note-item.dragging {
-        opacity: 0.3;
-      }
-
-      .note-item.drag-over {
-        border-top: 2px solid var(--blue);
-        padding-top: 4px;
       }
 
       /* Editor area */
@@ -803,81 +354,6 @@
         z-index: 0;
       }
 
-      /* Editor top bar */
-      .md-tab-bar {
-        display: flex;
-        align-items: center;
-        border-bottom: 1px solid var(--border);
-        background: var(--sidebar);
-        padding: 0 4px;
-        gap: 0;
-      }
-
-      .md-tab-bar-left {
-        display: flex;
-        align-items: center;
-        gap: 0;
-      }
-
-      .md-tabs {
-        display: none;
-        margin-left: auto;
-      }
-
-      .md-tabs.visible {
-        display: flex;
-      }
-
-      /* Desktop: tabs centred in the top bar (mobile keeps them right) */
-      @media (min-width: 901px) {
-        .md-tab-bar {
-          position: relative;
-        }
-
-        .md-tabs {
-          position: absolute;
-          left: 50%;
-          bottom: 0;
-          transform: translateX(-50%);
-        }
-      }
-
-      .md-tab-bar .file-menu {
-        top: 100%;
-        bottom: auto;
-        left: 0;
-        right: auto;
-        margin-top: 4px;
-        margin-bottom: 0;
-      }
-
-      .md-tab-bar .btn-share {
-        font-size: 14px;
-        padding: 6px 14px;
-        border-radius: 0;
-      }
-
-      .md-tab {
-        background: none;
-        border: none;
-        color: var(--subtext);
-        font-family: var(--font);
-        font-size: 14px;
-        padding: 6px 14px;
-        cursor: pointer;
-        border-bottom: 2px solid transparent;
-        margin-bottom: -1px;
-      }
-
-      .md-tab:hover {
-        color: var(--text);
-      }
-
-      .md-tab.active {
-        color: var(--blue);
-        border-bottom-color: var(--blue);
-      }
-
       /* Markdown preview */
       .md-preview {
         display: none;
@@ -904,56 +380,6 @@
         display: block;
       }
 
-      /* New-note split button: + creates text, ▾ picks the kind */
-      .new-split {
-        position: relative;
-        display: flex;
-        align-items: center;
-      }
-
-      .btn-new.btn-new-more {
-        width: 20px;
-        font-size: 11px;
-      }
-
-      .status-hint.btn-new-more {
-        padding: 2px 4px;
-        font-size: 11px;
-      }
-
-      .new-split .new-menu {
-        min-width: 140px;
-        left: 0;
-        right: auto;
-      }
-
-      .sidebar-header .new-menu {
-        top: 100%;
-        bottom: auto;
-        left: auto;
-        right: 0;
-        margin: 4px 0 0;
-      }
-
-      .new-menu kbd {
-        color: var(--gutter);
-        font-size: 12px;
-        margin-left: 8px;
-      }
-
-      .file-menu .draw-only {
-        display: none;
-      }
-
-      .file-menu.is-draw .draw-only,
-      .file-menu.is-md .md-only {
-        display: block;
-      }
-
-      .file-menu .md-only {
-        display: none;
-      }
-
       /* Drawing canvas (UI styles come with draw.js) */
       .draw-host {
         display: none;
@@ -970,7 +396,7 @@
       }
 
       .zen-mode .draw-host.visible {
-        margin-top: 37px;
+        margin-top: 44px;
       }
 
       .draw-embed {
@@ -1042,149 +468,6 @@
         height: 40vh;
       }
 
-      .zen-bar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 1000;
-        background: var(--bg);
-        border-bottom: 1px solid var(--border);
-        padding: 8px 16px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-family: var(--font);
-        font-size: 13px;
-        color: var(--subtext);
-        user-select: none;
-        -webkit-user-select: none;
-      }
-      .zen-bar-left {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        min-width: 0;
-        flex: 1;
-      }
-      .zen-bar-logo {
-        width: 18px;
-        height: 18px;
-        border-radius: 3px;
-        flex-shrink: 0;
-        outline: 2px solid var(--border);
-      }
-      .zen-bar-filename {
-        color: var(--subtext);
-        display: flex;
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-      }
-      .zen-bar-filename-start {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        flex-shrink: 1;
-      }
-      .zen-bar-filename-end {
-        white-space: nowrap;
-        flex-shrink: 0;
-      }
-      .zen-bar-right {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        position: relative;
-        flex-shrink: 0;
-      }
-
-      .zen-close-btn {
-        padding: 4px 10px;
-        border: none;
-        border-radius: 4px;
-        background: none;
-        color: var(--text);
-        cursor: pointer;
-        font-family: var(--font);
-        font-size: 18px;
-        line-height: 1;
-        opacity: 0.4;
-        transition: opacity 0.2s;
-      }
-      .zen-close-btn:hover {
-        opacity: 1;
-      }
-
-      .zen-actions {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        z-index: 1000;
-        display: flex;
-        gap: 2px;
-        padding: 3px;
-        background: var(--sidebar);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        opacity: 0.6;
-        transition: opacity 0.2s;
-      }
-
-      .zen-actions:hover,
-      .zen-actions:focus-within {
-        opacity: 1;
-      }
-
-      .zen-action-btn {
-        width: 36px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: none;
-        border: none;
-        border-radius: 6px;
-        color: var(--subtext);
-        cursor: pointer;
-      }
-
-      .zen-action-btn:hover {
-        background: var(--overlay);
-        color: var(--text);
-      }
-
-      .zen-action-btn svg {
-        fill: none;
-        stroke: currentColor;
-        stroke-width: 1.8;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-      }
-
-      @media (pointer: coarse) {
-        .zen-action-btn {
-          width: 44px;
-          height: 44px;
-        }
-      }
-
-      .zen-copied {
-        font-family: var(--font);
-        font-size: 13px;
-        color: var(--subtext);
-        opacity: 0;
-        transition: opacity 0.2s;
-        position: fixed;
-        bottom: 56px;
-        right: 24px;
-        z-index: 1000;
-        white-space: nowrap;
-        pointer-events: none;
-      }
-      .zen-copied.visible {
-        opacity: 1;
-      }
 
       .md-preview h1,
       .md-preview h2,
@@ -1460,13 +743,15 @@
       .md-preview li.task-item input[type="checkbox"] {
         appearance: none;
         -webkit-appearance: none;
+        display: inline-grid;
+        place-items: center;
         width: 16px;
         height: 16px;
-        border: 2px solid var(--blue);
-        border-radius: 3px;
-        margin-right: 8px;
+        margin: 0 8px 0 0;
+        border-radius: 4px;
+        box-shadow: inset 0 0 0 1.5px var(--n-text-3);
         position: relative;
-        top: 2px;
+        top: 3px;
         cursor: pointer;
         flex-shrink: 0;
       }
@@ -1475,25 +760,25 @@
         flex: 1;
       }
 
+      /* Checked: accent fill, a dark tick drawn in CSS — full contrast */
       .md-preview li.task-item input[type="checkbox"]:checked {
-        background: var(--text);
-        border-color: var(--text);
-        opacity: 0.5;
+        background: var(--n-accent);
+        box-shadow: none;
+        color: var(--n-on-accent);
       }
 
       .md-preview li.task-item input[type="checkbox"]:checked::after {
-        content: "\2714";
-        position: absolute;
-        left: 0;
-        top: -2px;
-        font-size: 14px;
-        color: var(--bg);
-        font-weight: bold;
+        content: "";
+        width: 8px;
+        height: 4.5px;
+        border: solid currentColor;
+        border-width: 0 0 2px 2px;
+        transform: translateY(-1px) rotate(-45deg);
       }
 
       .md-preview li.task-item:has(> input:checked) > :is(span, label) {
         text-decoration: line-through;
-        opacity: 0.5;
+        color: var(--n-text-3);
       }
 
       /* Focus visible */
@@ -1558,357 +843,6 @@
       .hl-link {
         color: var(--hl-link, var(--blue));
         text-decoration: underline;
-      }
-
-      /* Empty state */
-      .empty-state {
-        display: none;
-        position: absolute;
-        inset: 0;
-        align-items: center;
-        justify-content: center;
-        color: var(--gutter);
-        font-size: 14px;
-        font-family: var(--font);
-        z-index: 2;
-        flex-direction: column;
-        gap: 4px;
-        pointer-events: none;
-      }
-
-      .empty-state.visible {
-        display: flex;
-      }
-
-      .empty-state-mobile {
-        display: none;
-        pointer-events: auto;
-      }
-
-      /* Find & Replace */
-      .find-replace-bar {
-        display: none;
-        background: var(--sidebar);
-        border-bottom: 1px solid var(--border);
-        padding: 6px 12px;
-        gap: 6px;
-        align-items: center;
-        font-size: 13px;
-      }
-
-      .find-replace-bar.visible {
-        display: flex;
-      }
-
-      .find-replace-bar input {
-        background: var(--overlay);
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        color: var(--text);
-        font-family: var(--font);
-        font-size: 13px;
-        padding: 3px 8px;
-        outline: none;
-        width: 160px;
-      }
-
-      .find-replace-bar input:focus {
-        border-color: var(--blue);
-      }
-
-      .find-replace-bar button {
-        background: none;
-        border: 1px solid var(--border);
-        color: var(--subtext);
-        cursor: pointer;
-        font-family: var(--font);
-        font-size: 12px;
-        padding: 3px 8px;
-        border-radius: 4px;
-        white-space: nowrap;
-      }
-
-      .find-replace-bar button:hover {
-        background: var(--overlay);
-        color: var(--text);
-      }
-
-      .find-replace-count {
-        color: var(--gutter);
-        font-size: 12px;
-        min-width: 50px;
-        white-space: nowrap;
-      }
-
-      /* Status bar */
-      .statusbar {
-        height: 28px;
-        background: var(--sidebar);
-        border-top: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        padding: 0 12px;
-        font-size: 14px;
-        color: var(--subtext);
-        gap: 16px;
-      }
-
-      .status-hint {
-        background: none;
-        border: none;
-        color: var(--subtext);
-        font-family: var(--font);
-        font-size: 14px;
-        cursor: pointer;
-        padding: 2px 8px;
-        border-radius: 3px;
-      }
-
-      .status-hint kbd {
-        color: var(--gutter);
-        font-size: 12px;
-      }
-
-      .status-hint:hover {
-        background: var(--overlay);
-      }
-
-      .status-hint:hover kbd {
-        color: var(--subtext);
-      }
-
-      .status-right {
-        margin-left: auto;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .status-info {
-        color: var(--gutter);
-        display: flex;
-        gap: 12px;
-        font-size: 12px;
-      }
-
-      .storage-meter {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .storage-bar {
-        width: 40px;
-        height: 6px;
-        background: var(--overlay);
-        border-radius: 3px;
-        overflow: hidden;
-      }
-
-      .storage-fill {
-        display: block;
-        height: 100%;
-        border-radius: 3px;
-        background: var(--subtext);
-        transition:
-          width 0.3s,
-          background 0.3s;
-      }
-
-      .storage-fill.warn {
-        background: var(--yellow);
-      }
-
-      .storage-fill.critical {
-        background: var(--red);
-      }
-
-      .btn-share {
-        background: none;
-        border: none;
-        color: var(--subtext);
-        cursor: pointer;
-        font-family: var(--font);
-        font-size: 14px;
-        padding: 2px 8px;
-        border-radius: 3px;
-      }
-
-      .btn-share:hover {
-        background: var(--overlay);
-        color: var(--text);
-      }
-
-      .btn-share.copied {
-        color: var(--green);
-      }
-
-      .file-menu-container {
-        position: relative;
-      }
-
-      .file-menu {
-        display: none;
-        position: absolute;
-        bottom: 100%;
-        right: 0;
-        margin-bottom: 4px;
-        background: var(--sidebar);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 4px 0;
-        min-width: 230px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-        z-index: 50;
-      }
-
-      .file-menu.visible {
-        display: block;
-      }
-
-      .file-menu-item.mobile-only,
-      .file-menu-separator.mobile-only {
-        display: none;
-      }
-
-      .file-menu-separator {
-        border: none;
-        border-top: 1px solid var(--border);
-        margin: 4px 0;
-      }
-
-      .file-menu-item {
-        display: block;
-        width: 100%;
-        background: none;
-        border: none;
-        color: var(--subtext);
-        font-family: var(--font);
-        font-size: 14px;
-        padding: 6px 14px;
-        text-align: left;
-        cursor: pointer;
-      }
-
-      .file-menu-item:hover {
-        background: var(--overlay);
-        color: var(--text);
-      }
-
-      .file-menu-item.copied {
-        color: var(--green);
-      }
-
-      .file-menu-label {
-        padding: 6px 14px 2px;
-        font-size: 12px;
-        line-height: 1.4;
-        color: var(--gutter);
-        cursor: default;
-        text-align: center;
-      }
-
-      /* Wraps within the menu's minimum width instead of widening it */
-      .sync-hint {
-        max-width: 230px;
-        box-sizing: border-box;
-      }
-
-      /* Flyout submenu: hover on desktop, tap toggles it on touch */
-      .file-menu-sub {
-        position: relative;
-      }
-
-      .file-menu-sub > .file-menu-item span {
-        float: right;
-        color: var(--gutter);
-      }
-
-      .md-tab-bar .file-menu.sub-menu {
-        top: -5px;
-        left: 100%;
-        margin: 0;
-        min-width: 140px;
-      }
-
-      .file-menu-sub:hover > .sub-menu {
-        display: block;
-      }
-
-      .file-menu-item[aria-checked="true"] {
-        color: var(--blue);
-      }
-
-      .file-menu-link {
-        text-decoration: none;
-        color: var(--subtext);
-      }
-
-      .sync-dot {
-        color: var(--green);
-      }
-
-      .sync-dot.disconnected {
-        color: var(--red);
-      }
-
-      .sync-dot.syncing {
-        animation: sync-blink 0.9s ease-in-out infinite;
-      }
-
-      @keyframes sync-blink {
-        0%,
-        100% {
-          opacity: 1;
-          text-shadow: none;
-        }
-        50% {
-          opacity: 0.08;
-          text-shadow:
-            0 0 6px var(--green),
-            0 0 12px var(--green);
-        }
-      }
-
-      .btn-wrap {
-        background: none;
-        border: none;
-        color: var(--subtext);
-        cursor: pointer;
-        font-family: var(--font);
-        font-size: 14px;
-        padding: 2px 8px;
-        border-radius: 3px;
-      }
-
-      .btn-wrap:hover {
-        background: var(--overlay);
-        color: var(--text);
-      }
-
-      .btn-wrap.active {
-        color: var(--blue);
-      }
-
-      @media (pointer: coarse) {
-        #btnVim {
-          display: none;
-        }
-
-        .md-tab,
-        .md-tab-bar .btn-share {
-          font-size: 16px;
-          padding: 10px 18px;
-        }
-
-        .zen-bar {
-          font-size: 16px;
-        }
-
-        .zen-bar-logo {
-          width: 24px;
-          height: 24px;
-        }
       }
 
       .vim-cursor {
@@ -1985,135 +919,6 @@
       .vim-command-bar.error input {
         color: var(--red);
       }
-      .vim-dirty-indicator {
-        color: var(--blue);
-        margin-left: 6px;
-      }
-
-      .vim-mode-normal,
-      .vim-mode-insert,
-      .vim-mode-visual {
-        font-weight: bold;
-        margin-right: 16px;
-      }
-      .vim-mode-normal {
-        color: var(--blue);
-      }
-      .vim-mode-insert {
-        color: var(--green);
-      }
-      .vim-mode-visual {
-        color: var(--green);
-      }
-
-      /* Modal */
-      .modal-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 100;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .modal-overlay.visible {
-        display: flex;
-      }
-
-      .modal {
-        background: var(--sidebar);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 20px 24px;
-        min-width: 280px;
-        max-width: 400px;
-      }
-
-      .modal-text {
-        font-size: 14px;
-        color: var(--text);
-        margin-bottom: 16px;
-        line-height: 1.5;
-      }
-
-      .modal-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-      }
-
-      .modal-btn {
-        background: none;
-        border: 1px solid var(--border);
-        color: var(--subtext);
-        font-family: var(--font);
-        font-size: 14px;
-        padding: 6px 14px;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-
-      .modal-btn:hover {
-        background: var(--overlay);
-        color: var(--text);
-      }
-
-      .modal-btn-danger {
-        border-color: var(--red);
-        color: var(--red);
-      }
-
-      .modal-btn-danger:hover {
-        background: var(--red);
-        color: var(--sidebar);
-      }
-
-      .modal-input {
-        display: none;
-        width: 100%;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        color: var(--text);
-        font-family: var(--font);
-        font-size: 14px;
-        padding: 8px 10px;
-        border-radius: 4px;
-        margin-bottom: 16px;
-        box-sizing: border-box;
-      }
-
-      .modal-input:focus {
-        outline: none;
-        border-color: var(--blue);
-      }
-
-      /* Drop overlay */
-      .drop-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: color-mix(in srgb, var(--blue) 8%, transparent);
-        z-index: 200;
-        align-items: center;
-        justify-content: center;
-        pointer-events: none;
-      }
-
-      .drop-overlay.visible {
-        display: flex;
-      }
-
-      .drop-label {
-        padding: 16px 32px;
-        border: 2px dashed var(--blue);
-        border-radius: 12px;
-        color: var(--blue);
-        font-family: var(--font);
-        font-size: 16px;
-        background: var(--sidebar);
-      }
-
       /* Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
@@ -2172,43 +977,1869 @@
         border-radius: 2px;
       }
 
-      /* Mobile files button (hidden on desktop) */
-      .btn-files {
-        display: none;
+      /* Semantic tokens (design/tokens.css): the UI reads these, never the palette */
+      :root {
+        --n-font:
+          -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+          "Segoe UI", system-ui, sans-serif;
+        --n-caption: 400 11px/14px var(--n-font);
+        --n-label: 500 11px/14px var(--n-font);
+        --n-body: 400 12.5px/18px var(--n-font);
+        --n-body-strong: 500 12.5px/18px var(--n-font);
+        --n-title: 600 13px/18px var(--n-font);
+        --n-heading: 600 15px/20px var(--n-font);
+        --n-display: 600 22px/28px var(--n-font);
+        --n-bg: var(--bg);
+        --n-panel: var(--sidebar);
+        --n-raised: color-mix(in oklab, var(--bg), var(--text) 6%);
+        --n-field: color-mix(in oklab, var(--bg), var(--text) 5%);
+        --n-hover: color-mix(in srgb, var(--text) 7%, transparent);
+        --n-pressed: color-mix(in srgb, var(--text) 12%, transparent);
+        --n-selected: color-mix(in srgb, var(--blue) 16%, transparent);
+        --n-line: color-mix(in srgb, var(--text) 9%, transparent);
+        --n-line-strong: color-mix(in srgb, var(--text) 16%, transparent);
+        --n-scrim: rgb(0 0 0 / 45%);
+        --n-text: var(--text);
+        --n-text-2: var(--subtext);
+        --n-text-3: var(--gutter);
+        --n-on-accent: var(--sidebar);
+        --n-accent: var(--blue);
+        --n-accent-soft: color-mix(in srgb, var(--blue) 14%, transparent);
+        --n-focus: color-mix(in srgb, var(--blue) 60%, transparent);
+        --n-danger: var(--red);
+        --n-danger-soft: color-mix(in srgb, var(--red) 13%, transparent);
+        --n-warning: var(--peach);
+        --n-warning-soft: color-mix(in srgb, var(--peach) 14%, transparent);
+        --n-success: var(--green);
+        --n-pin: var(--yellow);
+        --n-kind-md: var(--blue);
+        --n-kind-draw: var(--mauve);
+        --n-kind-code: var(--peach);
+        --n-kind-text: var(--gutter);
+        --n-inverse: var(--text);
+        --n-inverse-text: var(--bg);
+        --n-r-sm: 4px;
+        --n-r-md: 6px;
+        --n-r-lg: 10px;
+        --n-r-xl: 14px;
+        --n-control: 26px;
+        --n-row: 28px;
+        --n-bar: 40px;
+        --n-shadow-1:
+          0 0 0 1px var(--n-line-strong), 0 4px 12px rgb(0 0 0 / 22%);
+        --n-shadow-2:
+          0 0 0 1px var(--n-line-strong), 0 12px 40px rgb(0 0 0 / 40%);
+        --n-ease: cubic-bezier(0.2, 0, 0, 1);
+      }
+
+      :root[data-theme="latte"] {
+        --n-raised: #ffffff;
+        --n-on-accent: #ffffff;
+        --n-scrim: rgb(76 79 105 / 28%);
+        --n-shadow-1:
+          0 0 0 1px rgb(76 79 105 / 10%), 0 2px 4px rgb(76 79 105 / 6%),
+          0 8px 24px rgb(76 79 105 / 10%);
+        --n-shadow-2:
+          0 0 0 1px rgb(76 79 105 / 10%), 0 8px 16px rgb(76 79 105 / 8%),
+          0 24px 56px rgb(76 79 105 / 16%);
+      }
+
+      body {
+        font: var(--n-body);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button {
+        font: inherit;
+        color: inherit;
         background: none;
-        border: none;
-        color: var(--subtext);
+        border: 0;
         cursor: pointer;
-        font-family: var(--font);
-        font-size: 14px;
-        padding: 2px 8px;
+      }
+
+      .grow {
+        flex: 1;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      .icon {
+        width: 16px;
+        height: 16px;
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .icon.sm {
+        width: 14px;
+        height: 14px;
+      }
+
+      .app {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* Buttons */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: var(--n-control);
+        padding: 0 10px;
+        border-radius: var(--n-r-md);
+        font: var(--n-body-strong);
+        color: var(--n-text);
+        white-space: nowrap;
+        background: var(--n-field);
+        box-shadow: inset 0 0 0 1px var(--n-line);
+        flex: none;
+      }
+
+      .btn:hover {
+        background: color-mix(in oklab, var(--n-field), var(--n-text) 6%);
+      }
+
+      .btn.primary,
+      .btn[aria-expanded="true"].share {
+        background: var(--n-accent);
+        color: var(--n-on-accent);
+        box-shadow: none;
+      }
+
+      .btn.primary:hover {
+        background: color-mix(in oklab, var(--n-accent), var(--n-text) 14%);
+      }
+
+      .btn.ghost {
+        background: none;
+        box-shadow: none;
+        color: var(--n-text-2);
+      }
+
+      .btn.ghost:hover,
+      .btn.ghost[aria-expanded="true"] {
+        background: var(--n-hover);
+        color: var(--n-text);
+      }
+
+      .btn.danger {
+        background: var(--n-danger);
+        color: var(--n-on-accent);
+        box-shadow: none;
+      }
+
+      .btn.square {
+        width: var(--n-control);
+        padding: 0;
+      }
+
+      .btn.sm {
+        height: 22px;
+        padding: 0 7px;
+        font: var(--n-label);
+      }
+
+      .btn.sm.square {
+        width: 22px;
+        padding: 0;
+      }
+
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      .kbd {
+        font: var(--n-caption);
+        font-feature-settings: "tnum";
+        color: var(--n-text-3);
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+      }
+
+      .kbd.boxed {
+        padding: 1px 5px;
+        border-radius: var(--n-r-sm);
+        box-shadow: inset 0 0 0 1px var(--n-line-strong);
+      }
+
+      .field {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: var(--n-control);
+        padding: 0 8px;
+        border-radius: var(--n-r-md);
+        background: var(--n-field);
+        box-shadow: inset 0 0 0 1px var(--n-line);
+        color: var(--n-text-3);
+        min-width: 0;
+      }
+
+      .field input {
+        all: unset;
+        flex: 1;
+        min-width: 0;
+        font: var(--n-body);
+        color: var(--n-text);
+      }
+
+      .field input::placeholder {
+        color: var(--n-text-3);
+      }
+
+      .field:focus-within {
+        box-shadow:
+          inset 0 0 0 1px var(--n-accent),
+          0 0 0 3px var(--n-accent-soft);
+      }
+
+      .field.error,
+      .field.error:focus-within {
+        box-shadow:
+          inset 0 0 0 1px var(--n-danger),
+          0 0 0 3px var(--n-danger-soft);
+      }
+
+      .seg {
+        display: inline-flex;
+        padding: 2px;
+        gap: 2px;
+        border-radius: var(--n-r-md);
+        background: var(--n-field);
+        box-shadow: inset 0 0 0 1px var(--n-line);
+        flex: none;
+      }
+
+      .seg > button {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 22px;
+        padding: 0 9px;
+        border-radius: var(--n-r-sm);
+        font: var(--n-body-strong);
+        color: var(--n-text-2);
+      }
+
+      .seg > button:hover {
+        color: var(--n-text);
+      }
+
+      .seg > button[aria-selected="true"],
+      .seg > button[aria-pressed="true"] {
+        background: var(--n-raised);
+        color: var(--n-text);
+        box-shadow:
+          0 0 0 1px var(--n-line-strong),
+          0 1px 2px rgb(0 0 0 / 15%);
+      }
+
+      .switch {
+        position: relative;
+        width: 26px;
+        height: 16px;
+        flex: none;
+        border-radius: 8px;
+        background: var(--n-line-strong);
+        transition: background 0.16s var(--n-ease);
+      }
+
+      .switch::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--n-text);
+        transition: transform 0.16s var(--n-ease);
+      }
+
+      .switch[aria-checked="true"] {
+        background: var(--n-accent);
+      }
+
+      .switch[aria-checked="true"]::after {
+        transform: translateX(10px);
+        background: var(--n-on-accent);
+      }
+
+      .check {
+        display: inline-grid;
+        place-items: center;
+        width: 14px;
+        height: 14px;
+        flex: none;
+        border-radius: 4px;
+        box-shadow: inset 0 0 0 1.5px var(--n-text-3);
+      }
+
+      .check[aria-checked="true"] {
+        background: var(--n-accent);
+        box-shadow: none;
+        color: var(--n-on-accent);
+      }
+
+      .check[aria-checked="true"]::after {
+        content: "";
+        width: 7px;
+        height: 4px;
+        border: solid currentColor;
+        border-width: 0 0 2px 2px;
+        transform: translateY(-1px) rotate(-45deg);
+      }
+
+      .meter {
+        position: relative;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--n-line-strong);
+        overflow: hidden;
+      }
+
+      .meter i {
+        position: absolute;
+        inset: 0 auto 0 0;
+        border-radius: 2px;
+        background: var(--n-text-2);
+      }
+
+      .meter.warn i {
+        background: var(--n-warning);
+      }
+
+      .meter.critical i {
+        background: var(--n-danger);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        height: 16px;
+        padding: 0 5px;
+        border-radius: 8px;
+        font: var(--n-label);
+        font-size: 10px;
+        flex: none;
+        background: var(--n-warning-soft);
+        color: var(--n-warning);
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex: none;
+        background: var(--n-success);
+      }
+
+      .dot.syncing {
+        background: var(--n-accent);
+        animation: dot-pulse 1.2s var(--n-ease) infinite;
+      }
+
+      .dot.disconnected {
+        background: var(--n-danger);
+      }
+
+      @keyframes dot-pulse {
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      /* Sidebar: your notes, and the state of all of them */
+      .sidebar {
+        width: var(--sidebar-width, 248px);
+        min-width: 160px;
+        max-width: 50vw;
+        background: var(--n-panel);
+        border-right: 1px solid var(--n-line);
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+
+      .app.sidebar-hidden .sidebar {
+        display: none;
+      }
+
+      .sidebar-resize {
+        position: absolute;
+        top: 0;
+        right: -4px;
+        width: 8px;
+        height: 100%;
+        cursor: col-resize;
+        z-index: 10;
+      }
+
+      .sidebar-resize:hover,
+      .sidebar-resize.active {
+        background: var(--n-accent);
+        opacity: 0.4;
+      }
+
+      .side-head {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        height: var(--n-bar);
+        padding: 0 8px 0 6px;
+        flex: none;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: var(--n-control);
+        padding: 0 6px;
+        border-radius: var(--n-r-md);
+        font: 400 15px/1 var(--font);
+        color: var(--n-text);
+      }
+
+      .brand:hover,
+      .brand[aria-expanded="true"] {
+        background: var(--n-hover);
+      }
+
+      .brand img {
+        width: 16px;
+        height: 16px;
         border-radius: 3px;
       }
 
-      .btn-files:hover {
-        background: var(--overlay);
-        color: var(--text);
+      .brand .icon {
+        width: 12px;
+        height: 12px;
+        color: var(--n-text-3);
+        margin-left: -2px;
       }
 
-      /* Responsive */
+      .new-split {
+        display: inline-flex;
+      }
+
+      .new-split .btn.more {
+        width: 18px;
+        padding: 0;
+      }
+
       .sidebar-close {
         display: none;
-        background: none;
-        border: none;
-        color: var(--subtext);
+      }
+
+      .side-search {
+        padding: 0 8px 6px;
+        flex: none;
+      }
+
+      .side-search .field {
+        width: 100%;
+        cursor: text;
+        text-align: left;
+        font: var(--n-body);
+      }
+
+      .side-search .field span:first-of-type {
+        flex: 1;
+      }
+
+      .note-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 2px 6px 8px;
+        min-height: 0;
+      }
+
+      .list-label {
+        display: flex;
+        align-items: center;
+        height: 26px;
+        padding: 6px 8px 0;
+        font: var(--n-label);
+        color: var(--n-text-3);
+      }
+
+      .note-item {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: var(--n-row);
+        padding: 0 4px 0 8px;
+        border-radius: var(--n-r-md);
+        color: var(--n-text-2);
         cursor: pointer;
-        font-size: 18px;
-        line-height: 1;
-        padding: 0 2px;
+        user-select: none;
+      }
+
+      .note-item:hover {
+        background: var(--n-hover);
+        color: var(--n-text);
+      }
+
+      .note-item.active {
+        background: var(--n-selected);
+        color: var(--n-text);
+      }
+
+      .kind {
+        color: var(--n-kind-text);
+      }
+
+      .kind.md {
+        color: var(--n-kind-md);
+      }
+
+      .kind.draw {
+        color: var(--n-kind-draw);
+      }
+
+      .kind.code {
+        color: var(--n-kind-code);
+      }
+
+      .note-item-name {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .ext {
+        color: var(--n-text-3);
+      }
+
+      .note-item-time {
+        font: var(--n-caption);
+        color: var(--n-text-3);
+        white-space: nowrap;
+        font-feature-settings: "tnum";
+      }
+
+      .note-item-acts {
+        display: none;
+      }
+
+      .note-item .btn {
+        color: var(--n-text-3);
+      }
+
+      .note-item .btn:hover {
+        color: var(--n-text);
+      }
+
+      .note-item .btn-pin.pinned {
+        display: inline-flex;
+        color: var(--n-pin);
+      }
+
+      @media (hover: hover) {
+        .note-item:hover .note-item-time {
+          display: none;
+        }
+
+        .note-item:hover .note-item-acts {
+          display: flex;
+        }
+      }
+
+      .note-item-input {
+        all: unset;
+        flex: 1;
+        min-width: 0;
+        height: 22px;
+        padding: 0 5px;
+        margin-left: -5px;
+        border-radius: var(--n-r-sm);
+        background: var(--n-bg);
+        color: var(--n-text);
+        box-shadow:
+          inset 0 0 0 1px var(--n-accent),
+          0 0 0 3px var(--n-accent-soft);
+      }
+
+      .note-item-input.error {
+        box-shadow:
+          inset 0 0 0 1px var(--n-danger),
+          0 0 0 3px var(--n-danger-soft);
+      }
+
+      .note-item.dragging {
+        opacity: 0.45;
+      }
+
+      .note-item.drag-over::before {
+        content: "";
+        position: absolute;
+        left: 6px;
+        right: 6px;
+        top: -1px;
+        height: 2px;
+        border-radius: 1px;
+        background: var(--n-accent);
+      }
+
+      .side-foot {
+        display: grid;
+        gap: 8px;
+        padding: 8px 10px 10px;
+        border-top: 1px solid var(--n-line);
+        flex: none;
+      }
+
+      .side-foot:not(:has(> :not([hidden], [style*="none"]))) {
+        display: none;
+      }
+
+      .sync-line {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        width: 100%;
+        min-height: 22px;
+        padding: 0 4px;
+        border-radius: var(--n-r-md);
+        font: var(--n-caption);
+        color: var(--n-text-2);
+        text-align: left;
+      }
+
+      button.sync-line:hover,
+      button.sync-line[aria-expanded="true"] {
+        background: var(--n-hover);
+      }
+
+      .sync-line .grow {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .storage {
+        display: grid;
+        gap: 5px;
+        padding: 0 4px;
+      }
+
+      .settings .storage {
+        padding: 6px 0;
+        font: var(--n-caption);
+        color: var(--n-text-3);
+      }
+
+      .storage:empty {
+        display: none;
+      }
+
+      .storage div {
+        display: flex;
+        justify-content: space-between;
+        font-feature-settings: "tnum";
+      }
+
+      .fab {
+        display: none;
+      }
+
+      /* Main column */
+      .editor-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        position: relative;
+        min-width: 0;
+      }
+
+      /* Title bar: which note, how you see it, and how it leaves the app */
+      .titlebar {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: var(--n-bar);
+        padding: 0 8px;
+        border-bottom: 1px solid var(--n-line);
+        flex: none;
+      }
+
+      .titlebar #btnSidebar {
+        display: none;
+      }
+
+      .app.sidebar-hidden #btnSidebar {
+        display: inline-flex;
+      }
+
+      .crumb {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        max-width: calc(50% - 110px);
+      }
+
+      .crumb-btn {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+        height: var(--n-control);
+        padding: 0 6px;
+        border-radius: var(--n-r-md);
+      }
+
+      .crumb-btn:hover {
+        background: var(--n-hover);
+      }
+
+      .crumb-name {
+        font: var(--n-title);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+      }
+
+      .crumb-name .ext {
+        font-weight: 400;
+      }
+
+      .crumb-state {
+        font: var(--n-caption);
+        color: var(--n-text-3);
+        white-space: nowrap;
+      }
+
+      .crumb-input {
+        all: unset;
+        font: var(--n-title);
+        width: 220px;
+        max-width: 100%;
+        height: 24px;
+        padding: 0 6px;
+        border-radius: var(--n-r-sm);
+        background: var(--n-field);
+        color: var(--n-text);
+        box-shadow:
+          inset 0 0 0 1px var(--n-accent),
+          0 0 0 3px var(--n-accent-soft);
+      }
+
+      .crumb-input.error {
+        box-shadow:
+          inset 0 0 0 1px var(--n-danger),
+          0 0 0 3px var(--n-danger-soft);
+      }
+
+      .crumb-input[hidden],
+      .crumb-btn[hidden] {
+        display: none;
+      }
+
+      .titlebar .seg {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .seg.is-draw #mdTabView {
+        order: -1;
+      }
+
+      #mdTabs:not(.visible),
+      #mdTabZen:not(.visible) {
+        display: none;
+      }
+
+      .titlebar-end {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* Banner: a state of this note that lasts until you act */
+      .banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 40px;
+        padding: 6px 8px 6px 14px;
+        background: var(--n-accent-soft);
+        border-bottom: 1px solid var(--n-line);
+        flex: none;
+      }
+
+      .banner[hidden] {
+        display: none;
+      }
+
+      .banner > .icon {
+        color: var(--n-accent);
+      }
+
+      .banner.warning {
+        background: var(--n-warning-soft);
+      }
+
+      .banner.warning > .icon {
+        color: var(--n-warning);
+      }
+
+      .banner .sub {
+        color: var(--n-text-2);
+      }
+
+      .banner-text {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .banner-acts {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .banner .btn {
+        height: 24px;
+      }
+
+      /* Status bar: facts and toggles for the open note only */
+      .statusbar {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        height: 26px;
+        padding: 0 6px;
+        border-top: 1px solid var(--n-line);
+        font: var(--n-caption);
+        color: var(--n-text-3);
+        font-feature-settings: "tnum";
+        white-space: nowrap;
+        overflow: hidden;
+        flex: none;
+      }
+
+      .st-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 20px;
+        padding: 0 6px;
+        border-radius: var(--n-r-sm);
+      }
+
+      .st-item:empty {
+        display: none;
+      }
+
+      button.st-item:hover {
+        background: var(--n-hover);
+        color: var(--n-text);
+      }
+
+      .st-item[aria-pressed="true"] {
+        color: var(--n-text);
+      }
+
+      .st-item[aria-pressed="true"] > .icon {
+        color: var(--n-accent);
+      }
+
+      .vim-pill {
+        font: 600 10px/1 var(--font);
+        letter-spacing: 0.04em;
+        padding: 3px 5px;
         border-radius: 3px;
+        background: var(--n-accent);
+        color: var(--n-on-accent);
       }
 
-      .sidebar-close:hover {
-        color: var(--text);
-        background: var(--overlay);
+      .vim-pill:empty {
+        display: none;
       }
 
+      .vim-pill.insert {
+        background: var(--n-success);
+      }
+
+      .vim-pill.visual {
+        background: var(--mauve);
+      }
+
+      .statusbar .hint-key {
+        font: var(--n-label);
+        color: var(--n-text-2);
+      }
+
+      /* Menus: one look for every menu, sheet on phones */
+      .menu {
+        display: none;
+        position: fixed;
+        z-index: 300;
+        min-width: 220px;
+        max-width: calc(100vw - 16px);
+        max-height: calc(100dvh - 16px);
+        overflow-y: auto;
+        padding: 4px;
+        border-radius: var(--n-r-lg);
+        background: var(--n-raised);
+        box-shadow: var(--n-shadow-1);
+        color: var(--n-text);
+      }
+
+      .menu.visible {
+        display: block;
+      }
+
+      .menu-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        height: 26px;
+        padding: 0 8px;
+        border-radius: var(--n-r-md);
+        text-align: left;
+        text-decoration: none;
+        color: var(--n-text);
+        font: var(--n-body);
+      }
+
+      .menu-item > .icon {
+        color: var(--n-text-2);
+      }
+
+      .menu-item .label {
+        flex: 1;
+        white-space: nowrap;
+      }
+
+      .menu-item .kbd {
+        margin-left: 16px;
+      }
+
+      .menu-item .tick {
+        width: 16px;
+        display: inline-flex;
+        color: var(--n-accent);
+      }
+
+      .menu-item:hover,
+      .menu-item:focus-visible,
+      .menu-item.open {
+        outline: none;
+        background: var(--n-accent);
+        color: var(--n-on-accent);
+      }
+
+      .menu-item:hover > *,
+      .menu-item:focus-visible > *,
+      .menu-item.open > *,
+      .menu-item:hover .kbd,
+      .menu-item:focus-visible .kbd {
+        color: inherit;
+      }
+
+      .menu-item.danger,
+      .menu-item.danger > .icon {
+        color: var(--n-danger);
+      }
+
+      .menu-item.danger:hover,
+      .menu-item.danger:focus-visible {
+        background: var(--n-danger);
+        color: var(--n-on-accent);
+      }
+
+      .menu-item[hidden],
+      .menu-sep[hidden] {
+        display: none;
+      }
+
+      .menu-sep {
+        height: 1px;
+        margin: 4px 8px;
+        background: var(--n-line);
+      }
+
+      .menu-label {
+        padding: 6px 8px 3px;
+        font: var(--n-label);
+        color: var(--n-text-3);
+      }
+
+      .menu-note {
+        padding: 4px 8px 6px;
+        font: var(--n-caption);
+        color: var(--n-text-3);
+        max-width: 260px;
+      }
+
+      .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        flex: none;
+        box-shadow: inset 0 0 0 1px var(--n-line-strong);
+      }
+
+      .menu-title {
+        display: none;
+      }
+
+      .share-pop.visible {
+        display: grid;
+        gap: 10px;
+        width: 340px;
+        padding: 14px;
+        border-radius: var(--n-r-xl);
+      }
+
+      .share-pop h4 {
+        margin: 0;
+        font: var(--n-title);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .share-pop p {
+        margin: 0;
+        color: var(--n-text-2);
+      }
+
+      .share-pop .hint {
+        font: var(--n-caption);
+        color: var(--n-text-3);
+      }
+
+      .share-pop .seg {
+        display: flex;
+      }
+
+      .share-pop .seg > button {
+        flex: 1;
+        justify-content: center;
+      }
+
+      .share-pop .field.mono input {
+        font: 400 11.5px/16px var(--font);
+      }
+
+      .share-size {
+        display: flex;
+        justify-content: space-between;
+        font: var(--n-caption);
+        color: var(--n-text-3);
+        margin-bottom: -4px;
+      }
+
+      .share-pop > .btn.primary {
+        height: 30px;
+      }
+
+      .share-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .share-row .btn {
+        flex: 1;
+      }
+
+      .row-pin {
+        display: none;
+        color: var(--n-pin);
+      }
+
+      /* Tooltip: icon buttons, short states, disabled reasons */
+      .tip {
+        position: fixed;
+        z-index: 400;
+        display: none;
+        max-width: 260px;
+        padding: 4px 8px;
+        border-radius: var(--n-r-md);
+        background: var(--n-inverse);
+        color: var(--n-inverse-text);
+        font: var(--n-caption);
+        pointer-events: none;
+      }
+
+      .tip.visible {
+        display: block;
+      }
+
+      .tip .kbd {
+        margin-left: 8px;
+        color: color-mix(in srgb, var(--n-inverse-text) 65%, transparent);
+      }
+
+      .tip b {
+        display: block;
+        font-weight: 600;
+      }
+
+      .tip .sub {
+        color: color-mix(in srgb, var(--n-inverse-text) 70%, transparent);
+      }
+
+      /* Toast: something happened — bottom centre, one at a time */
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 44px;
+        z-index: 350;
+        display: none;
+        align-items: center;
+        gap: 12px;
+        max-width: calc(100vw - 24px);
+        min-height: 36px;
+        padding: 0 6px 0 14px;
+        border-radius: var(--n-r-lg);
+        background: var(--n-inverse);
+        color: var(--n-inverse-text);
+        box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
+        font: var(--n-body);
+        transform: translateX(-50%);
+      }
+
+      .toast.visible {
+        display: flex;
+        animation: toast-in 0.16s var(--n-ease);
+      }
+
+      .toast:not(:has(.toast-act:not([hidden]))) {
+        padding-right: 14px;
+      }
+
+      @keyframes toast-in {
+        from {
+          opacity: 0;
+          transform: translate(-50%, 8px);
+        }
+      }
+
+      .toast-msg {
+        padding: 9px 0;
+      }
+
+      .toast.error > .icon {
+        color: var(--red);
+      }
+
+      .toast-act {
+        height: 26px;
+        padding: 0 10px;
+        border-radius: var(--n-r-md);
+        font-weight: 600;
+        background: color-mix(in srgb, var(--n-inverse-text) 10%, transparent);
+      }
+
+      .toast-act:hover {
+        background: color-mix(in srgb, var(--n-inverse-text) 18%, transparent);
+      }
+
+      .toast-act[hidden] {
+        display: none;
+      }
+
+      /* Find: floats at the top right of the text */
+      .find-replace-bar {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        z-index: 6;
+        display: none;
+        grid-template-columns: 22px 1fr;
+        gap: 4px;
+        width: 380px;
+        max-width: calc(100% - 24px);
+        padding: 5px;
+        border-radius: var(--n-r-lg);
+        background: var(--n-raised);
+        box-shadow: var(--n-shadow-1);
+      }
+
+      .find-replace-bar.visible {
+        display: grid;
+      }
+
+      .find-row {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .find-row .field {
+        flex: 1;
+        height: 24px;
+      }
+
+      .find-replace-bar:not(.replace) .replace-row {
+        display: none;
+      }
+
+      .find-toggle {
+        grid-row: 1 / 3;
+        align-self: start;
+      }
+
+      .find-replace-bar.replace .find-toggle .icon {
+        transform: rotate(90deg);
+      }
+
+      .find-replace-count {
+        font: var(--n-caption);
+        color: var(--n-text-3);
+        min-width: 58px;
+        text-align: right;
+        padding-right: 4px;
+        font-feature-settings: "tnum";
+        white-space: nowrap;
+      }
+
+      .find-replace-count.none {
+        color: var(--n-danger);
+      }
+
+      /* Palette (⌘P): notes, lines and commands */
+      .search-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: color-mix(in srgb, var(--n-scrim) 60%, transparent);
+        z-index: 209;
+      }
+
+      .search-backdrop.visible {
+        display: block;
+      }
+
+      .search-results {
+        display: none;
+        position: fixed;
+        top: 12vh;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        max-width: calc(100vw - 24px);
+        max-height: 70vh;
+        flex-direction: column;
+        border-radius: var(--n-r-xl);
+        overflow: hidden;
+        background: var(--n-raised);
+        box-shadow: var(--n-shadow-2);
+        z-index: 210;
+      }
+
+      .search-results.visible {
+        display: flex;
+      }
+
+      .search-results-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 48px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--n-line);
+        color: var(--n-text-3);
+        flex: none;
+      }
+
+      .search-input {
+        all: unset;
+        flex: 1;
+        min-width: 0;
+        font: 400 15px/20px var(--n-font);
+        color: var(--n-text);
+      }
+
+      .search-input::placeholder {
+        color: var(--n-text-3);
+      }
+
+      .search-scope {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 22px;
+        max-width: 45%;
+        padding: 0 8px;
+        border-radius: 11px;
+        font: var(--n-label);
+        background: var(--n-accent-soft);
+        color: var(--n-accent);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: none;
+      }
+
+      .search-scope[hidden] {
+        display: none;
+      }
+
+      .search-results-list {
+        overflow-y: auto;
+        padding: 6px;
+        min-height: 0;
+      }
+
+      .search-results-list:empty {
+        display: none;
+      }
+
+      .search-group {
+        padding: 8px 10px 4px;
+        font: var(--n-label);
+        color: var(--n-text-3);
+      }
+
+      .search-result-item {
+        display: grid;
+        grid-template-columns: 16px 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 1px;
+        padding: 6px 10px;
+        border-radius: var(--n-r-md);
+        cursor: pointer;
+        color: var(--n-text);
+      }
+
+      .search-result-item.selected {
+        background: var(--n-selected);
+      }
+
+      .search-result-item:hover:not(.selected) {
+        background: var(--n-hover);
+      }
+
+      .search-result-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .search-result-aside {
+        font: var(--n-caption);
+        color: var(--n-text-3);
+      }
+
+      .search-result-snippet {
+        grid-column: 2 / 4;
+        font: 400 11.5px/16px var(--font);
+        color: var(--n-text-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .search-result-line .search-result-snippet {
+        grid-column: 1 / 4;
+      }
+
+      .search-result-snippet .ln {
+        color: var(--n-text-3);
+        margin-right: 8px;
+      }
+
+      .search-results mark {
+        background: none;
+        color: var(--n-accent);
+        font-weight: 600;
+      }
+
+      .search-no-results {
+        display: grid;
+        justify-items: center;
+        gap: 12px;
+        padding: 26px 16px;
+        color: var(--n-text-3);
+        text-align: center;
+      }
+
+      .search-foot {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        height: 32px;
+        padding: 0 14px;
+        border-top: 1px solid var(--n-line);
+        font: var(--n-caption);
+        color: var(--n-text-3);
+        flex: none;
+      }
+
+      /* Dialogs */
+      .modal-overlay,
+      .dialog-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: var(--n-scrim);
+        z-index: 220;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 14vh 12px 12px;
+      }
+
+      .modal-overlay.visible,
+      .dialog-overlay.visible {
+        display: flex;
+      }
+
+      .modal,
+      .dialog {
+        display: grid;
+        gap: 14px;
+        width: 420px;
+        max-width: 100%;
+        max-height: 100%;
+        overflow: auto;
+        padding: 18px;
+        border-radius: var(--n-r-xl);
+        background: var(--n-raised);
+        box-shadow: var(--n-shadow-2);
+        color: var(--n-text);
+      }
+
+      .modal-text {
+        font: var(--n-body);
+        font-size: 13px;
+        line-height: 20px;
+        white-space: pre-line;
+      }
+
+      .modal-text b,
+      .dialog h2 {
+        display: block;
+        font: var(--n-heading);
+        margin: 0;
+      }
+
+      .dialog p {
+        margin: 0;
+        color: var(--n-text-2);
+      }
+
+      .modal-input {
+        all: unset;
+        display: none;
+        height: 30px;
+        padding: 0 10px;
+        border-radius: var(--n-r-md);
+        background: var(--n-field);
+        box-shadow:
+          inset 0 0 0 1px var(--n-accent),
+          0 0 0 3px var(--n-accent-soft);
+        font: var(--n-body);
+        font-size: 13px;
+      }
+
+      .modal-actions,
+      .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .modal-btn {
+        display: inline-flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 12px;
+        border-radius: var(--n-r-md);
+        font: var(--n-body-strong);
+        background: var(--n-field);
+        box-shadow: inset 0 0 0 1px var(--n-line);
+        color: var(--n-text);
+      }
+
+      .modal-btn.primary {
+        background: var(--n-accent);
+        color: var(--n-on-accent);
+        box-shadow: none;
+      }
+
+      .modal-btn-danger {
+        background: var(--n-danger);
+        color: var(--n-on-accent);
+        box-shadow: none;
+      }
+
+      .import-rows {
+        display: grid;
+        gap: 4px;
+        max-height: 40vh;
+        overflow-y: auto;
+      }
+
+      .import-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+      }
+
+      .import-row .note-item-name {
+        flex: 1;
+      }
+
+      .import-row .note-item-time {
+        flex: none;
+      }
+
+      .dialog label.same {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--n-text-2);
+        cursor: pointer;
+        margin-right: auto;
+      }
+
+      /* Settings */
+      .settings {
+        width: 560px;
+        gap: 18px;
+      }
+
+      .settings-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .set-group {
+        display: grid;
+        gap: 2px;
+      }
+
+      .set-group > h3 {
+        font: var(--n-label);
+        color: var(--n-text-3);
+        margin: 0 0 6px;
+      }
+
+      .set-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 38px;
+        text-align: left;
+        width: 100%;
+      }
+
+      .set-row > .icon {
+        color: var(--n-text-2);
+      }
+
+      .set-text {
+        flex: 1;
+        display: grid;
+        min-width: 0;
+      }
+
+      .set-text small {
+        font: var(--n-caption);
+        color: var(--n-text-3);
+      }
+
+      .themes {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 8px;
+      }
+
+      .theme-card {
+        display: grid;
+        gap: 6px;
+        padding: 6px;
+        border-radius: var(--n-r-lg);
+        box-shadow: inset 0 0 0 1px var(--n-line);
+        font: var(--n-caption);
+        color: var(--n-text-2);
+        text-align: left;
+        background: var(--n-raised);
+      }
+
+      .theme-card[aria-checked="true"] {
+        box-shadow: inset 0 0 0 2px var(--n-accent);
+        color: var(--n-text);
+      }
+
+      .theme-card .pv {
+        height: 40px;
+        border-radius: var(--n-r-md);
+        display: grid;
+        grid-template-columns: 30% 1fr;
+        overflow: hidden;
+        background: var(--bg);
+        box-shadow: inset 0 0 0 1px var(--n-line);
+      }
+
+      .theme-card .pv span {
+        display: grid;
+        align-content: start;
+        gap: 4px;
+        padding: 6px;
+      }
+
+      .theme-card .pv span:first-child {
+        background: var(--sidebar);
+      }
+
+      .theme-card .pv i {
+        display: block;
+        height: 3px;
+        border-radius: 2px;
+      }
+
+      .settings-note {
+        font: var(--n-caption);
+        color: var(--n-text-3);
+        margin: 0;
+      }
+
+      /* Empty state */
+      .empty-state {
+        display: none;
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        place-items: center;
+        background: var(--n-bg);
+      }
+
+      .empty-state.visible {
+        display: grid;
+      }
+
+      .empty-inner {
+        display: grid;
+        justify-items: center;
+        gap: 12px;
+        max-width: 360px;
+        padding: 24px;
+        text-align: center;
+        color: var(--n-text-3);
+      }
+
+      .empty-inner h2 {
+        font: var(--n-heading);
+        color: var(--n-text);
+        margin: 0;
+      }
+
+      .empty-inner p {
+        margin: 0;
+      }
+
+      .empty-acts {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      .empty-keys {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 6px 14px;
+        margin-top: 8px;
+        text-align: left;
+        font: var(--n-caption);
+      }
+
+      /* Zen: the note alone, Share and Download at hand */
+      .zen-mode .sidebar,
+      .zen-mode .statusbar,
+      .zen-mode .titlebar,
+      .zen-mode .banner,
+      .zen-mode .keybar {
+        display: none !important;
+      }
+
+      .zen-mode .draw-host.visible {
+        margin-top: 44px;
+      }
+
+      .zen-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        height: 44px;
+        padding: 0 8px 0 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--n-bg);
+        color: var(--n-text-3);
+        user-select: none;
+        -webkit-user-select: none;
+        transition: opacity 0.3s;
+      }
+
+      .zen-bar.faded {
+        opacity: 0;
+      }
+
+      .zen-bar-logo {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        flex: none;
+      }
+
+      .zen-bar-filename {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .zen-actions {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        border-radius: var(--n-r-xl);
+        background: var(--n-raised);
+        box-shadow: var(--n-shadow-1);
+      }
+
+      /* Drop to import */
+      .drop-overlay {
+        display: none;
+        position: fixed;
+        inset: 10px;
+        border-radius: 14px;
+        border: 2px dashed var(--n-accent);
+        background: color-mix(in srgb, var(--n-bg) 82%, var(--blue));
+        z-index: 200;
+        place-items: center;
+        pointer-events: none;
+      }
+
+      .drop-overlay.visible {
+        display: grid;
+      }
+
+      .drop-label {
+        display: grid;
+        justify-items: center;
+        gap: 10px;
+        text-align: center;
+        color: var(--n-text-2);
+      }
+
+      .drop-label .icon {
+        width: 32px;
+        height: 32px;
+        color: var(--n-accent);
+      }
+
+      .drop-label b {
+        font: var(--n-heading);
+        color: var(--n-text);
+      }
+
+      /* Phone key bar: keys a phone keyboard doesn't have */
+      .keybar {
+        display: none;
+        align-items: center;
+        gap: 2px;
+        height: 44px;
+        padding: 0 4px;
+        background: var(--n-panel);
+        border-top: 1px solid var(--n-line);
+        overflow-x: auto;
+        flex: none;
+      }
+
+      .keybar button {
+        min-width: 40px;
+        height: 36px;
+        padding: 0 8px;
+        border-radius: var(--n-r-md);
+        display: grid;
+        place-items: center;
+        color: var(--n-text-2);
+        font: 500 14px/1 var(--n-font);
+        flex: none;
+      }
+
+      .keybar button.mono {
+        font: 500 14px/1 var(--font);
+      }
+
+      .keybar button:active {
+        background: var(--n-pressed);
+      }
+
+      .keybar .sep {
+        width: 1px;
+        height: 20px;
+        background: var(--n-line-strong);
+        margin: 0 2px;
+        flex: none;
+      }
+
+      body.keybar-on .keybar {
+        display: flex;
+      }
+
+      body.keybar-on .statusbar {
+        display: none;
+      }
+
+      .mobile-only {
+        display: none;
+      }
+
+      @media (pointer: coarse) {
+        #btnVim {
+          display: none;
+        }
+      }
+
+      /* Phones: one region at a time — the list, then a note */
       @media (max-width: 900px) {
+        :root {
+          font-size: 16px;
+        }
+
         .md-preview {
           padding: 24px 16px;
         }
@@ -2217,8 +2848,12 @@
           display: none;
         }
 
-        :root {
-          font-size: 16px;
+        .mobile-only {
+          display: revert;
+        }
+
+        .desktop-only {
+          display: none !important;
         }
 
         .sidebar {
@@ -2226,79 +2861,184 @@
           width: 100%;
           min-width: 0;
           max-width: 100%;
-        }
-
-        .app.sidebar-open ~ .statusbar {
-          display: none !important;
+          border-right: none;
         }
 
         .sidebar.open {
           display: flex;
           position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
+          inset: 0;
           z-index: 50;
-          border-right: none;
-        }
-
-        .sidebar-header {
-          padding: 14px 16px;
-          font-size: 24px;
-          border-bottom: 1px solid var(--border);
-        }
-
-        .btn-new {
-          font-size: 24px;
-          padding: 8px 12px;
-          height: auto;
-        }
-
-        .sidebar-close {
-          display: block;
-          font-size: 24px;
-          padding: 8px 12px;
-        }
-
-        .note-list {
-          padding: 0 0 4px;
-        }
-
-        .note-item {
-          padding: 10px 16px 10px 0;
-          font-size: 16px;
-        }
-
-        .note-item-name,
-        .note-item-input {
-          font-size: 18px;
-        }
-
-        .note-item-time {
-          font-size: 13px;
-        }
-
-        .note-item .btn-pin {
-          width: 44px;
-        }
-
-        .note-item .btn-delete {
-          width: 44px;
-        }
-
-        .note-item .btn-rename {
-          width: 44px;
         }
 
         .sidebar-resize {
           display: none;
         }
 
-        .btn-files {
-          display: block;
+        .side-head {
+          height: 56px;
+          padding: 0 10px;
+        }
+
+        .brand {
+          font-size: 20px;
+          height: 40px;
+        }
+
+        .brand img {
+          width: 20px;
+          height: 20px;
+        }
+
+        .new-split {
+          display: none;
+        }
+
+        .side-search {
+          padding: 0 16px 10px;
+        }
+
+        .side-search .field {
+          height: 38px;
+          border-radius: var(--n-r-lg);
           font-size: 16px;
-          padding: 4px 10px;
+        }
+
+        .side-search .kbd {
+          display: none;
+        }
+
+        .note-list {
+          padding: 0 0 96px;
+        }
+
+        .list-label {
+          padding: 12px 16px 4px;
+        }
+
+        .note-item {
+          height: 52px;
+          padding: 0 8px 0 16px;
+          gap: 12px;
+          border-radius: 0;
+          border-bottom: 1px solid var(--n-line);
+          font-size: 15px;
+        }
+
+        .note-item .kind {
+          width: 18px;
+          height: 18px;
+        }
+
+        .note-item-acts {
+          display: none !important;
+        }
+
+        .row-pin {
+          display: block;
+        }
+
+        .note-item-time {
+          font-size: 12px;
+        }
+
+        .side-foot {
+          padding: 10px 16px 24px;
+        }
+
+        .sync-line {
+          font-size: 12px;
+          min-height: 28px;
+        }
+
+        .fab {
+          display: grid;
+          place-items: center;
+          position: absolute;
+          right: 16px;
+          bottom: 84px;
+          width: 52px;
+          height: 52px;
+          border-radius: 16px;
+          background: var(--n-accent);
+          color: var(--n-on-accent);
+          box-shadow: 0 6px 20px rgb(0 0 0 / 30%);
+          z-index: 5;
+        }
+
+        .fab .icon {
+          width: 22px;
+          height: 22px;
+          stroke-width: 2;
+        }
+
+        .titlebar {
+          height: 48px;
+          padding: 0 4px;
+          gap: 2px;
+        }
+
+        .titlebar #btnSidebar {
+          display: inline-flex;
+        }
+
+        .titlebar .btn.square,
+        .titlebar .btn.share {
+          width: 40px;
+          height: 40px;
+          padding: 0;
+        }
+
+        .titlebar .btn .icon {
+          width: 20px;
+          height: 20px;
+        }
+
+        .titlebar .btn.share span,
+        .seg > button span {
+          display: none;
+        }
+
+        .titlebar .btn.share {
+          background: none;
+          box-shadow: none;
+          color: var(--n-text-2);
+        }
+
+        .crumb {
+          flex: 1;
+          max-width: none;
+        }
+
+        .crumb-name {
+          font-size: 15px;
+        }
+
+        .crumb-state {
+          display: none;
+        }
+
+        .crumb-input {
+          width: 100%;
+          font-size: 16px;
+        }
+
+        .titlebar .seg {
+          position: static;
+          transform: none;
+        }
+
+        .seg > button {
+          height: 32px;
+          padding: 0 10px;
+        }
+
+        #mdTabZen {
+          display: none;
+        }
+
+        .statusbar {
+          display: none;
         }
 
         .editor-area > *:not(.vim-cursor) {
@@ -2316,92 +3056,125 @@
           padding: 0 10px 0 6px;
         }
 
-        .statusbar {
-          height: 36px;
-          padding: 0 10px;
-          font-size: 16px;
+        .menu {
+          font-size: 15px;
         }
 
-        .status-hint {
-          display: none;
+        /* Menus become sheets */
+        .menu.visible {
+          left: 0 !important;
+          right: 0 !important;
+          top: auto !important;
+          bottom: 0 !important;
+          max-width: none;
+          max-height: 80dvh;
+          border-radius: 14px 14px 0 0;
+          padding: 6px 8px 24px;
+          box-shadow: var(--n-shadow-2);
         }
 
-        .status-info {
-          display: none;
-        }
-
-        .btn-wrap,
-        .statusbar .btn-share {
-          font-size: 16px;
-          padding: 4px 10px;
-        }
-
-        .md-tab,
-        .md-tab-bar .btn-share {
-          font-size: 16px;
-          padding: 10px 14px;
-        }
-
-        .file-menu {
-          min-width: 250px;
-        }
-
-        .file-menu-item.mobile-only {
+        .menu.visible::before {
+          content: "";
           display: block;
+          width: 36px;
+          height: 4px;
+          border-radius: 2px;
+          background: var(--n-line-strong);
+          margin: 2px auto 10px;
         }
 
-        #fileMenu {
-          max-height: calc(100dvh - 60px);
-          overflow-y: auto;
+        .menu-title {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 0 12px 10px;
+          font: var(--n-heading);
         }
 
-        /* No room for a flyout: the submenu expands in place */
-        .md-tab-bar .file-menu.sub-menu {
-          position: static;
-          border: none;
-          box-shadow: none;
-          padding: 0 0 0 16px;
+        .menu-item {
+          height: 44px;
+          font-size: 15px;
+          padding: 0 12px;
         }
 
-        .file-menu-sub:hover > .sub-menu:not(.visible) {
+        .menu-item > .icon {
+          width: 20px;
+          height: 20px;
+        }
+
+        .menu-item .kbd {
           display: none;
         }
 
-        .file-menu-separator.mobile-only {
-          display: block;
-        }
-
-        .file-menu-item {
-          font-size: 16px;
-          padding: 10px 16px;
-        }
-
-        .empty-state {
-          font-size: 16px;
-        }
-
-        .empty-state-desktop {
-          display: none;
-        }
-
-        .empty-state-mobile {
-          display: block;
+        .menu-scrim {
+          position: fixed;
+          inset: 0;
+          z-index: 299;
+          background: var(--n-scrim);
         }
 
         .find-replace-bar {
-          flex-wrap: wrap;
-          padding: 8px 12px;
+          top: 8px;
+          right: 8px;
+          left: 8px;
+          width: auto;
+          max-width: none;
         }
 
-        .find-replace-bar input {
-          width: 100px;
+        .find-row .field {
+          height: 34px;
+        }
+
+        .find-row .field input {
           font-size: 16px;
-          padding: 6px 10px;
         }
 
-        .find-replace-bar button {
-          font-size: 14px;
-          padding: 6px 10px;
+        .search-results {
+          top: 8px;
+          max-height: calc(100dvh - 16px);
+        }
+
+        .search-input {
+          font-size: 16px;
+        }
+
+        .search-foot {
+          display: none;
+        }
+
+        .toast {
+          bottom: 20px;
+        }
+
+        .zen-actions {
+          left: 50%;
+          right: auto;
+          bottom: 30px;
+          transform: translateX(-50%);
+        }
+
+        .zen-actions .btn {
+          height: 44px;
+          padding: 0 16px;
+          font-size: 15px;
+        }
+
+        .zen-bar .btn.square {
+          width: 44px;
+          height: 44px;
+        }
+
+        .zen-esc {
+          display: none;
+        }
+
+        .settings {
+          width: 100%;
+        }
+
+        .modal-overlay,
+        .dialog-overlay {
+          padding-top: 8vh;
         }
       }
     </style>
@@ -2420,552 +3193,288 @@
         https://note.directory/llms.txt
       </p>
     </noscript>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="i-sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2" /><path d="M6 3v10" /></symbol>
+      <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5l3 3" /></symbol>
+      <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" /></symbol>
+      <symbol id="i-minus" viewBox="0 0 16 16"><path d="M3 8h10" /></symbol>
+      <symbol id="i-chev-down" viewBox="0 0 16 16"><path d="M4.5 6.5L8 10l3.5-3.5" /></symbol>
+      <symbol id="i-chev-right" viewBox="0 0 16 16"><path d="M6.5 4.5L10 8l-3.5 3.5" /></symbol>
+      <symbol id="i-back" viewBox="0 0 16 16"><path d="M10 3.5L5.5 8l4.5 4.5" /></symbol>
+      <symbol id="i-more" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.1" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none" /><circle cx="12.5" cy="8" r="1.1" fill="currentColor" stroke="none" /></symbol>
+      <symbol id="i-link" viewBox="0 0 16 16"><path d="M7 9a2.5 2.5 0 0 0 3.5 0l2-2A2.5 2.5 0 0 0 9 3.5l-.7.7M9 7a2.5 2.5 0 0 0-3.5 0l-2 2A2.5 2.5 0 0 0 7 12.5l.7-.7" /></symbol>
+      <symbol id="i-share" viewBox="0 0 16 16"><path d="M8 2.5v8M5 5.5l3-3 3 3M3.5 9v3.5a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V9" /></symbol>
+      <symbol id="i-download" viewBox="0 0 16 16"><path d="M8 2.5v8M5 7.5l3 3 3-3M3 13.5h10" /></symbol>
+      <symbol id="i-import" viewBox="0 0 16 16"><path d="M8 2.5v7M5 6.5l3 3 3-3M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10" /></symbol>
+      <symbol id="i-archive" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="3" rx="1" /><path d="M3 6v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6M6.5 8.5h3" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 16 16"><path d="M6 2.5h4M6.5 2.5v4l-2 2.5h7l-2-2.5v-4M8 9v4.5" /></symbol>
+      <symbol id="i-pin-on" viewBox="0 0 16 16"><path d="M6 2.5h4M6.5 2.5v4l-2 2.5h7l-2-2.5v-4M8 9v4.5" /><path d="M6.5 3v3.5l-2 2.5h7l-2-2.5V3z" fill="currentColor" /></symbol>
+      <symbol id="i-trash" viewBox="0 0 16 16"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.2a1 1 0 0 0 1 .8h3.8a1 1 0 0 0 1-.8l.6-8.2" /></symbol>
+      <symbol id="i-pencil" viewBox="0 0 16 16"><path d="M10.5 3l2.5 2.5L6 12.5l-3 .5.5-3z" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 16 16"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" /><circle cx="8" cy="8" r="2" /></symbol>
+      <symbol id="i-code" viewBox="0 0 16 16"><path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5" /></symbol>
+      <symbol id="i-zen" viewBox="0 0 16 16"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" /></symbol>
+      <symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" /></symbol>
+      <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" /></symbol>
+      <symbol id="i-wrap" viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h9a2 2 0 0 1 0 4H8M9.5 10.5L8 12l1.5 1.5M2.5 12h3" /></symbol>
+      <symbol id="i-cloud" viewBox="0 0 16 16"><path d="M4.5 12.5a3 3 0 0 1-.4-6 4 4 0 0 1 7.7-1 3.2 3.2 0 0 1-.3 7z" /></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 16 16"><path d="M4.5 12.5a3 3 0 0 1-.4-6 4 4 0 0 1 7.7-1 3.2 3.2 0 0 1-.3 7z" /><path d="M2 2l12 12" /></symbol>
+      <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 2.5l6 10.5H2zM8 6.5v3M8 11.3v.2" /></symbol>
+      <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" /><path d="M8 7.5V11M8 5v.2" /></symbol>
+      <symbol id="i-settings" viewBox="0 0 16 16"><path d="M2.5 5H9M12 5h1.5M2.5 11H4M7 11h6.5" /><circle cx="10.5" cy="5" r="1.5" /><circle cx="5.5" cy="11" r="1.5" /></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="1.5" /><path d="M4 7h.01M6.5 7h.01M9 7h.01M11.5 7h.01M5 9.5h6" /></symbol>
+      <symbol id="i-help" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" /><path d="M6.3 6.3a1.8 1.8 0 1 1 2.5 1.6c-.5.3-.8.6-.8 1.2M8 11.2v.2" /></symbol>
+      <symbol id="i-note" viewBox="0 0 16 16"><path d="M4 1.5h5.5l3 3v10H4zM9.5 1.5v3h3M6 8h4.5M6 10.5h4.5" /></symbol>
+      <symbol id="i-file-code" viewBox="0 0 16 16"><path d="M4 1.5h5.5l3 3v10H4zM9.5 1.5v3h3M7 8.3L5.8 9.8 7 11.3M9.5 8.3l1.2 1.5-1.2 1.5" /></symbol>
+      <symbol id="i-file-draw" viewBox="0 0 16 16"><circle cx="5.5" cy="10.5" r="3" /><rect x="8" y="2.5" width="5.5" height="5.5" rx="1" /></symbol>
+      <symbol id="i-undo" viewBox="0 0 16 16"><path d="M5.5 4L2.5 7l3 3M2.5 7h7a3.5 3.5 0 0 1 0 7H7" /></symbol>
+      <symbol id="i-redo" viewBox="0 0 16 16"><path d="M10.5 4l3 3-3 3M13.5 7h-7a3.5 3.5 0 0 0 0 7H9" /></symbol>
+      <symbol id="i-cursor" viewBox="0 0 16 16"><path d="M3.5 2.5l9 4.5-4 1.2-1.6 4z" /></symbol>
+      <symbol id="i-hand" viewBox="0 0 16 16"><path d="M5.5 8V3.8a1 1 0 0 1 2 0v3.7M7.5 7V2.8a1 1 0 0 1 2 0V7M9.5 7V3.8a1 1 0 0 1 2 0v5.7A4.5 4.5 0 0 1 7 14h-.3a4 4 0 0 1-3.2-1.7L2.3 9.8a1 1 0 0 1 1.5-1.2L5.5 10" /></symbol>
+      <symbol id="i-pen" viewBox="0 0 16 16"><path d="M2.5 12c2-3 3.5-7 5.5-7s1 6 3 6 2.5-3 2.5-3" /></symbol>
+      <symbol id="i-highlighter" viewBox="0 0 16 16"><path d="M9.5 2.5l4 4L8 12H5V9zM3 14h5" /></symbol>
+      <symbol id="i-eraser" viewBox="0 0 16 16"><path d="M9 2.5l4.5 4.5-6.5 6.5H4.5l-2-2a1 1 0 0 1 0-1.4zM6 6l4.5 4.5M7 13.5h6.5" /></symbol>
+      <symbol id="i-rect" viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5" /></symbol>
+      <symbol id="i-ellipse" viewBox="0 0 16 16"><ellipse cx="8" cy="8" rx="5.5" ry="4.5" /></symbol>
+      <symbol id="i-diamond" viewBox="0 0 16 16"><path d="M8 2l6 6-6 6-6-6z" /></symbol>
+      <symbol id="i-line" viewBox="0 0 16 16"><path d="M3 13L13 3" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 16 16"><path d="M3 13L13 3M7 3h6v6" /></symbol>
+      <symbol id="i-text" viewBox="0 0 16 16"><path d="M3.5 4.5V3h9v1.5M8 3v10M6 13h4" /></symbol>
+      <symbol id="i-grid" viewBox="0 0 16 16"><g fill="currentColor" stroke="none"><circle cx="4" cy="4" r="1" /><circle cx="8" cy="4" r="1" /><circle cx="12" cy="4" r="1" /><circle cx="4" cy="8" r="1" /><circle cx="8" cy="8" r="1" /><circle cx="12" cy="8" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="8" cy="12" r="1" /><circle cx="12" cy="12" r="1" /></g></symbol>
+      <symbol id="i-fit" viewBox="0 0 16 16"><path d="M2.5 5.5v-3h3M10.5 2.5h3v3M13.5 10.5v3h-3M5.5 13.5h-3v-3" /><rect x="5.5" y="5.5" width="5" height="5" rx="1" /></symbol>
+      <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" /><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" /></symbol>
+      <symbol id="i-image" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" /><circle cx="5.5" cy="6.5" r="1" /><path d="M2.5 11.5L6 8l3 3 2-2 2.5 2.5" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></symbol>
+      <symbol id="i-contrast" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" /><path d="M8 2.5v11a5.5 5.5 0 0 0 0-11z" fill="currentColor" /></symbol>
+      <symbol id="i-format" viewBox="0 0 16 16"><path d="M3 4h10M3 7h7M3 10h10M3 13h5" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 16 16"><path d="M8 2.5l5.5 3-5.5 3-5.5-3zM2.5 8.5l5.5 3 5.5-3" /></symbol>
+      <symbol id="i-indent" viewBox="0 0 16 16"><path d="M2.5 3.5h11M7 8h6.5M7 12.5h6.5M2.5 6l2.5 2-2.5 2" /></symbol>
+      <symbol id="i-outdent" viewBox="0 0 16 16"><path d="M2.5 3.5h11M7 8h6.5M7 12.5h6.5M5 6L2.5 8 5 10" /></symbol>
+      <symbol id="i-task" viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2" /><path d="M5.5 8l2 2 3-4" /></symbol>
+      <symbol id="i-list" viewBox="0 0 16 16"><path d="M6 4h7.5M6 8h7.5M6 12h7.5" /><g fill="currentColor" stroke="none"><circle cx="3" cy="4" r="1" /><circle cx="3" cy="8" r="1" /><circle cx="3" cy="12" r="1" /></g></symbol>
+      <symbol id="i-history" viewBox="0 0 16 16"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9L2.5 5.7M2.5 2.5v3.2h3.2M8 5v3l2 1.5" /></symbol>
+      <symbol id="i-conflict" viewBox="0 0 16 16"><path d="M5 2.5v7M11 6.5v7M2.5 7L5 9.5 7.5 7M8.5 9l2.5-2.5L13.5 9" /></symbol>
+    </svg>
     <div class="app">
-      <div class="sidebar" role="complementary" aria-label="Note list">
+      <aside class="sidebar" id="sidebar" aria-label="Notes">
         <div class="sidebar-resize" id="sidebarResize" aria-hidden="true"></div>
-        <div class="sidebar-header">
-          <span>note</span>
-          <span style="margin-left: auto; display: flex; gap: 8px">
-            <span class="new-split">
-              <button
-                class="btn-new"
-                data-action="new-note-rename"
-                title="New note"
-                aria-label="New note"
-              >
-                +
-              </button>
-              <button
-                class="btn-new btn-new-more"
-                data-action="toggle-new-menu"
-                title="New text note or drawing"
-                aria-label="Choose what to create"
-                aria-haspopup="menu"
-              >
-                &#9662;
-              </button>
-              <div class="file-menu new-menu" role="menu" aria-label="New">
-                <button class="file-menu-item" role="menuitem" data-action="new-note-rename" data-close-menu>
-                  text
-                </button>
-                <button class="file-menu-item" role="menuitem" data-action="new-drawing-rename" data-close-menu>
-                  drawing
-                </button>
-              </div>
-            </span>
-            <button
-              class="sidebar-close"
-              data-action="toggle-sidebar"
-              title="Close sidebar"
-              aria-label="Close sidebar"
-            >
-              &times;
-            </button>
+        <div class="side-head">
+          <button class="brand" id="btnAppMenu" data-action="toggle-app-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Menu">
+            <img src="img/favicon-32x32.png" alt="" />note<svg class="icon"><use href="#i-chev-down" /></svg>
+          </button>
+          <span class="grow"></span>
+          <span class="new-split">
+            <button class="btn ghost square" data-action="new-note-rename" aria-label="New note" data-tip="New note" data-key="new"><svg class="icon"><use href="#i-plus" /></svg></button>
+            <button class="btn ghost more" id="btnNewMenu" data-action="toggle-new-menu" aria-haspopup="menu" aria-expanded="false" aria-label="New drawing or import" data-tip="New drawing or import"><svg class="icon sm"><use href="#i-chev-down" /></svg></button>
           </span>
+          <button class="btn ghost square sidebar-close" data-action="toggle-sidebar" aria-label="Close notes"><svg class="icon"><use href="#i-x" /></svg></button>
         </div>
-        <div
-          class="note-list"
-          id="noteList"
-          role="list"
-          aria-label="Notes"
-        ></div>
-      </div>
-      <div class="editor-container" role="main">
-        <div
-          class="find-replace-bar"
-          id="findReplaceBar"
-          role="search"
-          aria-label="Find and replace"
-        >
-          <input
-          autocomplete="off"
-          autocapitalize="off"
-          autocorrect="off"
-            type="text"
-            id="findInput"
-            placeholder="find..."
-            aria-label="Find text"
-            spellcheck="false"
-          />
-          <input
-          autocomplete="off"
-          autocapitalize="off"
-          autocorrect="off"
-            type="text"
-            id="replaceInput"
-            placeholder="replace..."
-            aria-label="Replace text"
-            spellcheck="false"
-          />
-          <button data-action="find-next">next</button>
-          <button data-action="find-prev">prev</button>
-          <button data-action="replace-current">replace</button>
-          <button data-action="replace-all">all</button>
-          <span
-            class="find-replace-count"
-            id="findReplaceCount"
-            aria-live="polite"
-          ></span>
-          <button
-            data-action="close-find-replace"
-            style="margin-left: auto; border: none"
-            aria-label="Close find and replace"
-          >
-            &times;
+        <div class="side-search">
+          <button class="field" data-action="search" aria-label="Search notes">
+            <svg class="icon sm"><use href="#i-search" /></svg><span>Search</span><span class="kbd" data-k="⌘P"></span>
           </button>
         </div>
-        <div class="md-tab-bar" id="mdTabBar" aria-label="Editor top bar">
-          <div class="md-tab-bar-left">
-            <div class="file-menu-container" id="fileMenuContainer">
-              <button class="btn-share" data-action="toggle-file-menu" aria-haspopup="menu">menu</button>
-              <div
-                class="file-menu"
-                id="fileMenu"
-                role="menu"
-                aria-label="Menu"
-              >
-                <button
-                  class="file-menu-item mobile-only"
-                  role="menuitem"
-                  data-action="new-note" data-close-menu
-                >
-                  new note
-                </button>
-                <button
-                  class="file-menu-item mobile-only"
-                  role="menuitem"
-                  data-action="new-drawing" data-close-menu
-                >
-                  new drawing
-                </button>
-                <button
-                  class="file-menu-item mobile-only"
-                  role="menuitem"
-                  data-action="find-replace" data-close-menu
-                >
-                  find &amp; replace
-                </button>
-                <button
-                  class="file-menu-item mobile-only"
-                  role="menuitem"
-                  data-action="search" data-close-menu
-                >
-                  search all
-                </button>
-                <hr class="file-menu-separator mobile-only" />
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  id="btnShare"
-                  data-action="share"
-                >
-                  share
-                </button>
-                <button
-                  class="file-menu-item draw-only"
-                  role="menuitem"
-                  data-action="draw-copy-png" data-close-menu
-                >
-                  copy as png
-                </button>
-                <button
-                  class="file-menu-item draw-only"
-                  role="menuitem"
-                  data-action="draw-source" data-close-menu
-                >
-                  edit source
-                </button>
-                <hr class="file-menu-separator" />
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  data-action="download" data-close-menu
-                >
-                  download file
-                </button>
-                <button
-                  class="file-menu-item md-only"
-                  role="menuitem"
-                  data-action="download-html" data-close-menu
-                >
-                  download as html
-                </button>
-                <button
-                  class="file-menu-item draw-only"
-                  role="menuitem"
-                  data-action="draw-download-svg" data-close-menu
-                >
-                  download as svg
-                </button>
-                <hr class="file-menu-separator" />
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  data-action="download-all" data-close-menu
-                >
-                  export all notes
-                </button>
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  id="btnDriveSync"
-                  data-action="drive-sync"
-                >
-                  enable google drive
-                </button>
-                <hr class="file-menu-separator" />
-                <div class="file-menu-sub">
-                  <button
-                    class="file-menu-item"
-                    role="menuitem"
-                    aria-haspopup="menu"
-                    data-action="toggle-theme-menu"
-                  >
-                    theme <span aria-hidden="true">&#9656;</span>
-                  </button>
-                  <div class="file-menu sub-menu" id="themeMenu" role="menu" aria-label="Theme">
-                    <button class="file-menu-item" role="menuitemradio" data-action="set-theme" data-value="mocha" data-close-menu>mocha</button>
-                    <button class="file-menu-item" role="menuitemradio" data-action="set-theme" data-value="macchiato" data-close-menu>macchiato</button>
-                    <button class="file-menu-item" role="menuitemradio" data-action="set-theme" data-value="frappe" data-close-menu>frappé</button>
-                    <button class="file-menu-item" role="menuitemradio" data-action="set-theme" data-value="latte" data-close-menu>latte</button>
-                    <button class="file-menu-item" role="menuitemradio" data-action="set-theme" data-value="espresso" data-close-menu>espresso</button>
-                  </div>
-                </div>
-                <button
-                  class="file-menu-item"
-                  role="menuitem"
-                  data-action="help" data-close-menu
-                >
-                  help
-                </button>
-                <a
-                  class="file-menu-item file-menu-link"
-                  role="menuitem"
-                  href="legal/privacy-policy.html"
-                  target="_blank"
-                >
-                  privacy policy
-                </a>
-              </div>
-            </div>
-          </div>
-          <div
-            class="md-tabs"
-            id="mdTabs"
-            role="tablist"
-            aria-label="Editor mode"
-          >
-            <button
-              class="md-tab active"
-              id="mdTabEdit"
-              role="tab"
-              aria-selected="true"
-              data-action="tab-edit"
-            >
-              edit
-            </button>
-            <button
-              class="md-tab"
-              id="mdTabView"
-              role="tab"
-              aria-selected="false"
-              data-action="tab-view"
-            >
-              view
-            </button>
-            <button
-              class="md-tab"
-              id="mdTabZen"
-              role="tab"
-              aria-selected="false"
-              data-action="tab-zen"
-            >
-              zen
+        <div class="note-list" id="noteList" role="list" aria-label="Notes"></div>
+        <div class="side-foot" id="sideFoot">
+          <div id="syncMenuContainer" style="display: none">
+            <button class="sync-line" id="syncButton" data-action="toggle-sync-menu" aria-haspopup="menu" aria-expanded="false">
+              <span class="dot sync-dot" id="syncDot"></span><span class="grow" id="syncLabel">Synced to Google Drive</span><span id="syncWhen"></span>
             </button>
           </div>
+          <div class="sync-line" id="syncLocal">
+            <svg class="icon sm"><use href="#i-lock" /></svg><span class="grow">Only in this browser</span>
+            <button class="btn ghost sm" data-action="settings" data-section="sync">Back up…</button>
+          </div>
+          <div class="storage" id="storageUsage"></div>
         </div>
+        <button class="fab" data-action="new-note-rename" aria-label="New note"><svg class="icon"><use href="#i-plus" /></svg></button>
+      </aside>
+
+      <div class="editor-container" role="main">
+        <header class="titlebar" id="mdTabBar">
+          <button class="btn ghost square" id="btnSidebar" data-action="toggle-sidebar" aria-label="Show notes" data-tip="Show sidebar" data-key="⌘\"><svg class="icon desktop-only"><use href="#i-sidebar" /></svg><svg class="icon mobile-only"><use href="#i-back" /></svg></button>
+          <div class="crumb" id="crumb">
+            <button class="crumb-btn" id="crumbBtn" data-action="rename-active" aria-label="Rename note">
+              <span class="crumb-name" id="crumbName"></span><span class="crumb-state" id="crumbState"></span>
+            </button>
+            <input class="crumb-input" id="crumbInput" hidden spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" aria-label="Note name" />
+          </div>
+          <div class="seg" id="mdTabs" role="tablist" aria-label="View">
+            <button id="mdTabEdit" role="tab" aria-selected="true" data-action="tab-edit"><svg class="icon sm"><use href="#i-code" /></svg><span>Edit</span></button>
+            <button id="mdTabView" role="tab" aria-selected="false" data-action="tab-view"><svg class="icon sm"><use href="#i-eye" /></svg><span>Preview</span></button>
+          </div>
+          <div class="titlebar-end">
+            <button class="btn ghost square" id="mdTabZen" data-action="tab-zen" aria-label="Zen" data-tip="Zen" data-sub="Read without the app around it"><svg class="icon"><use href="#i-zen" /></svg></button>
+            <button class="btn share" id="btnShare" data-action="toggle-share" aria-haspopup="dialog" aria-expanded="false"><svg class="icon sm"><use href="#i-share" /></svg><span>Share</span></button>
+            <button class="btn ghost square" id="btnNoteMenu" data-action="toggle-note-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Note actions" data-tip="Note actions"><svg class="icon"><use href="#i-more" /></svg></button>
+          </div>
+        </header>
+        <div class="banner" id="banner" hidden></div>
         <div class="editor-wrap">
           <div class="gutter" id="gutter" aria-hidden="true"></div>
           <div class="editor-area" id="editorArea">
-            <pre
-              class="highlight-layer"
-              id="highlightLayer"
-              aria-hidden="true"
-            ></pre>
-            <div
-              class="occurrence-overlay"
-              id="occurrenceOverlay"
-              aria-hidden="true"
-            ></div>
-            <textarea
-              class="editor"
-              id="editor"
-              name="editor"
-              aria-label="Text editor"
-              placeholder="Start typing..."
-              spellcheck="false"
-            ></textarea>
+            <pre class="highlight-layer" id="highlightLayer" aria-hidden="true"></pre>
+            <div class="occurrence-overlay" id="occurrenceOverlay" aria-hidden="true"></div>
+            <textarea class="editor" id="editor" name="editor" aria-label="Text editor" placeholder="Start writing" spellcheck="false"></textarea>
             <div class="vim-cursor" id="vimCursor" aria-hidden="true"></div>
           </div>
-          <div
-            class="occurrence-track"
-            id="occurrenceTrack"
-            aria-hidden="true"
-          ></div>
+          <div class="occurrence-track" id="occurrenceTrack" aria-hidden="true"></div>
           <div class="md-preview" id="mdPreview"></div>
           <div class="draw-host" id="drawHost" aria-label="Drawing canvas"></div>
-          <div class="zen-bar" id="zenBar" style="display: none">
-            <div class="zen-bar-left">
-              <img
-                class="zen-bar-logo"
-                src="img/favicon-32x32.png"
-                alt="note"
-              />
-              <span class="zen-bar-filename" id="zenBarFilename"
-                ><span class="zen-bar-filename-start"></span
-                ><span class="zen-bar-filename-end"></span
-              ></span>
+          <div class="find-replace-bar" id="findReplaceBar" role="search" aria-label="Find and replace">
+            <button class="btn ghost sm square find-toggle" data-action="toggle-replace" aria-label="Toggle replace" data-tip="Replace" data-key="⌘⌥F"><svg class="icon sm"><use href="#i-chev-right" /></svg></button>
+            <div class="find-row">
+              <label class="field"><input type="text" id="findInput" placeholder="Find" aria-label="Find text" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" /></label>
+              <span class="find-replace-count" id="findReplaceCount" aria-live="polite"></span>
+              <button class="btn ghost sm square" data-action="find-prev" aria-label="Previous match" data-tip="Previous" data-key="⇧↵"><svg class="icon sm" style="transform: rotate(180deg)"><use href="#i-chev-down" /></svg></button>
+              <button class="btn ghost sm square" data-action="find-next" aria-label="Next match" data-tip="Next" data-key="↵"><svg class="icon sm"><use href="#i-chev-down" /></svg></button>
+              <button class="btn ghost sm square" data-action="close-find-replace" aria-label="Close find and replace" data-tip="Close" data-key="Esc"><svg class="icon sm"><use href="#i-x" /></svg></button>
             </div>
-            <div class="zen-bar-right">
-              <span class="zen-copied" id="zenCopied">copied to clipboard</span>
-              <button
-                class="zen-close-btn"
-                data-action="exit-zen"
-                title="Close zen mode [Esc]"
-                aria-label="Close zen mode"
-              >
-                &times;
-              </button>
-            </div>
-            <div class="zen-actions" id="zenActions" style="display: none">
-              <button
-                class="zen-action-btn"
-                data-action="zen-share"
-                title="Copy share link"
-                aria-label="Copy share link"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
-              </button>
-              <button
-                class="zen-action-btn"
-                data-action="zen-download"
-                title="Download as shown"
-                aria-label="Download as shown"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
-              </button>
+            <div class="find-row replace-row">
+              <label class="field"><input type="text" id="replaceInput" placeholder="Replace" aria-label="Replace text" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" /></label>
+              <button class="btn sm" data-action="replace-current">Replace</button>
+              <button class="btn sm" data-action="replace-all">All</button>
             </div>
           </div>
-          <div class="md-toast" id="mdToast"></div>
+          <div class="zen-bar" id="zenBar" style="display: none">
+            <img class="zen-bar-logo" src="img/favicon-32x32.png" alt="" />
+            <span class="zen-bar-filename" id="zenBarFilename"></span>
+            <span class="kbd zen-esc">Esc to leave</span>
+            <button class="btn ghost square zen-close-btn" data-action="exit-zen" aria-label="Leave zen" data-tip="Leave zen" data-key="Esc"><svg class="icon"><use href="#i-x" /></svg></button>
+          </div>
+          <div class="zen-actions" id="zenActions" style="display: none">
+            <button class="btn ghost" data-action="zen-save" id="zenSave" hidden><svg class="icon sm"><use href="#i-plus" /></svg>Save to my notes</button>
+            <button class="btn ghost" data-action="zen-share" aria-label="Copy share link"><svg class="icon sm"><use href="#i-share" /></svg>Share</button>
+            <button class="btn ghost" data-action="zen-download" aria-label="Download as shown"><svg class="icon sm"><use href="#i-download" /></svg>Download</button>
+          </div>
           <div class="empty-state" id="emptyState">
-            <div class="empty-state-desktop">
-              ctrl+n or drop a file to start
+            <div class="empty-inner">
+              <h2>No note open</h2>
+              <p>Start a note or a drawing, or bring your own files.</p>
+              <div class="empty-acts">
+                <button class="btn primary" data-action="new-note-rename"><svg class="icon sm"><use href="#i-plus" /></svg>New note</button>
+                <button class="btn" data-action="new-drawing-rename"><svg class="icon sm"><use href="#i-file-draw" /></svg>New drawing</button>
+                <button class="btn" data-action="import"><svg class="icon sm"><use href="#i-import" /></svg>Import…</button>
+              </div>
+              <div class="empty-keys desktop-only">
+                <span class="kbd boxed" data-k="new"></span><span>New note</span>
+                <span class="kbd boxed" data-k="⌘P"></span><span>Search and commands</span>
+                <span class="kbd boxed" data-k="⌘/"></span><span>All shortcuts</span>
+              </div>
+              <p class="desktop-only" style="font: var(--n-caption)">or drop files anywhere to import</p>
             </div>
-            <button class="empty-state-mobile btn-wrap" data-action="new-note">
-              new file
-            </button>
-            <button class="empty-state-mobile btn-wrap" data-action="new-drawing">
-              new drawing
-            </button>
           </div>
         </div>
         <div class="vim-command-bar" id="vimCommandBar">
           <span class="vim-command-prefix">:</span>
-          <input
-          autocomplete="off"
-          autocapitalize="off"
-          autocorrect="off"
-            id="vimCommandInput"
-            type="text"
-            aria-label="Vim command"
-            spellcheck="false"
-          />
+          <input autocomplete="off" autocapitalize="off" autocorrect="off" id="vimCommandInput" type="text" aria-label="Vim command" spellcheck="false" />
         </div>
-      </div>
-    </div>
-    <div class="statusbar">
-      <button class="btn-files" id="btnFiles" data-action="toggle-sidebar">
-        notes
-      </button>
-      <span class="new-split">
-        <button class="status-hint" data-action="new-note">
-          new <kbd>ctrl+n</kbd></button
-        ><button
-          class="status-hint btn-new-more"
-          data-action="toggle-new-menu"
-          title="New text note or drawing"
-          aria-label="Choose what to create"
-          aria-haspopup="menu"
-        >
-          &#9662;
-        </button>
-        <div class="file-menu new-menu" role="menu" aria-label="New">
-          <button class="file-menu-item" role="menuitem" data-action="new-note" data-close-menu>
-            text <kbd>ctrl+n</kbd>
-          </button>
-          <button class="file-menu-item" role="menuitem" data-action="new-drawing" data-close-menu>
-            drawing
-          </button>
+        <div class="keybar" id="keybar" aria-label="Editing keys">
+          <button data-key-action="indent" aria-label="Indent">Tab</button>
+          <button data-key-action="outdent" aria-label="Outdent">⇧Tab</button>
+          <span class="sep"></span>
+          <button data-key-action="task" aria-label="Task"><svg class="icon"><use href="#i-task" /></svg></button>
+          <button class="mono" data-key-action="insert" data-text="# " aria-label="Heading">#</button>
+          <button class="mono" data-key-action="insert" data-text="`" aria-label="Backtick">`</button>
+          <button class="mono" data-key-action="insert" data-text="[]" aria-label="Brackets">[ ]</button>
+          <span class="sep"></span>
+          <button data-key-action="undo" aria-label="Undo"><svg class="icon"><use href="#i-undo" /></svg></button>
+          <button data-key-action="redo" aria-label="Redo"><svg class="icon"><use href="#i-redo" /></svg></button>
+          <button data-key-action="find" aria-label="Find"><svg class="icon"><use href="#i-search" /></svg></button>
         </div>
-      </span>
-      <button class="status-hint" data-action="search">
-        search <kbd>ctrl+p</kbd>
-      </button>
-      <button class="status-hint" id="btnReplace" data-action="find-replace">
-        replace <kbd>ctrl+h</kbd>
-      </button>
-      <button class="status-hint" id="btnVim" data-action="toggle-vim">
-        vim <kbd>ctrl+shift+m</kbd>
-      </button>
-      <div class="status-right">
-        <span class="status-info">
-          <span id="cursorPos">Ln 1, Col 1</span>
-        </span>
-        <span
-          id="storageUsage"
-          class="storage-meter"
-          title="localStorage usage"
-        ></span>
-        <button
-          class="btn-wrap"
-          id="btnWrap"
-          data-action="toggle-wrap"
-          title="Toggle word wrap"
-        >
-          wrap
-        </button>
-        <div
-          class="file-menu-container"
-          id="syncMenuContainer"
-          style="display: none"
-        >
-          <button class="btn-share" data-action="toggle-sync-menu">
-            <span id="syncLabel">sync</span>
-            <span class="sync-dot">&#9679;</span>
-          </button>
-          <div
-            class="file-menu"
-            id="syncMenu"
-            role="menu"
-            aria-label="Sync menu"
-          >
-            <div id="syncMenuConnected">
-              <button
-                class="file-menu-item"
-                role="menuitem"
-                data-action="drive-sync"
-              >
-                sync now
-              </button>
-              <hr class="file-menu-separator" />
-              <button
-                class="file-menu-item"
-                role="menuitem"
-                data-action="drive-sign-out"
-              >
-                disconnect
-              </button>
-            </div>
-            <div id="syncMenuFailed" style="display: none">
-              <div class="file-menu-label sync-hint" id="syncSignedOutHint" style="display: none">
-                google sign-in needs renewing &mdash; reconnect once to keep syncing
-              </div>
-              <button
-                class="file-menu-item"
-                role="menuitem"
-                data-action="drive-sync"
-              >
-                reconnect
-              </button>
-            </div>
-            <div id="syncMenuDisconnected" style="display: none">
-              <button
-                class="file-menu-item"
-                role="menuitem"
-                data-action="drive-sync"
-              >
-                connect
-              </button>
-            </div>
-          </div>
-        </div>
+        <footer class="statusbar" id="statusbar">
+          <span class="st-item" id="statusLang"></span>
+          <span class="st-item" id="cursorPos"></span>
+          <span class="st-item" id="statusSel"></span>
+          <span class="grow"></span>
+          <span class="st-item" id="statusHint"></span>
+          <button class="st-item" id="btnWrap" data-action="toggle-wrap" aria-pressed="false" data-tip="Word wrap"><svg class="icon sm"><use href="#i-wrap" /></svg>Wrap</button>
+          <button class="st-item" id="btnVim" data-action="toggle-vim" aria-pressed="false" data-tip="Vim keys" data-key="⌃⇧M"><span class="vim-pill" id="vimPill"></span>Vim</button>
+        </footer>
       </div>
     </div>
 
-    <div
-      class="modal-overlay"
-      id="modalOverlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modalText"
-    >
+    <!-- Menus: positioned next to whatever opened them -->
+    <div class="menu" id="appMenu" role="menu" aria-label="Menu">
+      <button class="menu-item" role="menuitem" data-action="new-note-rename" data-close-menu><svg class="icon"><use href="#i-note" /></svg><span class="label">New note</span><span class="kbd" data-k="new"></span></button>
+      <button class="menu-item" role="menuitem" data-action="new-drawing-rename" data-close-menu><svg class="icon"><use href="#i-file-draw" /></svg><span class="label">New drawing</span></button>
+      <button class="menu-item" role="menuitem" data-action="import" data-close-menu><svg class="icon"><use href="#i-import" /></svg><span class="label">Import files…</span></button>
+      <button class="menu-item" role="menuitem" data-action="download-all" data-close-menu><svg class="icon"><use href="#i-archive" /></svg><span class="label">Export all as ZIP</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" role="menuitem" id="btnDriveSync" data-action="drive-sync" data-close-menu><svg class="icon"><use href="#i-cloud" /></svg><span class="label">Sync with Google Drive…</span></button>
+      <button class="menu-item" role="menuitem" data-action="settings" data-close-menu><svg class="icon"><use href="#i-settings" /></svg><span class="label">Settings…</span></button>
+      <button class="menu-item" role="menuitem" aria-haspopup="menu" data-action="toggle-theme-menu" id="btnThemeMenu"><svg class="icon"><use href="#i-contrast" /></svg><span class="label">Theme</span><svg class="icon sm"><use href="#i-chev-right" /></svg></button>
+      <div class="menu-sep"></div>
+      <button class="menu-item desktop-only" role="menuitem" data-action="shortcuts" data-close-menu><svg class="icon"><use href="#i-keyboard" /></svg><span class="label">Keyboard shortcuts</span><span class="kbd" data-k="⌘/"></span></button>
+      <button class="menu-item" role="menuitem" data-action="help" data-close-menu><svg class="icon"><use href="#i-help" /></svg><span class="label">Help</span></button>
+      <button class="menu-item" role="menuitem" data-action="md-demo" data-close-menu><svg class="icon"><use href="#i-note" /></svg><span class="label">Markdown guide</span></button>
+      <div class="menu-sep"></div>
+      <a class="menu-item" role="menuitem" href="legal/privacy-policy.html" target="_blank"><span class="tick"></span><span class="label">Privacy policy</span></a>
+      <a class="menu-item" role="menuitem" href="legal/terms.html" target="_blank"><span class="tick"></span><span class="label">Terms</span></a>
+    </div>
+    <div class="menu" id="themeMenu" role="menu" aria-label="Theme">
+      <button class="menu-item" role="menuitemcheckbox" data-action="toggle-system-theme" id="btnSystemTheme"><span class="tick"></span><span class="label">Match system</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" role="menuitemradio" data-action="set-theme" data-value="mocha" data-close-menu><span class="tick"></span><span class="label">Mocha</span><span class="swatch" style="background: #1e1e2e"></span></button>
+      <button class="menu-item" role="menuitemradio" data-action="set-theme" data-value="macchiato" data-close-menu><span class="tick"></span><span class="label">Macchiato</span><span class="swatch" style="background: #24273a"></span></button>
+      <button class="menu-item" role="menuitemradio" data-action="set-theme" data-value="frappe" data-close-menu><span class="tick"></span><span class="label">Frappé</span><span class="swatch" style="background: #303446"></span></button>
+      <button class="menu-item" role="menuitemradio" data-action="set-theme" data-value="latte" data-close-menu><span class="tick"></span><span class="label">Latte</span><span class="swatch" style="background: #ffffff"></span></button>
+      <button class="menu-item" role="menuitemradio" data-action="set-theme" data-value="espresso" data-close-menu><span class="tick"></span><span class="label">Espresso</span><span class="swatch" style="background: #1f1f1f"></span></button>
+    </div>
+    <div class="menu" id="newMenu" role="menu" aria-label="New">
+      <button class="menu-item" role="menuitem" data-action="new-note-rename" data-close-menu><svg class="icon"><use href="#i-note" /></svg><span class="label">New note</span><span class="kbd" data-k="new"></span></button>
+      <button class="menu-item" role="menuitem" data-action="new-drawing-rename" data-close-menu><svg class="icon"><use href="#i-file-draw" /></svg><span class="label">New drawing</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" role="menuitem" data-action="import" data-close-menu><svg class="icon"><use href="#i-import" /></svg><span class="label">Import files…</span></button>
+    </div>
+    <div class="menu" id="noteMenu" role="menu" aria-label="Note actions"></div>
+    <div class="menu" id="syncMenu" role="menu" aria-label="Google Drive">
+      <div class="menu-label">Google Drive</div>
+      <div id="syncMenuConnected">
+        <button class="menu-item" role="menuitem" data-action="drive-sync"><svg class="icon"><use href="#i-cloud" /></svg><span class="label">Sync now</span><span class="kbd" data-k="⌘S"></span></button>
+      </div>
+      <div id="syncMenuFailed" style="display: none">
+        <div class="menu-note" id="syncSignedOutHint" style="display: none">Google sign-in needs renewing. Reconnect once to keep syncing.</div>
+        <button class="menu-item" role="menuitem" data-action="drive-sync"><svg class="icon"><use href="#i-cloud" /></svg><span class="label">Reconnect</span></button>
+      </div>
+      <button class="menu-item" role="menuitem" data-action="settings" data-section="sync" data-close-menu><svg class="icon"><use href="#i-settings" /></svg><span class="label">Sync settings…</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" role="menuitem" data-action="drive-sign-out"><svg class="icon"><use href="#i-cloud-off" /></svg><span class="label">Disconnect</span></button>
+      <div class="menu-note">Notes stay in this browser. Your Drive copy stays in Drive.</div>
+    </div>
+    <div class="menu share-pop" id="sharePop" role="dialog" aria-label="Share"></div>
+
+    <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalText">
       <div class="modal">
         <div class="modal-text" id="modalText"></div>
-        <input
-          autocomplete="off"
-          autocapitalize="off"
-          autocorrect="off"
-          class="modal-input"
-          id="modalInput"
-          type="text"
-          aria-label="Input"
-          spellcheck="false"
-        />
+        <input autocomplete="off" autocapitalize="off" autocorrect="off" class="modal-input" id="modalInput" type="text" aria-label="Input" spellcheck="false" />
         <div class="modal-actions">
-          <button class="modal-btn" id="modalCancel">cancel</button>
-          <button class="modal-btn modal-btn-danger" id="modalConfirm">
-            delete
-          </button>
+          <button class="modal-btn" id="modalCancel">Cancel</button>
+          <button class="modal-btn modal-btn-danger" id="modalConfirm">Delete</button>
         </div>
       </div>
     </div>
 
+    <div class="dialog-overlay" id="dialogOverlay" role="dialog" aria-modal="true"></div>
+
     <div class="search-backdrop" id="searchBackdrop"></div>
-    <div
-      class="search-results"
-      id="searchResults"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Search notes"
-    >
+    <div class="search-results" id="searchResults" role="dialog" aria-modal="true" aria-label="Search notes">
       <div class="search-results-header">
-        <input
-          autocomplete="off"
-          autocapitalize="off"
-          autocorrect="off"
-          class="search-input"
-          id="searchInput"
-          name="search"
-          type="text"
-          placeholder="search..."
-          aria-label="Search notes"
-          spellcheck="false"
-        />
-        <label class="search-scope" title="ctrl+f: this note · ctrl+p: all notes">
-          <input type="checkbox" id="searchAll" />
-          all
-        </label>
-        <span
-          class="search-results-count"
-          id="searchCount"
-          aria-live="polite"
-        ></span>
-        <button
-          class="btn-search-close"
-          data-action="close-search"
-          title="Close"
-          aria-label="Close search"
-        >
-          &times;
-        </button>
+        <svg class="icon" id="searchIcon"><use href="#i-search" /></svg>
+        <span class="search-scope" id="searchScope" hidden></span>
+        <input autocomplete="off" autocapitalize="off" autocorrect="off" class="search-input" id="searchInput" name="search" type="text" placeholder="Search notes, or > for commands" aria-label="Search notes" spellcheck="false" />
+        <span class="kbd desktop-only" id="searchHint">Tab: this note</span>
       </div>
       <div class="search-results-list" id="searchResultsList"></div>
+      <div class="search-foot"><span>↑↓ to move</span><span>↵ to open</span><span class="grow"></span><span id="searchCount" aria-live="polite"></span></div>
     </div>
 
     <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
-      <div class="drop-label">drop files to import</div>
+      <div class="drop-label"><svg class="icon"><use href="#i-import" /></svg><b>Drop to import</b><span>Text files and note ZIP exports. Nothing leaves this browser.</span></div>
     </div>
-
+    <input type="file" id="importInput" multiple hidden />
+    <div class="toast" id="mdToast" role="status" aria-live="polite"><span class="toast-msg"></span><button class="toast-act" hidden></button></div>
+    <div class="tip" id="tip" role="tooltip"></div>
     <script src="app.js"></script>
   </body>
 </html>

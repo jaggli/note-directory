@@ -143,9 +143,8 @@ test("old and new version open side by side see each other's edits", async ({ pa
 
   // Deleting in either one removes it in the other
   await page.evaluate(() => {
-    confirmDelete(state.notes.find((n) => n.name === "from-old.md").id);
+    deleteNote(state.notes.find((n) => n.name === "from-old.md").id);
   });
-  await page.click("#modalConfirm");
   await expect.poll(() => names(old)).not.toContain("from-old.md");
   await old.evaluate(() => {
     confirmDelete(state.notes.find((n) => n.name === "from-new.md").id);
@@ -299,9 +298,8 @@ test("a note deleted in another tab leaves this tab's URL", async ({ page, conte
   const other = await context.newPage();
   await openApp(other);
   await other.evaluate(() => {
-    confirmDelete(state.notes.find((n) => n.name === "doomed.md").id);
+    deleteNote(state.notes.find((n) => n.name === "doomed.md").id);
   });
-  await other.click("#modalConfirm");
   // A reload would otherwise restore the note from the URL
   await expect
     .poll(() => page.evaluate(() => decodeURIComponent(location.hash)))

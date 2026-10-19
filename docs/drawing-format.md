@@ -2,7 +2,7 @@
 
 A drawing is a plain-text note: one line per shape, in drawing order (later
 lines are drawn on top). The canvas reads and writes this text; the source
-view (file → source), vim, find & replace, Drive sync and URL sharing all work on it like on
+view (the **Source** tab), vim, find & replace, Drive sync and URL sharing all work on it like on
 any other note.
 
 ```

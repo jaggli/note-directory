@@ -5,13 +5,19 @@ hidden `appDataFolder`. Scope: `drive.appdata` only.
 
 ## UI States
 
-| State            | Dot                    | Animation    | Label         | Menu                       |
-| ---------------- | ---------------------- | ------------ | ------------- | -------------------------- |
-| Disconnected     | —                      | —            | _(hidden)_    | "enable google drive"      |
-| Connected (idle) | Green                  | None         | `sync`        | sync now · disconnect      |
-| Syncing          | Green                  | Blinking LED | `syncing`     | —                          |
-| Sync success     | Green ✔ → Green ● (2s) | None         | `sync`        | sync now · disconnect      |
-| Sync failed      | Red                    | None         | `sync failed` | reconnect                  |
+The state lives in the sidebar footer (one line for all notes); the title
+bar shows *Synced* / *Syncing…* for the open note.
+
+| State            | Dot   | Animation | Footer label                                 | Menu                             |
+| ---------------- | ----- | --------- | -------------------------------------------- | -------------------------------- |
+| Disconnected     | —     | —         | *Only in this browser · Back up…*            | note ▾ › Sync with Google Drive… |
+| Connected (idle) | Green | None      | `Synced to Google Drive` + time              | Sync now · Sync settings · Disconnect |
+| Syncing          | Blue  | Pulsing   | `Syncing…`                                   | —                                |
+| Sync failed      | Red   | None      | `Sync paused · sign-in expired` / `· will retry` | Reconnect · Sync settings · Disconnect |
+
+Both sides changed a note: the merge keeps both (`name (conflict).ext`), a
+toast says so once, the copy carries a *Conflict* badge, and opening it
+shows a banner: **Open original · Use this one · Delete this copy**.
 
 ---
 

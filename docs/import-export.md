@@ -2,7 +2,7 @@
 
 ## Export
 
-**Trigger:** "export all notes" in the menu.
+**Trigger:** **note ▾ › Export all as ZIP**, or Settings › Sync and backup.
 
 Creates a standard ZIP file (DEFLATE-compressed) containing:
 
@@ -52,7 +52,10 @@ Uses the browser's native `CompressionStream('deflate-raw')` API. All entries ar
 
 ## Import via Drag-and-Drop
 
-Drop files onto the editor to import them. Two types are supported:
+Drop files anywhere, or pick them with **note ▾ › Import files…** (also in
+the **+ ▾** menu, Settings and the palette). Everything is read first
+(`importFiles()`); then one dialog lists every name clash. Two types are
+supported:
 
 ### ZIP files
 
@@ -64,14 +67,14 @@ Detected by `.zip` extension or `application/zip` MIME type. The ZIP reader hand
 | ----------------------------------- | ------------------------------------------ |
 | Same ID + same or older `updatedAt` | Skip silently (local is current)           |
 | Same ID + newer `updatedAt`         | Auto-update local note                     |
-| Same filename, different ID         | Show conflict modal                        |
+| Same filename, different ID         | A row in the import dialog                 |
 | New file (no match)                 | Create note with original ID and timestamp |
 
 **Without `.note.directory` (plain zip):**
 
 | Scenario        | Behavior                |
 | --------------- | ----------------------- |
-| Filename exists | Show conflict modal     |
+| Filename exists | A row in the import dialog |
 | New file        | Create note with new ID |
 
 ### Individual text files
@@ -80,22 +83,27 @@ Any file with a text MIME type or a recognized text extension (~80 extensions su
 
 | Scenario        | Behavior                      |
 | --------------- | ----------------------------- |
-| Filename exists | Modal: "update" or "new file" |
+| Filename exists | A row in the import dialog    |
 | New file        | Create note                   |
 
 ---
 
-## Conflict Modal (ZIP import)
+## Import dialog
 
-When a ZIP import encounters a filename collision (different ID or no metadata), a three-option modal appears:
+Every filename collision (zip or plain file; different ID or no metadata)
+is one row in a single dialog, with the same three words used everywhere:
 
 | Option        | Effect                                                      |
 | ------------- | ----------------------------------------------------------- |
-| **skip**      | Don't import this file                                      |
-| **keep both** | Import with a numbered suffix (`todo1.md`, `todo2.md`, ...) |
-| **override**  | Replace the existing note's content                         |
+| **Replace**   | Replace the existing note's content (undoable with ⌘Z there) |
+| **Keep both** | Import with a numbered suffix (`todo1.md`, `todo2.md`, ...) |
+| **Skip**      | Don't import this file                                      |
 
-Escape or clicking outside the modal defaults to "skip".
+The default is Replace when the incoming copy is newer (known from the
+export's metadata), otherwise Keep both. **Same for all** applies a choice
+to every row. New files and skipped ones (binary, unsupported, no space)
+are listed too. Cancel, Escape or the scrim import nothing. Without
+clashes there is no dialog — a toast says what was imported or skipped.
 
 ---
 
@@ -106,8 +114,9 @@ Notes can be shared via URL using zlib compression in the URL hash fragment. The
 When opening a shared URL:
 
 - If a note with the same filename exists and content is identical → activate it
-- If content differs → modal: "update" or "new file"
-- If no match → create new note
+- Otherwise the note is shown, not saved, under a banner: **Shared with you ·
+  Save to my notes / Dismiss**, or for a name clash **Show mine · Keep both ·
+  Replace mine**. The first edit or ticked task saves it too.
 
 ---
 
