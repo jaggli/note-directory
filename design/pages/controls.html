@@ -1,0 +1,43 @@
+<h1 class="pg-title">Fields and controls</h1>
+<p class="pg-lede">Fields sit on a field tint with a hairline, so they read as inputs on every surface. Focus is the accent ring, errors the danger ring with a note under it — never a toast.</p>
+
+<section class="sec">
+  <h2>Fields</h2>
+  <div class="board">
+    <div class="spec" style="width:240px"><div class="n-field" style="width:100%"><i data-i="search" class="sm"></i><input placeholder="Search" /><span class="n-kbd">⌘P</span></div><span class="cap">Search field — opens the palette</span></div>
+    <div class="spec" style="width:240px"><div class="n-field focus" style="width:100%"><input value="release-notes" /></div><span class="cap">Focus</span></div>
+    <div class="spec" style="width:240px"><div style="width:100%"><div class="n-field error"><input value="todo.md" /></div><div class="n-field-note error">A note called todo.md exists</div></div><span class="cap">Error, inline where the fix is</span></div>
+    <div class="spec" style="width:300px"><div class="n-field mono" style="width:100%"><input value="https://note.directory/#name=release…" readonly /></div><span class="cap">Mono — links, paths</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Segmented control</h2>
+  <p class="lede">For two or three views of the same thing. Each segment has an icon and a word.</p>
+  <div class="board">
+    <div class="spec"><div class="n-seg"><button aria-pressed="true"><i data-i="code" class="sm"></i>Edit</button><button aria-pressed="false"><i data-i="eye" class="sm"></i>Preview</button></div><span class="cap">Markdown</span></div>
+    <div class="spec"><div class="n-seg"><button aria-pressed="true"><i data-i="file-draw" class="sm"></i>Canvas</button><button aria-pressed="false"><i data-i="code" class="sm"></i>Source</button></div><span class="cap">Drawing</span></div>
+    <div class="spec"><div class="n-seg"><button aria-pressed="true">Editable</button><button aria-pressed="false"><i data-i="lock" class="sm"></i>Read-only</button></div><span class="cap">Share</span></div>
+    <div class="spec"><div class="n-seg"><button>Replace</button><button aria-pressed="true">Keep both</button><button>Skip</button></div><span class="cap">Import conflict, per row</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Toggles, checks, meters, badges</h2>
+  <div class="board">
+    <div class="spec"><span class="n-switch" aria-checked="true"></span><span class="cap">Switch on — settings</span></div>
+    <div class="spec"><span class="n-switch" aria-checked="false"></span><span class="cap">Switch off</span></div>
+    <div class="spec"><span class="n-check" aria-checked="true"></span><span class="cap">Check — tasks, apply to all</span></div>
+    <div class="spec"><span class="n-check"></span><span class="cap">Check off</span></div>
+    <div class="spec"><span class="n-radio" aria-checked="true"></span><span class="cap">Radio</span></div>
+    <div class="spec" style="width:160px"><div class="n-meter" style="width:100%"><i style="width:38%"></i></div><span class="cap">Meter</span></div>
+    <div class="spec" style="width:160px"><div class="n-meter warn" style="width:100%"><i style="width:74%"></i></div><span class="cap">≥ 70 %</span></div>
+    <div class="spec" style="width:160px"><div class="n-meter critical" style="width:100%"><i style="width:93%"></i></div><span class="cap">≥ 90 %</span></div>
+  </div>
+  <div class="board">
+    <div class="spec"><span class="n-badge warning">Conflict</span><span class="cap">Badge — conflict copy</span></div>
+    <div class="spec"><span class="n-badge accent">Shared</span><span class="cap">Badge — unsaved shared note</span></div>
+    <div class="spec"><span class="n-badge">Read-only</span><span class="cap">Badge — neutral</span></div>
+    <div class="spec"><span style="display:flex;gap:10px"><span class="n-dot ok"></span><span class="n-dot busy"></span><span class="n-dot fail"></span><span class="n-dot dirty"></span></span><span class="cap">Dots — synced, syncing, failed, edited</span></div>
+  </div>
+</section>

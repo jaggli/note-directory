@@ -1,0 +1,47 @@
+<h1 class="pg-title">First run and empty</h1>
+<p class="pg-lede">First run still opens the help note in Preview — it's a good introduction. What changes is that the app around it already explains itself, and an empty list has a real empty state.</p>
+
+<section class="sec">
+  <h2>First visit</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:720px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="help.md" data-foot="local" data-notes='[["help.md","now"]]'></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="help.md" data-view="preview" data-state="Read-only"></div>
+        <div class="n-preview"><div class="prose">
+          <h1>Welcome to note</h1>
+          <p>A private, local-first editor for text and drawings. Your notes stay in this browser — nothing is collected or sent anywhere.</p>
+          <h2>Start</h2>
+          <ul><li><b>⌃N</b> a new note, or <b>+</b> at the top left</li><li><b>⌘P</b> finds any note, line or command</li><li><b>Share</b> puts the whole note in a link</li></ul>
+          <h2>Keep it safe</h2>
+          <p>Browsers can clear storage. Turn on Google Drive sync or export a ZIP now and then — both under <a href="#">Back up</a>.</p>
+        </div></div>
+        <div data-part="status" data-kind="preview"></div>
+      </div>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>Help is Read-only</b> in the title bar; today an edited help note silently forks into a numbered copy.</span></li>
+    <li><span><b>Help text drops the menu directions</b> (“menu → share”) — the buttons are visible now.</span></li>
+  </ul>
+</section>
+
+<section class="sec">
+  <h2>No notes</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:620px">
+    <div class="n-app">
+      <div data-part="sidebar" data-foot="local" data-notes='[]'></div>
+      <div class="n-main" style="grid-template-rows:var(--n-bar) 1fr">
+        <header class="n-titlebar"></header>
+        <div style="display:grid;place-items:center">
+          <div class="n-empty">
+            <h3>No note open</h3>
+            <p>Start a note or a drawing, or bring your own files.</p>
+            <div class="acts"><button class="n-btn primary"><i data-i="plus" class="sm"></i>New note</button><button class="n-btn"><i data-i="file-draw" class="sm"></i>New drawing</button><button class="n-btn"><i data-i="import" class="sm"></i>Import…</button></div>
+            <div class="keys"><span class="n-kbd boxed">⌃N</span><span>New note</span><span class="n-kbd boxed">⌘P</span><span>Search and commands</span><span class="n-kbd boxed">⌘/</span><span>All shortcuts</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>

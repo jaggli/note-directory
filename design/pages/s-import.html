@@ -1,0 +1,49 @@
+<h1 class="pg-title">Import</h1>
+<p class="pg-lede">Import gets a button (so phones can do it) and one dialog that handles every clash at once with the same three words used everywhere else.</p>
+
+<section class="sec">
+  <h2>Dropping files</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:640px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md"></div>
+        <div data-part="editor" data-caret="none"></div>
+        <div data-part="status"></div>
+      </div>
+    </div>
+    <div style="position:absolute;inset:10px;border-radius:14px;border:2px dashed var(--n-accent);background:color-mix(in srgb, var(--n-bg) 82%, var(--p-blue));display:grid;place-items:center">
+      <div class="n-empty" style="color:var(--n-text-2)"><i data-i="import" class="lg" style="width:32px;height:32px;color:var(--n-accent)"></i><h3>Drop to import 3 files</h3><p>Text files and note ZIP exports. Nothing leaves this browser.</p></div>
+    </div>
+  </div></div>
+</section>
+
+<section class="sec">
+  <h2>Clashes</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:640px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md"></div>
+        <div data-part="editor" data-caret="none"></div>
+        <div data-part="status"></div>
+      </div>
+    </div>
+    <div class="n-scrim">
+      <div class="n-dialog" style="width:540px">
+        <h4>Import 3 notes</h4>
+        <p>2 already exist. Choose what to do with each.</p>
+        <div style="display:grid;gap:6px">
+          <div class="n-row" style="padding:0"><i data-i="note" class="kind md"></i><span class="name">release-notes<span class="ext">.md</span> <span class="meta" style="display:inline">· yours is newer</span></span><div class="n-seg"><button>Replace</button><button aria-pressed="true">Keep both</button><button>Skip</button></div></div>
+          <div class="n-row" style="padding:0"><i data-i="file-code" class="kind code"></i><span class="name">deploy<span class="ext">.sh</span> <span class="meta" style="display:inline">· theirs is newer</span></span><div class="n-seg"><button aria-pressed="true">Replace</button><button>Keep both</button><button>Skip</button></div></div>
+          <div class="n-row" style="padding:0"><i data-i="note" class="kind md"></i><span class="name">retro<span class="ext">.md</span></span><span class="n-badge accent">New</span></div>
+        </div>
+        <div class="actions"><label style="display:flex;align-items:center;gap:8px;color:var(--n-text-2)"><span class="n-check"></span>Same for all</label><span class="grow"></span><button class="n-btn">Cancel</button><button class="n-btn primary">Import 3</button></div>
+      </div>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>Defaults are safe</b>: Keep both when yours is newer, Replace when theirs is — Replace is undoable from the toast.</span></li>
+    <li><span><b>Same-id ZIP entries</b> still merge by date without asking, as today. Binary or oversized files are listed as skipped in this dialog, not in separate alerts.</span></li>
+  </ul>
+</section>

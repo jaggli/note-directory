@@ -1,0 +1,31 @@
+<h1 class="pg-title">Phone parts</h1>
+<p class="pg-lede">Same components at touch size: 44 px targets, sheets instead of menus, long-press instead of hover.</p>
+
+<section class="sec">
+  <h2>App bar and key bar</h2>
+  <div class="board col" style="background:var(--n-bg);align-items:start">
+    <div class="spec" style="width:390px;justify-items:stretch"><div class="n-appbar"><button class="n-btn ghost icon"><i data-i="back" class="lg"></i></button><button class="title"><span>release-notes<span style="color:var(--n-text-3);font-weight:400">.md</span></span><i data-i="chev-down" class="sm" style="color:var(--n-text-3)"></i></button><button class="n-btn ghost icon"><i data-i="eye" class="lg"></i></button><button class="n-btn ghost icon"><i data-i="share" class="lg"></i></button></div><span class="cap">App bar — back to notes, name (tap = actions), Preview, Share</span></div>
+    <div class="spec" style="width:390px;justify-items:stretch"><div class="n-accessory"><button style="font:500 13px/1 var(--n-font)">Tab</button><button style="font:500 13px/1 var(--n-font)">⇧Tab</button><span class="sep"></span><button><i data-i="task"></i></button><button>#</button><button>`</button><button>[ ]</button><span class="sep"></span><button><i data-i="undo"></i></button><button><i data-i="redo"></i></button><button><i data-i="search"></i></button></div><span class="cap">Key bar above the keyboard — Tab and ⇧Tab make list nesting reachable</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Sheets and rows</h2>
+  <div class="board" style="background:var(--n-bg)">
+    <div class="spec" style="width:390px;justify-items:stretch"><div class="n-sheet">
+      <div style="display:flex;align-items:center;gap:10px;padding:0 12px 10px;font:var(--n-heading)"><i data-i="note" style="color:var(--n-kind-md)"></i>release-notes.md</div>
+      <button class="n-menu-item"><i data-i="pencil"></i><span class="label">Rename</span></button>
+      <button class="n-menu-item"><i data-i="pin"></i><span class="label">Pin</span></button>
+      <button class="n-menu-item"><i data-i="zen"></i><span class="label">Zen</span></button>
+        <button class="n-menu-item"><i data-i="link"></i><span class="label">Copy link</span></button>
+      <button class="n-menu-item"><i data-i="download"></i><span class="label">Download</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item danger"><i data-i="trash"></i><span class="label">Delete</span></button>
+    </div><span class="cap">Actions sheet — long-press a row or tap the title</span></div>
+    <div class="spec" style="width:390px;justify-items:stretch"><div style="background:var(--n-panel);border-radius:12px;overflow:hidden">
+      <div class="n-mrow"><i data-i="note" style="color:var(--n-kind-md)"></i><span class="name">todo.md<small>2m ago</small></span><i data-i="pin-on" class="sm" style="color:var(--n-pin)"></i></div>
+      <div class="n-mrow"><i data-i="note" style="color:var(--n-kind-md)"></i><span class="name">release-notes.md<small>just now</small></span></div>
+      <div class="n-mrow"><i data-i="file-draw" style="color:var(--n-kind-draw)"></i><span class="name">architecture.draw<small>1h ago</small></span></div>
+    </div><span class="cap">List rows — 52 px, time under the name</span></div>
+  </div>
+</section>

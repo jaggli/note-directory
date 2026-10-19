@@ -1,0 +1,102 @@
+<h1 class="pg-title">Parity check</h1>
+<p class="pg-lede">Every user-facing feature today and where it lives after the redesign. If a row says <span class="tbl"><span class="gone">gone</span></span>, the reason is next to it. Nothing else is removed.</p>
+
+<section class="sec">
+  <h2>Notes and the list</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:30%">Today</th><th style="width:40%">Redesign</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Sidebar <code>+</code> / <code>▾ text, drawing</code></td><td>Sidebar <b>+ ▾</b></td><td>Also in note ▾ and the palette</td></tr>
+      <tr><td>Status bar <code>new ctrl+n ▾</code></td><td><span class="gone">gone</span></td><td>Duplicate of the sidebar button</td></tr>
+      <tr><td>Click active row to rename · ✎ on touch</td><td>Title bar name, F2, ⋯ › Rename, double-click a row</td><td>Esc cancels, duplicates rejected inline</td></tr>
+      <tr><td>Pin ★ on hover</td><td>Pin on hover, ⋯ › Pin, Pinned section</td><td></td></tr>
+      <tr><td>Drag to reorder (mouse)</td><td>Same, with a drop line; touch: long-press then drag</td><td></td></tr>
+      <tr><td>Delete × (confirm if content) · Ctrl+Shift+D</td><td>⋯ › Delete, ⌘⇧D, hover ⋯; immediate + Undo toast</td><td></td></tr>
+      <tr><td>Relative time + size under the name</td><td>Time on the row; size in the row tooltip and Settings › Storage</td><td></td></tr>
+      <tr><td>Sidebar resize, close × on mobile</td><td>Resize handle; ⌘\ and the title bar sidebar button</td><td></td></tr>
+      <tr><td>Mobile filename prompt on new</td><td>Same rename-in-title as desktop</td><td>No modal</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Editing</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:30%">Today</th><th style="width:40%">Redesign</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Syntax highlighting, list continuation, Tab nesting, Alt+↑↓, occurrences</td><td>unchanged</td><td>Phone gets a key bar for Tab/⇧Tab</td></tr>
+      <tr><td>Find &amp; replace bar (Ctrl+H)</td><td>Find widget ⌘F, Replace row ⌘⌥F / Ctrl+H</td><td>Same matching rules</td></tr>
+      <tr><td>Ctrl+F line list in this note</td><td>Palette with the <i>This note</i> scope</td><td></td></tr>
+      <tr><td>Status <code>replace</code>, <code>vim</code> hints</td><td>Vim toggle stays; Replace moves into the find widget</td><td>Hints → tooltips and menus</td></tr>
+      <tr><td><code>wrap</code> button</td><td>Status bar <b>Wrap</b> toggle; default in Settings › Editor</td><td></td></tr>
+      <tr><td>Vim modes, <code>[+]</code>, ex commands, <code>:fmt :e :view :help :draw :new</code></td><td>unchanged; mode pill in status bar</td><td>Each ex command also has a palette command</td></tr>
+      <tr><td><code>:mddemo</code></td><td>note ▾ › Markdown guide</td><td>Was vim-only</td></tr>
+      <tr><td>Ctrl+Shift+F format · Ctrl+S format</td><td>⌥⇧F, ⋯ › Format markdown; on save per setting</td><td></td></tr>
+      <tr><td>Undo per note (200 steps)</td><td>unchanged</td><td></td></tr>
+      <tr><td>Cursor position memory, Ln/Col</td><td>unchanged</td><td>Status bar adds selection count</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Markdown preview and zen</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:30%">Today</th><th style="width:40%">Redesign</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>edit / view / zen tabs</td><td>Edit | Preview segment + Zen button</td><td>URL <code>?view=</code> unchanged</td></tr>
+      <tr><td>Heading anchors, code copy, task cascade, tables, details, note links, drawing embeds</td><td>unchanged, restyled with the reading face</td><td>Copy feedback → toast</td></tr>
+      <tr><td><code>e</code> to edit</td><td><code>E</code> and ⌘E; shown in the status bar</td><td></td></tr>
+      <tr><td>Zen bar: logo, name, ×, share, download</td><td>Same, auto-hiding; share opens the Share popover</td><td></td></tr>
+      <tr><td>download as html</td><td>⋯ › Download as HTML</td><td></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Drawing</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:30%">Today</th><th style="width:40%">Redesign</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>11 tools, keys, phone 3×3 grid</td><td>Dock in three groups, name and key on hover; phone grid kept</td><td></td></tr>
+      <tr><td>Nav panel: − 100% + fit grid undo redo</td><td>Zoom panel bottom left; grid in the status bar; undo/redo on touch only</td><td></td></tr>
+      <tr><td>Style panel, abbreviated actions</td><td>Inspector with full words; arrange under ⋯</td><td></td></tr>
+      <tr><td>Context menu</td><td>unchanged</td><td></td></tr>
+      <tr><td>Error badge “fix in source”</td><td>Same badge; click opens Source at the line</td><td></td></tr>
+      <tr><td>copy as png · download as svg · edit source</td><td>⋯ menu · ⋯ menu · Canvas | Source segment</td><td></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Sharing, import, export, sync</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:30%">Today</th><th style="width:40%">Redesign</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>menu › share (hidden over 60 kB)</td><td>Share popover, always present</td><td>Too large: explains, offers Download</td></tr>
+      <tr><td>Zen links (<code>?view=zen</code>)</td><td>Share › <i>Read-only</i></td><td>Link format unchanged</td></tr>
+      <tr><td>URL updates while typing</td><td>unchanged</td><td></td></tr>
+      <tr><td>Opening a link imports silently</td><td>Banner: Save · Dismiss</td><td></td></tr>
+      <tr><td>Drop files / zip</td><td>Same + Import files… picker</td><td></td></tr>
+      <tr><td>Import conflict modals (two vocabularies)</td><td>One import dialog, Replace · Keep both · Skip</td><td></td></tr>
+      <tr><td>export all notes</td><td>note ▾ › Export all as ZIP; Settings › Storage</td><td></td></tr>
+      <tr><td>enable google drive · sync menu</td><td>Settings › Sync; sidebar footer line with its menu</td><td>Dead <code>connect</code> pane goes</td></tr>
+      <tr><td>Storage meter in status bar (over 50%)</td><td>Sidebar footer, same thresholds; full detail in Settings › Storage</td><td></td></tr>
+      <tr><td>Drive <code>(conflict)</code> copies</td><td>Same copies + Conflict badge + toast</td><td></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Everything else</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:30%">Today</th><th style="width:40%">Redesign</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>theme ▸ five flavours</td><td>note ▾ › Theme ▸, Settings › Appearance, Match system</td><td></td></tr>
+      <tr><td>help · privacy policy</td><td>note ▾; Terms added</td><td></td></tr>
+      <tr><td>Storage-full and save-failed modals</td><td>Error toast with <i>Export all</i>, banner while saving is blocked</td><td>Not dismissible while unsaved</td></tr>
+      <tr><td>Toasts (formatted, copied as png …)</td><td>The one toast</td><td></td></tr>
+      <tr><td>Empty state “ctrl+n or drop a file”</td><td>Empty state with New note, New drawing, Import, and keys</td><td></td></tr>
+      <tr><td>Drop overlay</td><td>unchanged, restyled</td><td></td></tr>
+    </tbody>
+  </table>
+</section>

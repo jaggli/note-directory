@@ -1,0 +1,42 @@
+<h1 class="pg-title">Typography</h1>
+<p class="pg-lede">Two faces with two jobs. The platform face (SF Pro, Segoe UI) for chrome: it is what every app on the machine uses for buttons, so ours read as buttons. Victor Mono for what you type and what you'd type: the note, code, keys, and the wordmark. Sentence case, no all-lowercase, no all-caps.</p>
+
+<section class="sec">
+  <h2>Chrome steps</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:18%">Token</th><th style="width:16%">Spec</th><th>Sample</th><th style="width:26%">Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--n-display</code></td><td>600 22/28</td><td><span style="font:var(--n-display)">No note open</span></td><td>Empty states, settings title</td></tr>
+      <tr><td><code>--n-heading</code></td><td>600 15/20</td><td><span style="font:var(--n-heading)">Import 3 notes</span></td><td>Dialog titles, phone app bar</td></tr>
+      <tr><td><code>--n-title</code></td><td>600 13/18</td><td><span style="font:var(--n-title)">release-notes.md</span></td><td>Note name in the title bar, popover titles</td></tr>
+      <tr><td><code>--n-body-strong</code></td><td>500 12.5/18</td><td><span style="font:var(--n-body-strong)">Share · Copy link · Edit</span></td><td>Buttons, segmented labels</td></tr>
+      <tr><td><code>--n-body</code></td><td>400 12.5/18</td><td><span style="font:var(--n-body)">Rows, menu items, field text</span></td><td>Default</td></tr>
+      <tr><td><code>--n-label</code></td><td>500 11/14</td><td><span style="font:var(--n-label);color:var(--n-text-3)">Pinned · Notes · Appearance</span></td><td>Section labels, badges</td></tr>
+      <tr><td><code>--n-caption</code></td><td>400 11/14</td><td><span style="font:var(--n-caption);color:var(--n-text-3)">2m ago · Ln 9, Col 24 · ⌘P</span></td><td>Meta, status bar, keys</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Content steps</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:18%">Token</th><th style="width:16%">Spec</th><th>Sample</th><th style="width:26%">Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--n-code</code></td><td>Victor Mono 13/21</td><td><span style="font:var(--n-code)"><span class="h-h">## Checklist</span> <span class="h-mark">- [ ]</span> Ship it</span></td><td>The editor (16 px on phones, as today)</td></tr>
+      <tr><td><code>--n-code-sm</code></td><td>Victor Mono 11.5/16</td><td><span style="font:var(--n-code-sm)">12: ./deploy.sh --env prod</span></td><td>Line hits in the palette, code in tables</td></tr>
+      <tr><td>Reading</td><td>System 15/1.65, h1 28, h2 19</td><td><span style="font:400 15px/1.65 var(--n-font)">Ships Thursday. Owner: @mira</span></td><td>Preview and zen, 680 px measure</td></tr>
+      <tr><td>Wordmark</td><td>Victor Mono 15</td><td><span style="font:400 15px/1 var(--n-mono)">note</span></td><td>The brand button only</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Rules</h2>
+  <ul class="notes">
+    <li><span><b>Sentence case</b> for every label, title, toast and tooltip: “Export all as ZIP”, not “export all notes” or “Export All Notes”.</span></li>
+    <li><span><b>No periods</b> in labels, toasts or tooltips. Full sentences in dialogs and banners get them.</span></li>
+    <li><span><b>Extensions are muted, never dropped.</b> <code>release-notes</code><span style="color:var(--n-text-3)">.md</span> — the extension decides how a note behaves, so it stays visible but quiet.</span></li>
+    <li><span><b>Tabular figures</b> for times, sizes, counts and positions so the status bar doesn't wobble while you type.</span></li>
+    <li><span><b>Keys in the platform's glyphs</b>: ⌘ ⌥ ⇧ ⌃ on Mac, “Ctrl+Shift+P” elsewhere. Never “ctrl+” on a Mac.</span></li>
+  </ul>
+</section>

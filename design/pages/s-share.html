@@ -1,0 +1,29 @@
+<h1 class="pg-title">Sharing</h1>
+<p class="pg-lede">Sharing is what makes note different: the whole note lives in the link. So it gets the one primary button, a popover that explains it in a sentence, and an honest answer when a note is too big.</p>
+
+<section class="sec">
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md" data-share="open"></div>
+        <div data-part="editor" data-caret="none"></div>
+        <div data-part="status"></div>
+      </div>
+    </div>
+    <div class="n-popover" style="position:absolute;right:42px;top:38px">
+      <h4>Share release-notes.md</h4>
+      <div class="n-seg" style="display:flex"><button aria-pressed="false" style="flex:1;justify-content:center">Editable</button><button aria-pressed="true" style="flex:1;justify-content:center"><i data-i="lock" class="sm"></i>Read-only</button></div>
+      <p style="font:var(--n-caption);color:var(--n-text-3);margin:-4px 0 0">Opens in zen. They can still save a copy.</p>
+      <div class="n-field mono"><input value="https://note.directory/?view=zen#name=release-notes.md&amp;note=…" readonly /></div>
+      <div style="display:grid;gap:5px"><div class="split hint"><span>Link size</span><span>8 of 60 kB</span></div><div class="n-meter"><i style="width:14%"></i></div></div>
+      <button class="n-btn primary" style="width:100%"><i data-i="link" class="sm"></i>Copy link</button>
+      <span class="hint">The note lives in the link. Nothing is uploaded; anyone with it can read it.</span>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>Editable or Read-only</b> maps to today's two link kinds (<code>?view=zen</code>). The link format doesn't change.</span></li>
+    <li><span><b>Size against the limit</b> is shown before it matters; past 60 kB the popover says so and offers Download and, for drawings, Copy as PNG.</span></li>
+    <li><span><b>Copy link</b> closes the popover and shows <i>Link copied</i>. ⋯ › Copy link skips the popover with the last mode used.</span></li>
+  </ul>
+</section>

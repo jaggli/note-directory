@@ -1,0 +1,82 @@
+<h1 class="pg-title">Color and themes</h1>
+<p class="pg-lede">The five themes stay. What changes is that the UI never reads a palette colour directly: it reads a semantic token, and every token is derived from the palette in <code>tokens.css</code>. A theme is twenty hex values, nothing more. Switch the theme at the top to see every token move.</p>
+<section class="sec"><h2>Surfaces</h2><p class="lede">Three levels. The sidebar sits lowest, the page you write on above it, and menus, popovers and the palette float on top. Hover, pressed and lines are translucent text, so they work on any surface.</p><div class="swatches">
+<div class="sw"><i style="background:var(--n-panel)"></i><div><b>Panel</b><code>--n-panel</code><span>Sidebar, settings nav</span></div></div>
+<div class="sw"><i style="background:var(--n-bg)"></i><div><b>Page</b><code>--n-bg</code><span>Editor, preview, canvas</span></div></div>
+<div class="sw"><i style="background:var(--n-raised)"></i><div><b>Raised</b><code>--n-raised</code><span>Menus, popovers, dialogs</span></div></div>
+<div class="sw"><i style="background:var(--n-field)"></i><div><b>Field</b><code>--n-field</code><span>Inputs, segmented track</span></div></div>
+<div class="sw"><i style="background:var(--n-hover)"></i><div><b>Hover</b><code>--n-hover</code><span>Rows, ghost buttons</span></div></div>
+<div class="sw"><i style="background:var(--n-selected)"></i><div><b>Selected</b><code>--n-selected</code><span>Active row, palette hit</span></div></div>
+<div class="sw"><i style="background:var(--n-line)"></i><div><b>Line</b><code>--n-line</code><span>Dividers</span></div></div>
+<div class="sw"><i style="background:var(--n-line-strong)"></i><div><b>Strong line</b><code>--n-line-strong</code><span>Outlines on raised</span></div></div>
+</div></section><section class="sec"><h2>Text</h2><p class="lede">Three steps. Text-3 is the gutter colour, not overlay0: it keeps 11 px captions above 4.5:1 in every theme.</p><div class="swatches">
+<div class="sw"><i style="background:var(--n-text)"></i><div><b>Text</b><code>--n-text</code><span>Content, labels</span></div></div>
+<div class="sw"><i style="background:var(--n-text-2)"></i><div><b>Text 2</b><code>--n-text-2</code><span>Secondary, idle icons</span></div></div>
+<div class="sw"><i style="background:var(--n-text-3)"></i><div><b>Text 3</b><code>--n-text-3</code><span>Captions, keys, meta</span></div></div>
+</div></section><section class="sec"><h2>Meanings</h2><p class="lede">One hue per meaning, the same role in every theme. Blue is the only accent; it marks the primary action, selection and focus — never decoration.</p><div class="swatches">
+<div class="sw"><i style="background:var(--n-accent)"></i><div><b>Accent</b><code>--n-accent</code><span>Primary, selection, focus</span></div></div>
+<div class="sw"><i style="background:var(--n-accent-soft)"></i><div><b>Accent soft</b><code>--n-accent-soft</code><span>Banner, scope chip</span></div></div>
+<div class="sw"><i style="background:var(--n-danger)"></i><div><b>Danger</b><code>--n-danger</code><span>Delete, failed</span></div></div>
+<div class="sw"><i style="background:var(--n-warning)"></i><div><b>Warning</b><code>--n-warning</code><span>Conflict, storage high</span></div></div>
+<div class="sw"><i style="background:var(--n-success)"></i><div><b>Success</b><code>--n-success</code><span>Synced, vim insert</span></div></div>
+<div class="sw"><i style="background:var(--n-pin)"></i><div><b>Pin</b><code>--n-pin</code><span>Pinned</span></div></div>
+<div class="sw"><i style="background:var(--n-inverse)"></i><div><b>Inverse</b><code>--n-inverse</code><span>Toast, tooltip</span></div></div>
+</div></section><section class="sec"><h2>Note kinds</h2><p class="lede">The kind icon in the list, the palette and the title bar takes its colour from the extension. Plain text stays grey so colour means something.</p><div class="swatches">
+<div class="sw"><i style="background:var(--n-kind-md)"></i><div><b>Markdown</b><code>--n-kind-md</code><span>.md</span></div></div>
+<div class="sw"><i style="background:var(--n-kind-draw)"></i><div><b>Drawing</b><code>--n-kind-draw</code><span>.draw</span></div></div>
+<div class="sw"><i style="background:var(--n-kind-code)"></i><div><b>Code</b><code>--n-kind-code</code><span>.js .sh .yaml …</span></div></div>
+<div class="sw"><i style="background:var(--n-kind-text)"></i><div><b>Text</b><code>--n-kind-text</code><span>.txt and the rest</span></div></div>
+</div></section>
+<section class="sec"><h2>The five themes</h2><p class="lede">Same tokens, five palettes. Latte is the light theme; <b>Match system</b> in Settings pairs it with a dark one.</p>
+<div class="board" data-single style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+<div class="n" data-theme="mocha" data-fixed style="border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--n-line-strong)">
+  <div style="display:grid;grid-template-columns:76px 1fr;height:120px">
+    <div style="background:var(--n-panel);padding:8px 6px;display:grid;gap:3px;align-content:start">
+      <div class="n-row active" style="height:20px;font-size:11px;padding:0 6px"><span class="name">todo</span></div>
+      <div class="n-row" style="height:20px;font-size:11px;padding:0 6px"><span class="name">ideas</span></div>
+    </div>
+    <div style="padding:10px;font:var(--n-code-sm);line-height:18px"><span class="h-h"># Release</span><br><span class="h-mark">- [x]</span> Freeze<br>Ships <span class="h-str">`v4.2`</span><br><span class="h-link">deploy.sh</span></div>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center;padding:8px;border-top:1px solid var(--n-line)"><b style="flex:1;font:var(--n-body-strong)">Mocha</b><span class="n-badge warning">Conflict</span><button class="n-btn primary sm">Share</button></div>
+</div>
+<div class="n" data-theme="macchiato" data-fixed style="border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--n-line-strong)">
+  <div style="display:grid;grid-template-columns:76px 1fr;height:120px">
+    <div style="background:var(--n-panel);padding:8px 6px;display:grid;gap:3px;align-content:start">
+      <div class="n-row active" style="height:20px;font-size:11px;padding:0 6px"><span class="name">todo</span></div>
+      <div class="n-row" style="height:20px;font-size:11px;padding:0 6px"><span class="name">ideas</span></div>
+    </div>
+    <div style="padding:10px;font:var(--n-code-sm);line-height:18px"><span class="h-h"># Release</span><br><span class="h-mark">- [x]</span> Freeze<br>Ships <span class="h-str">`v4.2`</span><br><span class="h-link">deploy.sh</span></div>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center;padding:8px;border-top:1px solid var(--n-line)"><b style="flex:1;font:var(--n-body-strong)">Macchiato</b><span class="n-badge warning">Conflict</span><button class="n-btn primary sm">Share</button></div>
+</div>
+<div class="n" data-theme="frappe" data-fixed style="border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--n-line-strong)">
+  <div style="display:grid;grid-template-columns:76px 1fr;height:120px">
+    <div style="background:var(--n-panel);padding:8px 6px;display:grid;gap:3px;align-content:start">
+      <div class="n-row active" style="height:20px;font-size:11px;padding:0 6px"><span class="name">todo</span></div>
+      <div class="n-row" style="height:20px;font-size:11px;padding:0 6px"><span class="name">ideas</span></div>
+    </div>
+    <div style="padding:10px;font:var(--n-code-sm);line-height:18px"><span class="h-h"># Release</span><br><span class="h-mark">- [x]</span> Freeze<br>Ships <span class="h-str">`v4.2`</span><br><span class="h-link">deploy.sh</span></div>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center;padding:8px;border-top:1px solid var(--n-line)"><b style="flex:1;font:var(--n-body-strong)">Frappé</b><span class="n-badge warning">Conflict</span><button class="n-btn primary sm">Share</button></div>
+</div>
+<div class="n" data-theme="latte" data-fixed style="border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--n-line-strong)">
+  <div style="display:grid;grid-template-columns:76px 1fr;height:120px">
+    <div style="background:var(--n-panel);padding:8px 6px;display:grid;gap:3px;align-content:start">
+      <div class="n-row active" style="height:20px;font-size:11px;padding:0 6px"><span class="name">todo</span></div>
+      <div class="n-row" style="height:20px;font-size:11px;padding:0 6px"><span class="name">ideas</span></div>
+    </div>
+    <div style="padding:10px;font:var(--n-code-sm);line-height:18px"><span class="h-h"># Release</span><br><span class="h-mark">- [x]</span> Freeze<br>Ships <span class="h-str">`v4.2`</span><br><span class="h-link">deploy.sh</span></div>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center;padding:8px;border-top:1px solid var(--n-line)"><b style="flex:1;font:var(--n-body-strong)">Latte</b><span class="n-badge warning">Conflict</span><button class="n-btn primary sm">Share</button></div>
+</div>
+<div class="n" data-theme="espresso" data-fixed style="border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--n-line-strong)">
+  <div style="display:grid;grid-template-columns:76px 1fr;height:120px">
+    <div style="background:var(--n-panel);padding:8px 6px;display:grid;gap:3px;align-content:start">
+      <div class="n-row active" style="height:20px;font-size:11px;padding:0 6px"><span class="name">todo</span></div>
+      <div class="n-row" style="height:20px;font-size:11px;padding:0 6px"><span class="name">ideas</span></div>
+    </div>
+    <div style="padding:10px;font:var(--n-code-sm);line-height:18px"><span class="h-h"># Release</span><br><span class="h-mark">- [x]</span> Freeze<br>Ships <span class="h-str">`v4.2`</span><br><span class="h-link">deploy.sh</span></div>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center;padding:8px;border-top:1px solid var(--n-line)"><b style="flex:1;font:var(--n-body-strong)">Espresso</b><span class="n-badge warning">Conflict</span><button class="n-btn primary sm">Share</button></div>
+</div>
+</div></section>

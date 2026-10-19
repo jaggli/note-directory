@@ -1,0 +1,86 @@
+<h1 class="pg-title">Toasts, banners, dialogs</h1>
+<p class="pg-lede">One rule per kind of feedback. <b>Toast</b>: something happened — bottom centre, 4 s, 10 s with an action. <b>Banner</b>: a state of this note that lasts until you act. <b>Inline</b>: an error you fix right there. <b>Dialog</b>: only when you must choose between outcomes.</p>
+
+<section class="sec">
+  <h2>Toast</h2>
+  <p class="lede">Inverse colours, so it wins over any theme and any content. One at a time; a new one replaces the old. It never holds the only way to do something.</p>
+  <div class="board" style="background:var(--n-bg)">
+    <div class="spec"><div class="n-toast">Deleted todo.md<button class="act">Undo</button><button class="x"><i data-i="x" class="sm"></i></button></div><span class="cap">With action — 10 s</span></div>
+    <div class="spec"><div class="n-toast"><i data-i="check"></i>Link copied</div><span class="cap">Confirmation — 4 s</span></div>
+    <div class="spec"><div class="n-toast">Replaced 4<button class="act">Undo</button></div><span class="cap">Replace all</span></div>
+    <div class="spec"><div class="n-toast">2 notes changed on two devices — both kept<button class="act">Show</button></div><span class="cap">Drive conflicts</span></div>
+    <div class="spec"><div class="n-toast error"><i data-i="alert"></i>Couldn't copy as PNG — downloaded instead</div><span class="cap">Error — says what happened instead</span></div>
+    <div class="spec"><div class="n-toast"><i data-i="format"></i>Formatted</div><span class="cap">Format</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Banner</h2>
+  <p class="lede">Under the title bar, full width of the note. For states, not events.</p>
+  <div class="board col" style="background:var(--n-bg);align-items:stretch;padding:0;overflow:hidden">
+    <div class="n-banner"><i data-i="link"></i><span><b>Shared with you</b> <span class="sub">· not in your notes yet</span></span><span class="grow"></span><button class="n-btn ghost sm">Dismiss</button><button class="n-btn primary sm">Save to my notes</button></div>
+    <div class="n-banner warning"><i data-i="alert"></i><span><b>You have a different release-notes.md</b> <span class="sub">· this link is newer by 2 days</span></span><span class="grow"></span><button class="n-btn ghost sm">Dismiss</button><button class="n-btn sm">Keep both</button><button class="n-btn sm">Replace mine</button></div>
+    <div class="n-banner warning"><i data-i="alert"></i><span><b>Browser storage is full</b> <span class="sub">· changes to this note aren't saved</span></span><span class="grow"></span><button class="n-btn sm">Export all as ZIP</button><button class="n-btn sm">Manage storage</button></div>
+    <div class="n-banner" style="background:var(--n-hover)"><i data-i="lock" style="color:var(--n-text-2)"></i><span><b>Read-only</b> <span class="sub">· too many shapes to edit as a drawing</span></span><span class="grow"></span><button class="n-btn ghost sm">Open source</button></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Popover — Share</h2>
+  <div class="board" style="background:var(--n-bg)">
+    <div class="spec"><div class="n-popover">
+      <h4>Share release-notes.md</h4>
+      <div class="n-seg" style="display:flex"><button aria-pressed="true" style="flex:1;justify-content:center">Editable</button><button aria-pressed="false" style="flex:1;justify-content:center"><i data-i="lock" class="sm"></i>Read-only</button></div>
+      <div class="n-field mono"><input value="https://note.directory/#name=release-notes.md&amp;note=…" readonly /></div>
+      <div class="split"><span class="hint">The note lives in the link. Nothing is uploaded.</span></div>
+      <div style="display:grid;gap:5px"><div class="split hint"><span>Link size</span><span>8 of 60 kB</span></div><div class="n-meter"><i style="width:14%"></i></div></div>
+      <button class="n-btn primary" style="width:100%"><i data-i="link" class="sm"></i>Copy link</button>
+    </div><span class="cap">Default</span></div>
+    <div class="spec"><div class="n-popover">
+      <h4>Share architecture.draw</h4>
+      <p>This note is too large for a link: 74 kB, the limit is 60 kB.</p>
+      <div style="display:grid;gap:5px"><div class="split hint"><span>Link size</span><span>74 of 60 kB</span></div><div class="n-meter critical"><i style="width:100%"></i></div></div>
+      <div class="split"><button class="n-btn" style="flex:1"><i data-i="download" class="sm"></i>Download</button><button class="n-btn" style="flex:1"><i data-i="image" class="sm"></i>Copy as PNG</button></div>
+    </div><span class="cap">Too large — explains instead of vanishing</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Dialog</h2>
+  <p class="lede">Centred, upper third, on a scrim. The safe choice is the default button; Esc and the scrim pick it too.</p>
+  <div class="board" style="background:var(--n-bg)">
+    <div class="spec"><div class="n-dialog" style="width:520px">
+      <h4>Import 3 notes</h4>
+      <p>2 already exist. Choose what to do with each.</p>
+      <div style="display:grid;gap:6px">
+        <div class="n-row" style="padding:0"><i data-i="note" class="kind md"></i><span class="name">release-notes<span class="ext">.md</span></span><div class="n-seg"><button>Replace</button><button aria-pressed="true">Keep both</button><button>Skip</button></div></div>
+        <div class="n-row" style="padding:0"><i data-i="file-code" class="kind code"></i><span class="name">deploy<span class="ext">.sh</span></span><div class="n-seg"><button>Replace</button><button aria-pressed="true">Keep both</button><button>Skip</button></div></div>
+        <div class="n-row" style="padding:0"><i data-i="note" class="kind md"></i><span class="name">retro<span class="ext">.md</span></span><span class="meta">New</span></div>
+      </div>
+      <div class="actions"><label style="display:flex;align-items:center;gap:8px;color:var(--n-text-2)"><span class="n-check"></span>Same for all</label><span class="grow"></span><button class="n-btn">Cancel</button><button class="n-btn primary">Import</button></div>
+    </div><span class="cap">Import — one dialog for every clash</span></div>
+    <div class="spec"><div class="n-dialog">
+      <h4>Disconnect Google Drive?</h4>
+      <p>Your notes stay in this browser and in Drive, but stop syncing. Other devices keep their copies.</p>
+      <div class="actions"><button class="n-btn primary">Keep syncing</button><button class="n-btn">Disconnect</button></div>
+    </div><span class="cap">Confirm — only for things Undo can't reverse</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Empty states</h2>
+  <div class="board" style="background:var(--n-bg)">
+    <div class="spec"><div class="n-empty" style="padding:24px">
+      <h3>No note open</h3>
+      <p>Pick one on the left, or start a new one.</p>
+      <div class="acts"><button class="n-btn primary"><i data-i="plus" class="sm"></i>New note</button><button class="n-btn"><i data-i="file-draw" class="sm"></i>New drawing</button></div>
+      <div class="keys"><span class="n-kbd boxed">⌃N</span><span>New note</span><span class="n-kbd boxed">⌘P</span><span>Search notes</span><span class="n-kbd boxed">⌘/</span><span>All shortcuts</span></div>
+      <p style="font:var(--n-caption)">or drop files anywhere to import</p>
+    </div></div>
+    <div class="spec"><div class="n-empty" style="padding:24px;max-width:260px">
+      <i data-i="search" class="lg"></i>
+      <p>No notes match “kubernetes”</p>
+      <button class="n-btn"><i data-i="plus" class="sm"></i>New note “kubernetes.md”</button>
+    </div></div>
+  </div>
+</section>

@@ -1,0 +1,65 @@
+<h1 class="pg-title">Buttons and keys</h1>
+<p class="pg-lede">Four kinds, one height. A screen has at most one primary button: in the editor that is Share. Ghost buttons carry the chrome; filled ones are for actions inside popovers and dialogs.</p>
+
+<section class="sec">
+  <h2>Kinds</h2>
+  <div class="board">
+    <div class="spec"><button class="n-btn primary"><i data-i="share" class="sm"></i>Share</button><span class="cap">Primary — one per surface</span></div>
+    <div class="spec"><button class="n-btn">Keep both</button><span class="cap">Default</span></div>
+    <div class="spec"><button class="n-btn ghost"><i data-i="settings" class="sm"></i>Settings</button><span class="cap">Ghost — chrome</span></div>
+    <div class="spec"><button class="n-btn danger">Replace mine</button><span class="cap">Danger — only in a dialog that names what is lost</span></div>
+    <div class="spec"><button class="n-btn" disabled>Sync now</button><span class="cap">Disabled — always with a tooltip saying why</span></div>
+  </div>
+  <div class="board">
+    <div class="spec"><button class="n-btn ghost icon"><i data-i="more"></i></button><span class="cap">Icon</span></div>
+    <div class="spec"><button class="n-btn ghost icon"><i data-i="sidebar"></i></button><span class="cap">Icon</span></div>
+    <div class="spec"><button class="n-btn ghost icon" aria-pressed="true"><i data-i="zen"></i></button><span class="cap">Icon, on</span></div>
+    <div class="spec"><button class="n-btn sm">Reconnect</button><span class="cap">Small 22</span></div>
+    <div class="spec"><button class="n-btn ghost sm icon"><i data-i="pin" class="sm"></i></button><span class="cap">Small icon (rows)</span></div>
+    <div class="spec"><span class="n-split"><button class="n-btn ghost icon"><i data-i="plus"></i></button><button class="n-btn ghost"><i data-i="chev-down" class="sm"></i></button></span><span class="cap">Split — New</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Keys and tooltips</h2>
+  <p class="lede">Shortcuts appear where the command is: in its menu row, its tooltip and the palette. The status bar no longer advertises them.</p>
+  <div class="board">
+    <div class="spec"><span class="n-kbd">⌘P</span><span class="cap">Inline key</span></div>
+    <div class="spec"><span class="n-kbd boxed">⌘</span><span class="cap">Boxed — empty states, shortcut sheet</span></div>
+    <div class="spec"><span class="n-tip">Search notes <span class="n-kbd">⌘P</span></span><span class="cap">Tooltip, after 500 ms</span></div>
+    <div class="spec"><span class="n-tip">Sync now — you're offline</span><span class="cap">Disabled reason</span></div>
+    <div class="spec"><span class="n-tip">Ctrl+Shift+P</span><span class="cap">Windows / Linux</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Where tooltips go</h2>
+  <p class="lede">Only where the visible UI hides something: an icon without a word, a short state with more behind it, or a control that is disabled. Labelled buttons without a shortcut get none, and nothing you need in order to act lives only in a tooltip. Shown after 500 ms, instantly while moving between neighbours.</p>
+  <table class="tbl">
+    <thead><tr><th style="width:26%">Where</th><th style="width:36%">Tooltip</th><th>Why it's not self-explanatory</th></tr></thead>
+    <tbody>
+      <tr><td>Title bar sidebar button</td><td>Show sidebar ⌘\</td><td>Icon only</td></tr>
+      <tr><td>Title bar Zen</td><td><b>Zen</b> — read without the app around it</td><td>Icon only, and “zen” is jargon</td></tr>
+      <tr><td>Title bar ⋯</td><td>Note actions</td><td>Icon only</td></tr>
+      <tr><td>Title bar state</td><td><b>Saved</b> — in this browser at 14:02<br /><b>Edited</b> — vim buffer not written, <code>:w</code><br /><b>Shared · not saved</b> — opened from a link</td><td>One word standing for a sentence</td></tr>
+      <tr><td>Row time</td><td>Edited 19 Oct, 14:02 · 12 kB</td><td>“2m” is relative; size moved off the row</td></tr>
+      <tr><td>Row Pin, ⋯</td><td>Pin · More actions</td><td>Icon only</td></tr>
+      <tr><td>Conflict badge</td><td><b>Edited on two devices</b> — this copy holds the other version</td><td>Badge word only</td></tr>
+      <tr><td>Sidebar + and ▾</td><td>New note ⌃N · New drawing or import</td><td>Icon only</td></tr>
+      <tr><td>Status Wrap, Vim</td><td>Word wrap · Vim keys ⌃⇧M</td><td>Shortcut</td></tr>
+      <tr><td>Storage meter</td><td>3.6 of 5 MB used by notes in this browser</td><td>A bar with a number</td></tr>
+      <tr><td>Find widget icons</td><td>Previous ⇧↵ · Next ↵ · Close Esc · Toggle replace ⌘⌥F</td><td>Icon only</td></tr>
+      <tr><td>Drawing tools, zoom, inspector icons</td><td>Rectangle R · Fit ⇧1 · Duplicate ⌘D · Group ⌘G · Delete ⌫</td><td>Icon only</td></tr>
+      <tr><td>Any disabled control</td><td>Sync now — you're offline</td><td>The reason</td></tr>
+    </tbody>
+  </table>
+  <div class="board" style="background:var(--n-bg);align-items:flex-end">
+    <div class="spec"><span class="n-tip">Show sidebar <span class="n-kbd">⌘\</span></span><span class="cap">Icon button</span></div>
+    <div class="spec"><span class="n-tip rich"><b>Zen</b><span>Read without the app around it</span></span><span class="cap">Jargon icon</span></div>
+    <div class="spec"><span class="n-tip rich"><b>Edited</b><span>Vim buffer not written yet — :w to save</span></span><span class="cap">Title bar state</span></div>
+    <div class="spec"><span class="n-tip">Edited 19 Oct, 14:02 · 12 kB</span><span class="cap">Row time</span></div>
+    <div class="spec"><span class="n-tip rich"><b>Edited on two devices</b><span>This copy holds the other version of release-notes.md</span></span><span class="cap">Conflict badge</span></div>
+  </div>
+  <h3>Not here</h3>
+  <p class="lede" style="margin:0 0 12px">Menu items (the shortcut is already on the row), segmented controls with words, Share, the palette, dialogs, and anything on phones — touch has no hover; there, the same text belongs in the sheet or the banner.</p>
+</section>

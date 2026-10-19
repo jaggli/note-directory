@@ -1,0 +1,83 @@
+/* The documentation shell only; nothing here ships */
+
+html, body { height: 100%; margin: 0; }
+body { background: var(--n-panel); }
+.doc { display: grid; grid-template-columns: 232px 1fr; height: 100%; }
+.doc-nav { overflow: auto; padding: 14px 10px 40px; border-right: 1px solid var(--n-line); }
+.doc-brand { display: flex; align-items: center; gap: 8px; padding: 2px 8px 16px; font: 400 16px/1 var(--n-mono); }
+.doc-brand img { width: 18px; height: 18px; border-radius: 4px; }
+.doc-brand span { font: var(--n-caption); color: var(--n-text-3); margin-top: 3px; }
+.doc-group { margin-bottom: 14px; }
+.doc-group h6 { margin: 0; padding: 4px 8px; font: var(--n-label); color: var(--n-text-3); }
+.doc-nav a { display: block; padding: 4px 8px; border-radius: var(--n-r-md); color: var(--n-text-2); text-decoration: none; }
+.doc-nav a:hover { background: var(--n-hover); color: var(--n-text); }
+.doc-nav a.on { background: var(--n-selected); color: var(--n-text); }
+.doc-main { display: grid; grid-template-rows: auto 1fr; min-width: 0; background: var(--n-bg); }
+.doc-bar { display: flex; align-items: center; gap: 16px; height: 44px; padding: 0 24px; border-bottom: 1px solid var(--n-line); }
+.doc-crumb { flex: 1; color: var(--n-text-3); }
+.doc-ctl { display: inline-flex; align-items: center; gap: 6px; color: var(--n-text-2); font: var(--n-caption); }
+.doc-ctl select { font: var(--n-body); color: var(--n-text); background: var(--n-field); border: 1px solid var(--n-line-strong); border-radius: var(--n-r-md); padding: 2px 6px; }
+.doc-page { overflow: auto; padding: 32px 40px 120px; }
+.doc-page > * { max-width: 1240px; }
+
+/* Page content */
+.pg-title { font: var(--n-display); margin: 0 0 8px; }
+.pg-lede { font: 400 14px/22px var(--n-font); color: var(--n-text-2); max-width: 720px; margin: 0 0 32px; }
+.sec { margin: 0 0 44px; }
+.sec > h2 { font: var(--n-heading); margin: 0 0 6px; }
+.sec > .lede, .prose { color: var(--n-text-2); max-width: 760px; margin: 0 0 16px; font: 400 13px/20px var(--n-font); }
+.prose p { margin: 0 0 10px; }
+.prose strong { color: var(--n-text); }
+.sec h3 { font: var(--n-title); margin: 24px 0 8px; }
+
+.tbl { width: 100%; border-collapse: collapse; font: 400 12.5px/18px var(--n-font); }
+.tbl th { text-align: left; font: var(--n-label); color: var(--n-text-3); padding: 6px 12px 6px 0; border-bottom: 1px solid var(--n-line-strong); }
+.tbl td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--n-line); vertical-align: top; color: var(--n-text-2); }
+.tbl td:first-child { color: var(--n-text); }
+.tbl td.num { color: var(--n-text-3); width: 24px; }
+.tbl code, .prose code { font: var(--n-code-sm); background: var(--n-field); padding: 1px 4px; border-radius: 3px; color: var(--n-text); }
+.tbl .new { color: var(--n-accent); font: var(--n-label); }
+.tbl .gone { color: var(--n-danger); font: var(--n-label); }
+
+.problems { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.problem { display: grid; grid-template-columns: 24px 1fr; gap: 10px; padding: 14px; border-radius: var(--n-r-lg); background: var(--n-panel); box-shadow: inset 0 0 0 1px var(--n-line); }
+.problem .num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--n-danger-soft); color: var(--n-danger); font: var(--n-label); }
+.problem h3 { margin: 1px 0 4px !important; }
+.problem p { margin: 0; color: var(--n-text-2); font: 400 12.5px/19px var(--n-font); }
+
+/* Specimen board: components sit on it; frames hold full screens */
+.board { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; padding: 24px; border-radius: var(--n-r-lg); background: var(--n-panel); box-shadow: inset 0 0 0 1px var(--n-line); margin-bottom: 12px; }
+.board.on-bg { background: var(--n-bg); }
+.board.col { flex-direction: column; }
+.spec { display: grid; gap: 8px; justify-items: start; }
+.spec > .cap { font: var(--n-caption); color: var(--n-text-3); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.compare-on .twin { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.frame { width: 100%; }
+.frame > .n { width: var(--w); height: var(--h); position: relative; overflow: hidden; border-radius: 10px; box-shadow: 0 0 0 1px var(--n-line-strong), 0 20px 50px rgb(0 0 0 / 25%); }
+.frame.phone > .n { border-radius: 36px; box-shadow: 0 0 0 8px #111, 0 0 0 9px #333, 0 20px 50px rgb(0 0 0 / 30%); }
+.frames { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; }
+.frames .frame { width: auto; }
+.notes { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; max-width: 900px; counter-reset: n; }
+.notes li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; color: var(--n-text-2); font: 400 12.5px/19px var(--n-font); counter-increment: n; }
+.notes li::before { content: counter(n); width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: var(--n-accent); color: var(--n-on-accent); font: var(--n-label); font-size: 10px; margin-top: 1px; }
+.notes li b { color: var(--n-text); font-weight: 500; }
+.pinmark { position: absolute; z-index: 5; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: var(--n-accent); color: var(--n-on-accent); font: 600 10px/1 var(--n-font); box-shadow: 0 0 0 2px var(--n-bg); }
+
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.sw { border-radius: var(--n-r-lg); overflow: hidden; box-shadow: inset 0 0 0 1px var(--n-line); background: var(--n-panel); }
+.sw i { display: block; height: 44px; border-bottom: 1px solid var(--n-line); }
+.sw div { padding: 7px 9px; display: grid; gap: 1px; }
+.sw b { font: var(--n-body-strong); }
+.sw code { font: var(--n-code-sm); color: var(--n-text-3); font-size: 10.5px; }
+.sw span { font: var(--n-caption); color: var(--n-text-3); }
+
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 20px; }
+.shots figure { margin: 0; display: grid; gap: 6px; }
+.shots img { width: 100%; border-radius: 8px; box-shadow: 0 0 0 1px var(--n-line-strong); }
+.shots figcaption { font: var(--n-caption); color: var(--n-text-3); }
+
+.anatomy { position: relative; }
+ul.notes li::before { content: ""; width: 5px; height: 5px; margin: 7px 0 0 6px; background: var(--n-text-3); }
+.pair > *, .compare-on .twin > * { min-width: 0; }

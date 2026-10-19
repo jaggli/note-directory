@@ -1,0 +1,21 @@
+<h1 class="pg-title">Delete and undo</h1>
+<p class="pg-lede">One rule: deleting is immediate and undoable. No confirm for full notes, no surprise for empty ones, the same behaviour from the row, the ⋯ menu and ⌘⇧D.</p>
+
+<section class="sec">
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md" data-notes='[["release-notes.md","now"],["architecture.draw","1h"],["deploy.sh","3h"],["meeting-2026-10-14.md","5d"],["config.yaml","1w"],["ideas.md","2w"],["scratch.txt","1mo"],["help.md","1mo"]]'></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md"></div>
+        <div data-part="editor" data-caret="none"></div>
+        <div data-part="status"></div>
+      </div>
+    </div>
+    <div class="n-toast" style="position:absolute;left:calc(50% + 124px);bottom:44px;transform:translateX(-50%)">Deleted todo.md<button class="act">Undo</button><button class="x"><i data-i="x" class="sm"></i></button></div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>The open note</b> is deleted → the next one in the list opens, as today.</span></li>
+    <li><span><b>Undo</b> (or ⌘Z while the toast shows) restores the note, its place, pin and cursor. The sync tombstone is dropped.</span></li>
+    <li><span><b>After 10 s</b> the toast goes; the note is gone the way it is today. See the open question on a trash in the brief.</span></li>
+  </ul>
+</section>

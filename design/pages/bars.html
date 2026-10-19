@@ -1,0 +1,38 @@
+<h1 class="pg-title">Title bar and status bar</h1>
+<p class="pg-lede">The title bar is about the note: which one, how you see it, and how it leaves the app. The status bar is about the cursor. Neither holds anything about other notes.</p>
+
+<section class="sec">
+  <h2>Title bar</h2>
+  <div class="board col" style="background:var(--n-bg);align-items:stretch">
+    <div class="spec" style="justify-items:stretch"><div data-part="titlebar" data-name="release-notes.md"></div><span class="cap">Markdown, editing — name and state left, view in the middle, Zen, Share, ⋯ right</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="titlebar" data-name="release-notes.md" data-view="preview" data-state="Edited" data-side="closed"></div><span class="cap">Sidebar hidden — the sidebar button appears; unsaved state reads “Edited”</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="titlebar" data-name="architecture.draw"></div><span class="cap">Drawing — Canvas | Source</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="titlebar" data-name="deploy.sh" data-state="Synced"></div><span class="cap">Any other file — no view switch, no Zen</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="titlebar" data-name="release-notes.md" data-rename="1"></div><span class="cap">Renaming — F2, or click the name</span></div>
+  </div>
+  <table class="tbl">
+    <thead><tr><th style="width:22%">State text</th><th>When</th></tr></thead>
+    <tbody>
+      <tr><td>Saved</td><td>Written to browser storage; no sync configured</td></tr>
+      <tr><td>Edited</td><td>Changes not yet written (vim buffer with <code>[+]</code>, or the 500 ms save debounce on a slow device)</td></tr>
+      <tr><td>Synced · Syncing…</td><td>Drive connected; this note's own state</td></tr>
+      <tr><td>Shared · not saved</td><td>Opened from a link, not in your notes yet</td></tr>
+      <tr><td>Read-only</td><td>Built-in help, or a drawing too large to edit (today's badge reasons)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Status bar</h2>
+  <p class="lede">Content changes with the mode; the bar itself never does. Toggles show their state with an accent icon, not just a colour change on a word.</p>
+  <div class="board col" style="background:var(--n-bg);align-items:stretch">
+    <div class="spec" style="justify-items:stretch"><div data-part="status"></div><span class="cap">Markdown, editing</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="status" data-sel="18 selected" data-pos="Ln 12, Col 3"></div><span class="cap">With a selection</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="status" data-vim="normal"></div><span class="cap">Vim, normal</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="status" data-vim="insert"></div><span class="cap">Vim, insert</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="status" data-vim="normal dirty"></div><span class="cap">Vim with unwritten changes — the <code>+</code> rides on the mode pill</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="status" data-kind="preview"></div><span class="cap">Preview</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="status" data-kind="draw" data-info="3 of 14 shapes selected"></div><span class="cap">Drawing</span></div>
+    <div class="spec" style="justify-items:stretch"><div data-part="status" data-kind="code" data-wrap="off"></div><span class="cap">Code file, wrap off</span></div>
+  </div>
+</section>

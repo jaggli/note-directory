@@ -1,0 +1,62 @@
+<h1 class="pg-title">Drawing tools</h1>
+<p class="pg-lede">The canvas keeps its engine and keys. Its chrome moves to the corners: zoom bottom left, tools bottom centre, the inspector top right. Every label is a full word.</p>
+
+<section class="sec">
+  <h2>Tool dock</h2>
+  <p class="lede">Three groups: navigate, freehand, shapes. Icons only; hovering a tool shows its name and key after 500 ms, the same tooltip as everywhere else.</p>
+  <div class="board" style="background:var(--n-bg)">
+    <div class="spec"><div class="n-dock" style="position:static;transform:none">
+      <button class="n-tool" aria-pressed="true"><i data-i="cursor"></i></button>
+      <button class="n-tool"><i data-i="hand"></i></button>
+      <span class="sep"></span>
+      <button class="n-tool"><i data-i="pen"></i></button>
+      <button class="n-tool"><i data-i="highlighter"></i></button>
+      <button class="n-tool"><i data-i="eraser"></i></button>
+      <span class="sep"></span>
+      <button class="n-tool hover" style="background:var(--n-hover);color:var(--n-text)"><i data-i="rect"></i><span class="n-tip">Rectangle <span class="n-kbd">R</span></span></button>
+      <button class="n-tool"><i data-i="ellipse"></i></button>
+      <button class="n-tool"><i data-i="diamond"></i></button>
+      <button class="n-tool"><i data-i="line"></i></button>
+      <button class="n-tool"><i data-i="arrow"></i></button>
+      <button class="n-tool"><i data-i="text"></i></button>
+    </div><span class="cap">Desktop</span></div>
+    <div class="spec"><div class="n-dock" style="position:static;transform:none">
+      <button class="n-tool"><i data-i="cursor"></i></button>
+      <button class="n-tool"><i data-i="hand"></i></button>
+      <span class="sep"></span>
+      <button class="n-tool" aria-pressed="true"><i data-i="arrow"></i></button>
+      <button class="n-tool"><i data-i="chev-down" style="transform:rotate(180deg)"></i></button>
+      <span class="sep"></span>
+      <button class="n-tool"><i data-i="undo"></i></button>
+      <button class="n-tool"><i data-i="redo"></i></button>
+    </div><span class="cap">Phone — the active tool, a sheet with the rest, undo and redo</span></div>
+    <div class="spec"><div class="n-zoom" style="position:static">
+      <button class="n-btn ghost sm icon"><i data-i="minus" class="sm"></i></button><button class="pct">100%</button><button class="n-btn ghost sm icon"><i data-i="plus" class="sm"></i></button><button class="n-btn ghost sm icon" title="Fit  ⇧1"><i data-i="fit" class="sm"></i></button>
+    </div><span class="cap">Zoom — click the number for 100 %</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Inspector</h2>
+  <p class="lede">Shows only the rows that apply to the selection or the active tool, as today. Rows are labelled; the actions row uses icons with tooltips and puts arrange in a menu.</p>
+  <div class="board" style="background:var(--n-bg)">
+    <div class="spec"><div class="n-inspector" style="position:static">
+      <div class="head">2 shapes<button class="n-btn ghost sm icon"><i data-i="x" class="sm"></i></button></div>
+      <div><h5>Colour</h5><div class="n-colors">
+        <span class="n-color" style="background:var(--p-text)"></span><span class="n-color" style="background:var(--p-gutter)"></span><span class="n-color" style="background:var(--p-red)"></span><span class="n-color" style="background:var(--p-peach)"></span><span class="n-color" style="background:var(--p-yellow)"></span><span class="n-color" style="background:var(--p-green)"></span>
+        <span class="n-color" style="background:var(--p-teal)"></span><span class="n-color" style="background:var(--p-sky)"></span><span class="n-color on" style="background:var(--p-blue)"></span><span class="n-color" style="background:var(--p-lavender)"></span><span class="n-color" style="background:var(--p-mauve)"></span><span class="n-color" style="background:var(--p-pink)"></span>
+      </div></div>
+      <div><h5>Stroke</h5><div class="n-seg"><button>S</button><button aria-pressed="true">M</button><button>L</button><button>XL</button></div></div>
+      <div><h5>Fill</h5><div class="n-seg"><button aria-pressed="true">None</button><button>Semi</button><button>Solid</button></div></div>
+      <div><h5>Line</h5><div class="n-seg"><button aria-pressed="true">Solid</button><button>Dashed</button><button>Dotted</button></div></div>
+      <div class="acts"><button class="n-btn ghost sm icon" title="Duplicate  ⌘D"><i data-i="copy" class="sm"></i></button><button class="n-btn ghost sm icon" title="Group  ⌘G"><i data-i="layers" class="sm"></i></button><button class="n-btn ghost sm" title="Arrange">Arrange<i data-i="chev-down" class="sm"></i></button><span style="flex:1"></span><button class="n-btn ghost sm icon" title="Delete  ⌫" style="color:var(--n-danger)"><i data-i="trash" class="sm"></i></button></div>
+    </div><span class="cap">Shapes selected</span></div>
+    <div class="spec"><div class="n-inspector" style="position:static">
+      <div class="head">Arrow<button class="n-btn ghost sm icon"><i data-i="x" class="sm"></i></button></div>
+      <div><h5>Start <span>End</span></h5><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div class="n-seg"><button aria-pressed="true">None</button><button>Dot</button></div><div class="n-seg"><button>None</button><button aria-pressed="true">Open</button></div></div></div>
+      <div><h5>Text</h5><div class="n-seg"><button aria-pressed="true">Left</button><button>Centre</button><button>Right</button></div></div>
+      <div><h5>Style</h5><div class="n-seg"><button aria-pressed="true" style="font-weight:700">B</button><button style="font-style:italic">I</button><button style="text-decoration:underline">U</button></div></div>
+    </div><span class="cap">Arrow and text tools</span></div>
+    <div class="spec"><div class="n-badge-canvas" style="position:static"><i data-i="alert"></i>2 lines can't be drawn · Open source</div><span class="cap">Source errors — click jumps to the first line</span></div>
+  </div>
+</section>

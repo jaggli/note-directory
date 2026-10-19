@@ -1,0 +1,150 @@
+<h1 class="pg-title">Redesign brief</h1>
+<p class="pg-lede">
+  Why the chrome changes, what replaces it, and every decision with its reason. Each row stands on its own and can be
+  rejected without the rest falling over. The editor, vim, the markdown renderer, the drawing engine, storage, sync and
+  the link format stay as they are — this is about how you reach them.
+</p>
+
+<section class="sec">
+  <h2>What is wrong today</h2>
+  <p class="lede">
+    Collected from the running app, the help notes and an inventory of <code>index.html</code>, <code>app.js</code> and
+    <code>draw.js</code>. The look is the smallest part: what makes note feel unfinished is structure — commands with no
+    home, things that vanish, words that change.
+  </p>
+  <div class="problems">
+    <div class="problem"><span class="num">1</span><div><h3>Commands live in four places, each half-complete</h3><p>The top bar's <code>menu</code> (15 items, app and note mixed, no shortcuts), the sidebar's <code>+ ▾</code>, the status bar's <code>new ▾</code> — the same thing with different behaviour: one starts a rename, the other doesn't — and the status-bar shortcut hints. Phones add four more items to the menu. Nothing is searchable: <code>:mddemo</code> exists only for vim users.</p></div></div>
+    <div class="problem"><span class="num">2</span><div><h3>You can't see where you are</h3><p>The open note's name appears only in the sidebar, which is hidden on phones and when collapsed. The top bar says <code>menu</code> and three tabs. Saved, syncing or failed is never shown next to the note.</p></div></div>
+    <div class="problem"><span class="num">3</span><div><h3>Deleting is inconsistent and permanent</h3><p>A note with content asks first, an empty one disappears without asking, and neither can be undone — while deleted text and shapes can. <code>Ctrl+Shift+D</code> deletes a note; <code>Ctrl+D</code> duplicates a shape. Rename can't be cancelled with Esc and takes duplicate names.</p></div></div>
+    <div class="problem"><span class="num">4</span><div><h3>Things disappear instead of explaining</h3><p><code>share</code> vanishes from the menu once a note passes 60 kB. Replace, vim, wrap and the cursor position vanish in preview and drawings, so the status bar jumps. A drawing in source mode has no tab back. The sync menu's <code>connect</code> is never shown.</p></div></div>
+    <div class="problem"><span class="num">5</span><div><h3>One situation, several words</h3><p>note, file, text, text note. <code>update / new file</code> for a link or dropped file, <code>skip / keep both / override</code> for a zip, silent <code>(conflict)</code> copies for Drive. <code>view</code> for markdown, <code>draw</code> for drawings. Help points to “file → source” and “download zip”, which don't exist.</p></div></div>
+    <div class="problem"><span class="num">6</span><div><h3>Feedback in six places</h3><p>A blocking modal, a bottom-right toast in a different font, a button whose label turns into <code>copied!</code>, a fixed label in zen, red text in the vim bar, a yellow badge on the canvas. Modals are sentence case with periods, toasts lowercase, tooltips capitalised.</p></div></div>
+    <div class="problem"><span class="num">7</span><div><h3>Two searches that overlap</h3><p><code>Ctrl+F</code> opens a modal list of matching lines — not the find bar every editor has — while <code>Ctrl+H</code> opens a separate find bar. An <code>all</code> checkbox switches one into the other.</p></div></div>
+    <div class="problem"><span class="num">8</span><div><h3>Shared links write to your notes without asking</h3><p>Opening anyone's link adds it to your list. Only a name clash asks. For an app whose promise is privacy, the list should only change when you say so.</p></div></div>
+    <div class="problem"><span class="num">9</span><div><h3>Phones are second class</h3><p>Import is drag-and-drop only. Tab nesting for lists can't be reached on a phone keyboard. Mobile help promises “long press to pin or delete” — there is no long press. Vim can arrive through Drive settings sync and can't be turned off on touch.</p></div></div>
+    <div class="problem"><span class="num">10</span><div><h3>Everything at the same volume</h3><p>Every label is lowercase Victor Mono, so buttons read as text (<code>menu</code>) and text reads as buttons. The wordmark is the largest thing on screen. Shortcut hints are permanent ads. Nothing reads as the primary action.</p></div></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>The new model</h2>
+  <div class="prose">
+    <p>
+      <strong>Every region answers one question.</strong> Left: <em>what notes do I have</em> — and the state of all of
+      them (sync, storage). Top: <em>which note is this</em> — its name and state, how you look at it, and the ways out
+      (Share, Zen, ⋯). Middle: the note. Bottom: <em>where is my cursor</em> — facts and toggles for the editor.
+      Anything without a button is one <code>⌘P</code> away, and every menu shows its shortcut.
+    </p>
+  </div>
+  <div class="board on-bg" data-single style="display:block">
+    <div style="display:grid;grid-template-columns:220px 1fr;grid-template-rows:44px 1fr 28px;gap:6px;height:340px;font:var(--n-body)">
+      <div style="grid-row:1/4;border-radius:10px;background:var(--n-panel);box-shadow:inset 0 0 0 1px var(--n-line-strong);padding:12px;display:grid;align-content:space-between">
+        <div style="display:grid;gap:8px"><b><span class="pinmark" style="position:static;display:inline-grid;margin-right:6px">1</span>Your notes</b><span style="color:var(--n-text-2)">note ▾ app menu · New · Search ⌘P</span><span style="color:var(--n-text-2)">Pinned / Notes, one line each</span><span style="color:var(--n-text-2)">Right-click = note actions</span></div>
+        <div style="color:var(--n-text-2)"><span class="pinmark" style="position:static;display:inline-grid;margin-right:6px">2</span>Sync and storage, for all notes</div>
+      </div>
+      <div style="border-radius:10px;box-shadow:inset 0 0 0 1px var(--n-line-strong);padding:0 12px;display:flex;align-items:center;gap:10px"><span class="pinmark" style="position:static;display:inline-grid">3</span><b>This note</b><span style="color:var(--n-text-2)">name · saved state · Edit | Preview · Zen · <b>Share</b> · ⋯</span></div>
+      <div style="border-radius:10px;box-shadow:inset 0 0 0 1px var(--n-line-strong);padding:12px;display:grid;place-items:center;color:var(--n-text-2);position:relative"><span><span class="pinmark" style="position:static;display:inline-grid;margin-right:6px">4</span>The note — text, preview or canvas. Find floats top right, toasts bottom centre.</span></div>
+      <div style="border-radius:10px;box-shadow:inset 0 0 0 1px var(--n-line-strong);padding:0 12px;display:flex;align-items:center;gap:10px;color:var(--n-text-2)"><span class="pinmark" style="position:static;display:inline-grid">5</span>Language · Ln, Col · selection · Wrap · Vim</div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Decisions</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:24%">Today</th><th style="width:44%">Redesign</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><code>menu</code> top left, 15 items, app and note mixed</td><td>Split by scope. <b>note ▾</b> in the sidebar holds the app: new, import, export, settings, theme, help. <b>⋯</b> in the title bar holds this note: rename, pin, download, format, delete. Right-click on a row opens the same ⋯ menu.</td><td>Where a menu lives tells you what it acts on. Each stays under 12 items.</td></tr>
+      <tr><td>Two “new” split buttons that behave differently</td><td>One: <b>+ ▾</b> in the sidebar header. New note always focuses its name in the title bar, base name selected; Enter or Tab drops into the text, Esc keeps the default.</td><td>One way to create, one result.</td></tr>
+      <tr><td>Note name only in the sidebar</td><td>Title bar shows the name, muted extension and state (<i>Saved</i>, <i>Edited</i>, <i>Syncing</i>). Click or F2 renames in place; Esc cancels; a taken name is an inline error.</td><td>You always know what you're editing — sidebar closed, zen off, on a phone.</td></tr>
+      <tr><td>Tabs <code>edit | view | zen</code>; drawings get <code>draw | zen</code> and lose <code>edit</code></td><td>A segmented control: <b>Edit | Preview</b> for markdown, <b>Canvas | Source</b> for drawings, nothing for other files. Zen is a button next to it.</td><td>Zen isn't a third way to edit. Source becomes a place you can see and leave.</td></tr>
+      <tr><td><code>share</code> inside the menu; disappears over 60 kB</td><td><b>Share</b> always top right. Its popover copies the link, chooses <i>Editable</i> or <i>Read-only (zen)</i>, and shows the size against the limit. Over it, it says so and offers Download.</td><td>The app's signature feature is visible and never vanishes without a reason.</td></tr>
+      <tr><td>Status bar: shortcut hints, cursor, storage, wrap, sync</td><td>Status bar is about the open note only: language, Ln/Col, selection, <b>Wrap</b>, <b>Vim</b> with its mode. Content changes per mode (preview: words; drawing: shapes, grid), the bar never jumps. Sync and storage move to the sidebar footer.</td><td>Status is about the cursor; state of all notes sits with the list of notes.</td></tr>
+      <tr><td><code>Ctrl+F</code> line list, <code>Ctrl+H</code> find bar, <code>Ctrl+P</code> fuzzy, an <code>all</code> checkbox</td><td><b>⌘P</b> palette: notes by name, lines across notes, and commands after <code>&gt;</code>. Tab narrows to <i>This note</i>. <b>⌘F</b> is the floating find widget; its chevron or <b>⌘⌥F</b> adds Replace.</td><td>VS Code and Zed muscle memory. Every command, including the vim-only ones, becomes findable.</td></tr>
+      <tr><td>Delete asks sometimes, never undoable</td><td>Delete is immediate everywhere and shows <i>Deleted todo.md · Undo</i> for 10 s. The tombstone sync already keeps makes it cheap.</td><td>One rule. No dialog to dismiss, nothing lost.</td></tr>
+      <tr><td>Three conflict vocabularies</td><td><b>Replace · Keep both · Skip</b>, everywhere. One import dialog lists every clash with a per-row choice and <i>Apply to all</i>. Drive's conflict copies get a <span class="n-badge warning">Conflict</span> badge in the list and one toast.</td><td>Same situation, same words, and silent copies become visible.</td></tr>
+      <tr><td>Shared links import silently</td><td>A link opens read-only under a banner: <i>Shared with you · not in your notes · Save · Dismiss</i>. A name clash says so in the banner with Replace and Keep both.</td><td>Your list only changes when you say so.</td></tr>
+      <tr><td>Import by drag-and-drop only</td><td><b>Import files…</b> in note ▾ and the palette (file picker, multiple, .zip). Dropping still works.</td><td>Phones can import.</td></tr>
+      <tr><td>Feedback in six places</td><td>One toast, bottom centre, with an optional action. Inline only where the fix is: rename, find count, canvas source errors. Dialogs only for choices.</td><td>One place to look.</td></tr>
+      <tr><td>Theme submenu; wrap and vim in the status bar; Drive in the menu</td><td>A <b>Settings</b> dialog: Appearance (theme cards, <i>Match system</i> with a light and a dark pick), Editor, Sync, Storage. Theme stays a submenu too; wrap and vim stay in the status bar.</td><td>One place that lists what can be set, without moving the quick toggles.</td></tr>
+      <tr><td><code>Ctrl+S</code> silently reformats markdown</td><td>Settings › Editor: <i>Format markdown on save</i>, on by default (today's behaviour), now visible and switchable.</td><td>Silent edits to your text should at least be a setting you can see.</td></tr>
+      <tr><td>Lowercase Victor Mono for every label</td><td>Chrome in the platform face, sentence case, 11–13 px. Victor Mono stays for what you type: note text, code, keys, and the wordmark.</td><td>Buttons read as buttons; the note reads as content. The mono identity stays where it means something.</td></tr>
+      <tr><td>Rows of two lines: name, “just now, 5kB”</td><td>One-line rows, 28 px: kind icon in its colour, name with muted extension, relative time. Hover shows Pin and ⋯. Size moves to the tooltip.</td><td>Twice the notes on screen; markdown, drawing and code tell apart at a glance.</td></tr>
+      <tr><td>Drawing: undo/redo in the zoom panel; “dup fwd bwd” in the style panel</td><td>Zoom bottom left. Tool dock bottom centre in three groups; hover shows the tool name and key. Inspector top right with full words; arrange in a ⋯ menu. Undo/redo buttons on touch only.</td><td>Labels a newcomer can read; desktop users already use the keys.</td></tr>
+      <tr><td>Phone: a status bar with <code>notes</code>; the menu grows by four</td><td>App bar: back to notes, name (tap = note actions sheet), Edit/Preview, Share. A key bar above the keyboard: Tab, ⇧Tab, task, heading, code, undo, redo, find. Long-press on a row opens actions.</td><td>Delivers what mobile help promises and makes list nesting reachable.</td></tr>
+      <tr><td>Hints always say <code>ctrl+</code>; ⌘ works for some keys only</td><td>Keys shown for the platform. On Mac every shortcut takes ⌘ except where Chrome owns it (⌘N, ⌘T, ⌘W) — there ⌃. Windows Chrome never hands Ctrl+N to a page, so new note is also Alt+N.</td><td>The hint you read is the key that works.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Words</h2>
+  <p class="lede">Sentence case everywhere. One noun per thing.</p>
+  <table class="tbl">
+    <thead><tr><th style="width:40%">Today</th><th>Redesign</th></tr></thead>
+    <tbody>
+      <tr><td>note, file, text, text note, new file</td><td><b>Note</b> — any file in your list. A <b>drawing</b> is a kind of note.</td></tr>
+      <tr><td>menu</td><td><b>note ▾</b> (the app) and <b>⋯</b> (this note)</td></tr>
+      <tr><td>edit · view · draw · edit source · file → source</td><td><b>Edit · Preview</b> (markdown), <b>Canvas · Source</b> (drawing)</td></tr>
+      <tr><td>zen</td><td><b>Zen</b> — kept, it's the developer term</td></tr>
+      <tr><td>share · copy share link · copied! · copied to clipboard</td><td><b>Share</b> → <b>Copy link</b> → toast <i>Link copied</i></td></tr>
+      <tr><td>download file · export all notes · download zip</td><td><b>Download</b> (this note) · <b>Export all as ZIP</b></td></tr>
+      <tr><td>search · search all · find &amp; replace · replace</td><td><b>Search</b> (⌘P, all notes) · <b>Find</b> and <b>Replace</b> (⌘F, this note)</td></tr>
+      <tr><td>update · new file · override · keep both · skip · (conflict)</td><td><b>Replace · Keep both · Skip</b>; badge <b>Conflict</b></td></tr>
+      <tr><td>enable google drive · connect · reconnect · sync now · disconnect</td><td><b>Google Drive</b>: <b>Connect · Sync now · Reconnect · Disconnect</b></td></tr>
+      <tr><td>dup · fwd · bwd · front · back</td><td><b>Duplicate · Bring forward · Send backward · Bring to front · Send to back</b></td></tr>
+      <tr><td>Start typing... · ctrl+n or drop a file to start</td><td>Placeholder <i>Start writing</i>; empty state <i>No note open</i></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Keys</h2>
+  <p class="lede">Shown as on a Mac; elsewhere ⌘ reads Ctrl and ⌥ reads Alt. Everything vim and canvas stays as it is.</p>
+  <table class="tbl">
+    <thead><tr><th style="width:18%">Key</th><th style="width:42%">Does</th><th>Today</th></tr></thead>
+    <tbody>
+      <tr><td>⌘P</td><td>Search notes and lines; <code>&gt;</code> for commands</td><td>Ctrl+P (fuzzy, all notes)</td></tr>
+      <tr><td>⌘⇧P</td><td>Palette opened on commands</td><td><span class="new">new</span></td></tr>
+      <tr><td>⌘F</td><td>Find in this note</td><td>Ctrl+F opened a line list</td></tr>
+      <tr><td>⌘⌥F · Ctrl+H</td><td>Find and replace</td><td>Ctrl+H</td></tr>
+      <tr><td>⌃N · Alt+N</td><td>New note</td><td>Ctrl+N only</td></tr>
+      <tr><td>F2</td><td>Rename this note</td><td><span class="new">new</span> (click the active row)</td></tr>
+      <tr><td>⌘E</td><td>Edit ⇄ Preview, Canvas ⇄ Source</td><td><code>e</code> from view only</td></tr>
+      <tr><td>⌘\</td><td>Show or hide the sidebar</td><td><span class="new">new</span></td></tr>
+      <tr><td>⌘⇧D</td><td>Delete this note — now with Undo</td><td>Ctrl+Shift+D, permanent</td></tr>
+      <tr><td>⌥⇧F</td><td>Format markdown</td><td>Ctrl+Shift+F</td></tr>
+      <tr><td>⌘/</td><td>Keyboard shortcuts</td><td><span class="new">new</span></td></tr>
+      <tr><td>⌃⇧M</td><td>Vim on or off</td><td>unchanged</td></tr>
+      <tr><td>Esc</td><td>Closes the topmost layer only: menu, find, palette, zen, sidebar on phones</td><td>unchanged order</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Menus</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:18%">Menu</th><th>Items</th></tr></thead>
+    <tbody>
+      <tr><td>note ▾ (app)</td><td>New note ⌃N · New drawing · Import files… · Export all as ZIP — Settings… · Theme ▸ — Keyboard shortcuts ⌘/ · Help · Markdown guide · Privacy policy · Terms</td></tr>
+      <tr><td>⋯ (this note), and right-click on a row</td><td>Rename F2 · Pin / Unpin — Copy link · Download · Download as HTML (markdown) · Download as SVG, Copy as PNG (drawing) · Format markdown ⌥⇧F (markdown) — Delete ⌘⇧D</td></tr>
+      <tr><td>+ ▾</td><td>New note ⌃N · New drawing · Import files…</td></tr>
+      <tr><td>Sync line in the sidebar footer</td><td>Sync now · Settings… · Disconnect</td></tr>
+      <tr><td>Canvas right-click</td><td>unchanged: arrange, duplicate, group, delete</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Left out on purpose</h2>
+  <div class="prose">
+    <p><strong>Folders and tags.</strong> Search, pins and kind icons carry a flat list a long way; folders are a data-model change, not a design one.</p>
+    <p><strong>Split edit + preview.</strong> Edit ⇄ Preview keeps scroll position already; a split doubles the layout cases for phones.</p>
+  </div>
+  <h3>Open questions for review</h3>
+  <ul class="notes">
+    <li><span><b>Undo toast or a “Recently deleted” section?</b> The toast covers the accident; a trash covers “I deleted it yesterday”. The tombstones are there either way.</span></li>
+    <li><span><b>Sans chrome vs all-mono identity.</b> I recommend sans for chrome; the whole system works in mono too if you want the old character — flip <code>--n-font</code> to see.</span></li>
+    <li><span><b>Format on save default.</b> Kept on to match today; I'd turn it off for non-markdown-native users, but that's your call.</span></li>
+  </ul>
+</section>

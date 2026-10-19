@@ -8,3 +8,4 @@ package.json
 package-lock.json
 worker.js
 wrangler.jsonc
+design

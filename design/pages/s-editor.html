@@ -1,0 +1,93 @@
+<h1 class="pg-title">Writing markdown</h1>
+<p class="pg-lede">The everyday screen. Compare with <a href="#current">today</a>: the note's name is finally on top, the status bar talks only about the cursor, and Share is the one blue thing.</p>
+
+<section class="sec">
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md"></div>
+        <div data-part="editor"></div>
+        <div data-part="status"></div>
+      </div>
+    </div>
+    <span class="pinmark" style="left:86px;top:11px">1</span>
+    <span class="pinmark" style="left:178px;top:11px">2</span>
+    <span class="pinmark" style="left:224px;top:78px">3</span>
+    <span class="pinmark" style="left:8px;top:744px">4</span>
+    <span class="pinmark" style="left:440px;top:11px">5</span>
+    <span class="pinmark" style="left:680px;top:11px">6</span>
+    <span class="pinmark" style="left:1104px;top:11px">7</span>
+    <span class="pinmark" style="left:1120px;top:780px">8</span>
+  </div></div>
+  <ol class="notes">
+    <li><span><b>note ▾</b> — the app menu: new, import, export, settings, theme, help.</span></li>
+    <li><span><b>New</b> — + makes a note and puts you in its name; ▾ for a drawing or import.</span></li>
+    <li><span><b>Search</b> — opens the palette. Pinned notes get their own section.</span></li>
+    <li><span><b>Sync and storage</b> for all notes, with the fix when something's wrong.</span></li>
+    <li><span><b>Name and state</b> — click or F2 to rename. “Saved” turns into “Edited” and back.</span></li>
+    <li><span><b>Edit | Preview</b> — ⌘E toggles. Not shown for files that have no preview.</span></li>
+    <li><span><b>Zen, Share, ⋯</b> — Share is the primary action of the whole app.</span></li>
+    <li><span><b>Wrap and Vim</b> — the only toggles left in the status bar; language and cursor on the left.</span></li>
+  </ol>
+</section>
+
+<section class="sec">
+  <h2>Vim, with the note menu open</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md" data-state="Edited"></div>
+        <div data-part="editor" data-vim="1"></div>
+        <div data-part="status" data-vim="normal dirty"></div>
+      </div>
+    </div>
+    <span class="n-tip rich" style="position:absolute;left:330px;top:42px;z-index:6"><b>Edited</b><span>Vim buffer not written yet — :w to save</span></span>
+    <div class="n-menu" style="position:absolute;right:8px;top:38px">
+      <button class="n-menu-item"><i data-i="pencil"></i><span class="label">Rename</span><span class="n-kbd">F2</span></button>
+      <button class="n-menu-item"><i data-i="pin"></i><span class="label">Pin</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item hover"><i data-i="link"></i><span class="label">Copy link</span></button>
+      <button class="n-menu-item"><i data-i="download"></i><span class="label">Download</span></button>
+      <button class="n-menu-item"><i data-i="download"></i><span class="label">Download as HTML</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><i data-i="format"></i><span class="label">Format markdown</span><span class="n-kbd">⌥⇧F</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item danger"><i data-i="trash"></i><span class="label">Delete</span><span class="n-kbd">⌘⇧D</span></button>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>Edited</b> in the title and <b>+</b> on the mode pill both say the vim buffer isn't written yet (<code>:w</code>).</span></li>
+    <li><span><b>The vim command line</b> stays where it is today, replacing the status bar while open.</span></li>
+  </ul>
+</section>
+
+<section class="sec">
+  <h2>Code file, sidebar hidden</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:560px">
+    <div class="n-app no-side">
+      <div class="n-main">
+        <div data-part="titlebar" data-name="deploy.sh" data-side="closed" data-state="Synced"></div>
+        <div class="n-editor"><div class="gutter" style="white-space:pre">1
+2
+3
+<b>4</b>
+5
+6
+7
+8
+9</div><div class="text"><span class="h-cmt">#!/usr/bin/env bash</span>
+<span class="h-kw">set</span> -euo pipefail
+
+<span class="cur">ENV=<span class="h-str">"${2:-staging}"</span><span class="caret"></span></span>
+TAG=<span class="h-str">"$4"</span>
+
+<span class="h-fn">echo</span> <span class="h-str">"Deploying $TAG to $ENV"</span>
+wrangler deploy --env <span class="h-str">"$ENV"</span>
+<span class="h-fn">curl</span> -fsS <span class="h-str">"https://$ENV.example.com/health"</span></div></div>
+        <div data-part="status" data-kind="code" data-pos="Ln 4, Col 23" data-wrap="off"></div>
+      </div>
+    </div>
+  </div></div>
+</section>

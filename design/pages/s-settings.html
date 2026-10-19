@@ -1,0 +1,77 @@
+<h1 class="pg-title">Settings</h1>
+<p class="pg-lede">There are only a handful of settings, scattered over three places today. A small dialog lists them all. The quick toggles stay where they're used — Wrap and Vim in the status bar, Theme in note ▾.</p>
+
+<section class="sec">
+  <h2>Appearance</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:720px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md"></div>
+        <div data-part="editor" data-caret="none"></div>
+        <div data-part="status"></div>
+      </div>
+    </div>
+    <div class="n-scrim" style="padding-top:100px">
+      <div class="n-settings">
+        <nav>
+          <h4>Settings</h4>
+          <div class="n-row active"><i data-i="contrast"></i><span class="name">Appearance</span></div>
+          <div class="n-row"><i data-i="code"></i><span class="name">Editor</span></div>
+          <div class="n-row"><i data-i="cloud"></i><span class="name">Sync and backup</span></div>
+          <div class="n-row"><i data-i="archive"></i><span class="name">Storage</span></div>
+          <div class="n-row"><i data-i="keyboard"></i><span class="name">Shortcuts</span></div>
+        </nav>
+        <section>
+          <div class="n-set-group">
+            <h5>Theme</h5>
+            <div class="n-set-row"><span class="text">Match system<small>Latte by day, your dark theme by night</small></span><span class="n-switch" aria-checked="true"></span></div>
+          </div>
+          <div class="n-set-group">
+            <h5>Dark</h5>
+            <div class="n-themes">
+              <button class="n-theme-card on" data-theme="mocha" data-fixed><span class="pv" style="background:var(--p-bg)"><span style="background:var(--p-panel)"><i style="background:var(--p-blue)"></i><i style="background:var(--p-overlay)"></i></span><span><i style="background:var(--p-mauve);width:50%"></i><i style="background:var(--p-text);width:80%"></i><i style="background:var(--p-green);width:60%"></i></span></span>Mocha</button>
+              <button class="n-theme-card" data-theme="macchiato" data-fixed><span class="pv" style="background:var(--p-bg)"><span style="background:var(--p-panel)"><i style="background:var(--p-blue)"></i><i style="background:var(--p-overlay)"></i></span><span><i style="background:var(--p-mauve);width:50%"></i><i style="background:var(--p-text);width:80%"></i><i style="background:var(--p-green);width:60%"></i></span></span>Macchiato</button>
+              <button class="n-theme-card" data-theme="frappe" data-fixed><span class="pv" style="background:var(--p-bg)"><span style="background:var(--p-panel)"><i style="background:var(--p-blue)"></i><i style="background:var(--p-overlay)"></i></span><span><i style="background:var(--p-mauve);width:50%"></i><i style="background:var(--p-text);width:80%"></i><i style="background:var(--p-green);width:60%"></i></span></span>Frappé</button>
+              <button class="n-theme-card" data-theme="espresso" data-fixed><span class="pv" style="background:var(--p-bg)"><span style="background:var(--p-panel)"><i style="background:var(--p-blue)"></i><i style="background:var(--p-overlay)"></i></span><span><i style="background:var(--p-mauve);width:50%"></i><i style="background:var(--p-text);width:80%"></i><i style="background:var(--p-green);width:60%"></i></span></span>Espresso</button>
+            </div>
+          </div>
+          <div class="n-set-group">
+            <h5>Light</h5>
+            <div class="n-themes">
+              <button class="n-theme-card on" data-theme="latte" data-fixed><span class="pv" style="background:var(--p-bg);box-shadow:inset 0 0 0 1px var(--n-line)"><span style="background:var(--p-panel)"><i style="background:var(--p-blue)"></i><i style="background:var(--p-overlay)"></i></span><span><i style="background:var(--p-mauve);width:50%"></i><i style="background:var(--p-text);width:80%"></i><i style="background:var(--p-green);width:60%"></i></span></span>Latte</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section class="sec">
+  <h2>The other sections</h2>
+  <div class="board" style="background:var(--n-bg);align-items:flex-start">
+    <div class="spec"><div class="n-settings" style="width:460px;grid-template-columns:1fr;height:auto"><section>
+      <div class="n-set-group"><h5>Editor</h5>
+        <div class="n-set-row"><span class="text">Wrap long lines<small>Default for new notes; the status bar toggles per session</small></span><span class="n-switch" aria-checked="true"></span></div>
+        <div class="n-set-row"><span class="text">Vim keys<small>⌃⇧M</small></span><span class="n-switch" aria-checked="false"></span></div>
+        <div class="n-set-row"><span class="text">Format markdown on save<small>Headings, lists and tables, on ⌘S</small></span><span class="n-switch" aria-checked="true"></span></div>
+      </div>
+    </section></div><span class="cap">Editor</span></div>
+    <div class="spec"><div class="n-settings" style="width:460px;grid-template-columns:1fr;height:auto"><section>
+      <div class="n-set-group"><h5>Sync and backup</h5>
+        <div class="n-set-row"><i data-i="cloud"></i><span class="text">Google Drive<small>Synced 2 min ago · in Drive's hidden app folder</small></span><button class="n-btn sm">Sync now</button><button class="n-btn ghost sm">Disconnect</button></div>
+        <div class="n-set-row"><i data-i="archive"></i><span class="text">Export all as ZIP<small>Every note, drawings as SVG too, re-importable</small></span><button class="n-btn sm">Export</button></div>
+        <div class="n-set-row"><i data-i="import"></i><span class="text">Import files<small>Text files or a ZIP from Export</small></span><button class="n-btn sm">Choose…</button></div>
+      </div>
+      <p style="font:var(--n-caption);color:var(--n-text-3);margin:0">Notes never pass through note.directory's server. Sign-in uses a small worker that only holds Google's token.</p>
+    </section></div><span class="cap">Sync and backup</span></div>
+    <div class="spec"><div class="n-settings" style="width:460px;grid-template-columns:1fr;height:auto"><section>
+      <div class="n-set-group"><h5>Storage</h5>
+        <div class="n-storage" style="font:var(--n-body);color:var(--n-text-2)"><div class="n-sync" style="font:var(--n-body)"><span class="grow">Browser storage</span><span>3.6 of 5 MB</span></div><div class="n-meter warn"><i style="width:72%"></i></div></div>
+        <div class="n-set-row"><span class="text">Largest notes<small>architecture.draw 1.1 MB · meeting-2026-10-14.md 420 kB · ideas.md 210 kB</small></span></div>
+        <div class="n-set-row"><span class="text">Browsers may clear storage without warning<small>Turn on Drive or export now and then</small></span></div>
+      </div>
+    </section></div><span class="cap">Storage</span></div>
+  </div>
+</section>

@@ -1,0 +1,37 @@
+<h1 class="pg-title">Space, shape, motion</h1>
+<p class="pg-lede">A 4 px grid, three control heights, four radii, two shadows, two durations. Dense like a code editor, never cramped: rows are 28 px, phones get 44 px targets.</p>
+
+<section class="sec">
+  <h2>Sizes</h2>
+  <table class="tbl">
+    <thead><tr><th style="width:22%">Token</th><th style="width:12%">Value</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td><code>--n-bar</code></td><td>40</td><td>Title bar, sidebar header — they line up</td></tr>
+      <tr><td><code>--n-row</code></td><td>28</td><td>Note rows, palette hits</td></tr>
+      <tr><td><code>--n-control</code></td><td>26</td><td>Buttons, fields, segmented controls; 22 for small</td></tr>
+      <tr><td><code>--n-status</code></td><td>26</td><td>Status bar</td></tr>
+      <tr><td><code>--n-touch</code></td><td>44</td><td>Every tap target on phones; 52 rows in the phone list</td></tr>
+      <tr><td>Spacing</td><td>2 4 6 8 12 16 24</td><td>Inside controls 6–10, between groups 12–16, page padding 24+</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec">
+  <h2>Radii and elevation</h2>
+  <div class="board">
+    <div class="spec"><div style="width:90px;height:56px;border-radius:var(--n-r-sm);background:var(--n-raised);box-shadow:inset 0 0 0 1px var(--n-line-strong)"></div><span class="cap">r-sm 4 · checks, kbd</span></div>
+    <div class="spec"><div style="width:90px;height:56px;border-radius:var(--n-r-md);background:var(--n-raised);box-shadow:inset 0 0 0 1px var(--n-line-strong)"></div><span class="cap">r-md 6 · controls, rows</span></div>
+    <div class="spec"><div style="width:90px;height:56px;border-radius:var(--n-r-lg);background:var(--n-raised);box-shadow:inset 0 0 0 1px var(--n-line-strong)"></div><span class="cap">r-lg 10 · menus, toasts</span></div>
+    <div class="spec"><div style="width:90px;height:56px;border-radius:var(--n-r-xl);background:var(--n-raised);box-shadow:inset 0 0 0 1px var(--n-line-strong)"></div><span class="cap">r-xl 14 · dialogs, palette</span></div>
+    <div class="spec"><div style="width:140px;height:56px;border-radius:var(--n-r-lg);background:var(--n-raised);box-shadow:var(--n-shadow-1)"></div><span class="cap">shadow-1 · menus, popovers, find, canvas panels</span></div>
+    <div class="spec"><div style="width:140px;height:56px;border-radius:var(--n-r-xl);background:var(--n-raised);box-shadow:var(--n-shadow-2)"></div><span class="cap">shadow-2 · palette, dialogs, settings</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Motion</h2>
+  <div class="prose">
+    <p><strong>90 ms</strong> for hover and press, <strong>160 ms</strong> for anything that appears: menus fade and drop 4 px, the palette and dialogs fade and scale from 98 %, toasts rise 8 px. One curve, <code>cubic-bezier(.2, 0, 0, 1)</code>. Exits are instant.</p>
+    <p><strong>Never animated:</strong> typing, the caret, scrolling, dragging, zoom, switching notes, Edit ⇄ Preview. Under <code>prefers-reduced-motion</code> everything is instant except the sync pulse, which becomes a static dot.</p>
+  </div>
+</section>

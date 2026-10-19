@@ -1,0 +1,127 @@
+/*
+ * Redesign tokens. Two layers:
+ *   --p-*  the theme palette (Catppuccin flavours + espresso), same values as index.html today
+ *   --n-*  semantic tokens the UI uses; derived from the palette, so a theme is only its palette
+ * Scope: any element with data-theme (the app sets it on :root).
+ */
+
+[data-theme="mocha"] {
+  --p-bg: #1e1e2e; --p-panel: #181825; --p-surface1: #45475a; --p-overlay: #313244;
+  --p-text: #cdd6f4; --p-subtext: #a6adc8; --p-gutter: #7f849c; --p-overlay0: #6c7086;
+  --p-red: #f38ba8; --p-peach: #fab387; --p-yellow: #f9e2af; --p-green: #a6e3a1;
+  --p-teal: #94e2d5; --p-sky: #89dceb; --p-blue: #89b4fa; --p-lavender: #b4befe;
+  --p-mauve: #cba6f7; --p-pink: #f5c2e7;
+  color-scheme: dark;
+}
+[data-theme="macchiato"] {
+  --p-bg: #24273a; --p-panel: #1e2030; --p-surface1: #494d64; --p-overlay: #363a4f;
+  --p-text: #cad3f5; --p-subtext: #a5adcb; --p-gutter: #8087a2; --p-overlay0: #6e738d;
+  --p-red: #ed8796; --p-peach: #f5a97f; --p-yellow: #eed49f; --p-green: #a6da95;
+  --p-teal: #8bd5ca; --p-sky: #91d7e3; --p-blue: #8aadf4; --p-lavender: #b7bdf8;
+  --p-mauve: #c6a0f6; --p-pink: #f5bde6;
+  color-scheme: dark;
+}
+[data-theme="frappe"] {
+  --p-bg: #303446; --p-panel: #292c3c; --p-surface1: #51576d; --p-overlay: #414559;
+  --p-text: #c6d0f5; --p-subtext: #a5adce; --p-gutter: #838ba7; --p-overlay0: #737994;
+  --p-red: #e78284; --p-peach: #ef9f76; --p-yellow: #e5c890; --p-green: #a6d189;
+  --p-teal: #81c8be; --p-sky: #99d1db; --p-blue: #8caaee; --p-lavender: #babbf1;
+  --p-mauve: #ca9ee6; --p-pink: #f4b8e4;
+  color-scheme: dark;
+}
+[data-theme="latte"][data-theme] {
+  --p-bg: #ffffff; --p-panel: #f5f6f9; --p-surface1: #ccd0da; --p-overlay: #e6e9ef;
+  --p-text: #4c4f69; --p-subtext: #6c6f85; --p-gutter: #7c7f93; --p-overlay0: #9ca0b0;
+  --p-red: #d20f39; --p-peach: #fe640b; --p-yellow: #df8e1d; --p-green: #40a02b;
+  --p-teal: #179299; --p-sky: #04a5e5; --p-blue: #1e66f5; --p-lavender: #7287fd;
+  --p-mauve: #8839ef; --p-pink: #ea76cb;
+  color-scheme: light;
+  /* Light theme: menus are white on a grey shadow, text on accent is white */
+  --n-raised: #ffffff;
+  --n-on-accent: #ffffff;
+  --n-shadow-1: 0 0 0 1px rgb(76 79 105 / 10%), 0 2px 4px rgb(76 79 105 / 6%), 0 8px 24px rgb(76 79 105 / 10%);
+  --n-shadow-2: 0 0 0 1px rgb(76 79 105 / 10%), 0 8px 16px rgb(76 79 105 / 8%), 0 24px 56px rgb(76 79 105 / 16%);
+  --n-scrim: rgb(76 79 105 / 28%);
+}
+[data-theme="espresso"] {
+  --p-bg: #1f1f1f; --p-panel: #181818; --p-surface1: #3c3c3c; --p-overlay: #2a2d2e;
+  --p-text: #cccccc; --p-subtext: #9d9d9d; --p-gutter: #8b8b8b; --p-overlay0: #6e7681;
+  --p-red: #f14c4c; --p-peach: #ce9178; --p-yellow: #d7ba7d; --p-green: #89d185;
+  --p-teal: #4ec9b0; --p-sky: #9cdcfe; --p-blue: #4daafc; --p-lavender: #b4a7f5;
+  --p-mauve: #c586c0; --p-pink: #d670d6;
+  color-scheme: dark;
+}
+
+[data-theme] {
+  /* Type: chrome in the platform face, content and anything you'd type in Victor Mono */
+  --n-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --n-mono: "Victor Mono", "SF Mono", "Cascadia Code", Consolas, monospace;
+  --n-caption: 400 11px/14px var(--n-font);
+  --n-label: 500 11px/14px var(--n-font);
+  --n-body: 400 12.5px/18px var(--n-font);
+  --n-body-strong: 500 12.5px/18px var(--n-font);
+  --n-title: 600 13px/18px var(--n-font);
+  --n-heading: 600 15px/20px var(--n-font);
+  --n-display: 600 22px/28px var(--n-font);
+  --n-code: 400 13px/21px var(--n-mono);
+  --n-code-sm: 400 11.5px/16px var(--n-mono);
+
+  /* Surfaces: panel (sidebar) sits under bg (the page you write on); raised floats above both */
+  --n-bg: var(--p-bg);
+  --n-panel: var(--p-panel);
+  --n-raised: color-mix(in oklab, var(--p-bg), var(--p-text) 6%);
+  --n-field: color-mix(in oklab, var(--p-bg), var(--p-text) 5%);
+  --n-hover: color-mix(in srgb, var(--p-text) 7%, transparent);
+  --n-pressed: color-mix(in srgb, var(--p-text) 12%, transparent);
+  --n-selected: color-mix(in srgb, var(--p-blue) 16%, transparent);
+  --n-line: color-mix(in srgb, var(--p-text) 9%, transparent);
+  --n-line-strong: color-mix(in srgb, var(--p-text) 16%, transparent);
+  --n-scrim: rgb(0 0 0 / 45%);
+
+  /* Text: three steps, text-3 still passes 4.5:1 for 11px captions */
+  --n-text: var(--p-text);
+  --n-text-2: var(--p-subtext);
+  --n-text-3: var(--p-gutter);
+  --n-on-accent: var(--p-panel);
+
+  /* Meanings: one hue each, same role in every theme */
+  --n-accent: var(--p-blue);
+  --n-accent-soft: color-mix(in srgb, var(--p-blue) 14%, transparent);
+  --n-focus: color-mix(in srgb, var(--p-blue) 60%, transparent);
+  --n-danger: var(--p-red);
+  --n-danger-soft: color-mix(in srgb, var(--p-red) 13%, transparent);
+  --n-warning: var(--p-peach);
+  --n-warning-soft: color-mix(in srgb, var(--p-peach) 14%, transparent);
+  --n-success: var(--p-green);
+  --n-pin: var(--p-yellow);
+
+  /* Note kinds: the icon colour tells markdown, drawing, code and plain text apart */
+  --n-kind-md: var(--p-blue);
+  --n-kind-draw: var(--p-mauve);
+  --n-kind-code: var(--p-peach);
+  --n-kind-text: var(--p-gutter);
+
+  /* Inverse: the toast, the one surface that must win over any content */
+  --n-inverse: var(--p-text);
+  --n-inverse-text: var(--p-bg);
+
+  /* Shape */
+  --n-r-sm: 4px;
+  --n-r-md: 6px;
+  --n-r-lg: 10px;
+  --n-r-xl: 14px;
+  --n-control: 26px;
+  --n-row: 28px;
+  --n-bar: 40px;
+  --n-status: 26px;
+  --n-touch: 44px;
+
+  /* Elevation: one step for menus and popovers, one for dialogs and the palette */
+  --n-shadow-1: 0 0 0 1px var(--n-line-strong), 0 4px 12px rgb(0 0 0 / 22%);
+  --n-shadow-2: 0 0 0 1px var(--n-line-strong), 0 12px 40px rgb(0 0 0 / 40%);
+
+  /* Motion: short and interruptible; never on typing, dragging or scrolling */
+  --n-ease: cubic-bezier(0.2, 0, 0, 1);
+  --n-fast: 90ms;
+  --n-base: 160ms;
+}

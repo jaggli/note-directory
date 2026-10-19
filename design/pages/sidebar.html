@@ -1,0 +1,44 @@
+<h1 class="pg-title">Sidebar and rows</h1>
+<p class="pg-lede">The sidebar answers “what notes do I have, and are they safe”. Header: the app menu and New. Then Search, the list, and a footer with sync and storage for all notes.</p>
+
+<section class="sec">
+  <h2>The sidebar</h2>
+  <div class="frames">
+    <div class="frame" style="width:auto"><div class="n" data-theme style="--w:248px;--h:520px;display:grid"><div data-part="sidebar" data-active="release-notes.md" data-hover="architecture.draw"></div></div></div>
+    <div class="frame" style="width:auto"><div class="n" data-theme style="--w:248px;--h:520px;display:grid"><div data-part="sidebar" data-active="release-notes.md" data-foot="storage" data-rename="ideas.md" data-rename-value="ideas-q4.md" data-notes='[["todo.md","2m",true],["release-notes.md","now"],["release-notes (conflict).md","now",false,{"badge":"Conflict"}],["architecture.draw","1h"],["deploy.sh","3h"],["ideas.md","2w"],["scratch.txt","1mo"]]'></div></div></div>
+  </div>
+  <ul class="notes">
+    <li><span><b>note ▾</b> is the app menu. The wordmark shrinks from 22 px to 15 px but stays in Victor Mono.</span></li>
+    <li><span><b>Search</b> looks like a field and opens the palette — the same thing ⌘P does.</span></li>
+    <li><span><b>Pinned</b> gets a label once something is pinned; without pins there are no sections.</span></li>
+    <li><span><b>Hover</b> swaps the time for Pin and ⋯. On touch they're behind long-press.</span></li>
+    <li><span><b>Rename</b> in place: Enter commits, Esc cancels, a taken name is refused inline.</span></li>
+    <li><span><b>Footer</b>: sync state for all notes, and storage once it passes half the quota (today's threshold).</span></li>
+  </ul>
+</section>
+
+<section class="sec">
+  <h2>Row states</h2>
+  <div class="board" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));background:var(--n-panel)">
+    <div class="spec" style="justify-items:stretch"><div class="n-row"><i data-i="note" class="kind md"></i><span class="name">meeting-2026-10-14<span class="ext">.md</span></span><span class="meta">5d</span></div><span class="cap">Idle</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-row hover"><i data-i="file-draw" class="kind draw"></i><span class="name">architecture<span class="ext">.draw</span></span><span class="meta">1h</span><span class="acts"><button class="n-btn ghost sm icon"><i data-i="pin" class="sm"></i></button><button class="n-btn ghost sm icon"><i data-i="more" class="sm"></i></button></span></div><span class="cap">Hover</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-row active"><i data-i="note" class="kind md"></i><span class="name">release-notes<span class="ext">.md</span></span><span class="meta">now</span></div><span class="cap">Open</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-row"><i data-i="file-code" class="kind code"></i><span class="name">deploy<span class="ext">.sh</span></span><span class="meta">3h</span></div><span class="cap">Code</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-row"><i data-i="note" class="kind md"></i><span class="name">release-notes (conflict)<span class="ext">.md</span></span><span class="n-badge warning">Conflict</span></div><span class="cap">Drive conflict copy</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-row"><i data-i="note" class="kind"></i><input value="scratch-2.txt" /></div><span class="cap">Renaming</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-row drop-before"><i data-i="note" class="kind md"></i><span class="name">ideas<span class="ext">.md</span></span><span class="meta">2w</span></div><span class="cap">Drop target</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-row dragging"><i data-i="file-code" class="kind code"></i><span class="name">config<span class="ext">.yaml</span></span><span class="meta">1w</span></div><span class="cap">Dragging</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Footer states</h2>
+  <div class="board" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));background:var(--n-panel)">
+    <div class="spec" style="justify-items:stretch"><div class="n-side-foot" style="border:0;padding:0"><div class="n-sync"><i data-i="lock" class="sm"></i><span class="grow">Only in this browser</span><button class="n-btn ghost sm">Back up…</button></div></div><span class="cap">No sync — says where notes live, offers Settings › Sync</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-side-foot" style="border:0;padding:0"><div class="n-sync"><span class="n-dot ok"></span><span class="grow">Synced to Google Drive</span><span>2m ago</span></div></div><span class="cap">Synced — click for Sync now / Settings / Disconnect</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-side-foot" style="border:0;padding:0"><div class="n-sync"><span class="n-dot busy"></span><span class="grow">Syncing…</span></div></div><span class="cap">Syncing</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-side-foot" style="border:0;padding:0"><div class="n-sync"><span class="n-dot fail"></span><span class="grow"><b>Sync paused</b> · sign-in expired</span><button class="n-btn sm">Reconnect</button></div></div><span class="cap">Failed — the reason and the fix, not just “sync failed”</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-side-foot" style="border:0;padding:0"><div class="n-sync"><i data-i="cloud-off" class="sm"></i><span class="grow">Offline · will sync when back</span></div></div><span class="cap">Offline</span></div>
+    <div class="spec" style="justify-items:stretch"><div class="n-storage"><div class="n-sync" style="min-height:0"><span class="grow">Browser storage</span><span>4.7 of 5 MB</span></div><div class="n-meter critical"><i style="width:94%"></i></div></div><span class="cap">Storage critical — click opens Settings › Storage</span></div>
+  </div>
+</section>

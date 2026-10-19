@@ -1,0 +1,46 @@
+<h1 class="pg-title">Opening a shared link</h1>
+<p class="pg-lede">Today a link writes itself into your notes. Now it opens like a document someone handed you: readable at once, kept only if you say so. Nothing else about the link changes.</p>
+
+<section class="sec">
+  <h2>A new note</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div class="n-app">
+      <div data-part="sidebar"></div>
+      <div class="n-main" style="grid-template-rows:var(--n-bar) auto 1fr var(--n-status)">
+        <div data-part="titlebar" data-name="onboarding.md" data-view="preview" data-state="Shared · not saved"></div>
+        <div class="n-banner"><i data-i="link"></i><span><b>Shared with you</b> <span class="sub">· not in your notes yet</span></span><span class="grow"></span><button class="n-btn ghost sm">Dismiss</button><button class="n-btn primary sm">Save to my notes</button></div>
+        <div class="n-preview"><div class="prose">
+          <h1>Onboarding</h1>
+          <p>Welcome to the team. This page gets you from laptop to first deploy.</p>
+          <h2>Day one</h2>
+          <ul><li class="task"><span class="n-check"></span><span>Get repo access</span></li><li class="task"><span class="n-check"></span><span>Run the app locally</span></li><li class="task"><span class="n-check"></span><span>Read <a href="#">architecture</a></span></li></ul>
+        </div></div>
+        <div data-part="status" data-kind="preview"></div>
+      </div>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>No row in the list</b> until you save. The title bar state says the same.</span></li>
+    <li><span><b>Editing</b> (Edit, typing, ticking a task) saves it — then it's clearly your note, and a toast says <i>Saved to your notes · Undo</i>.</span></li>
+    <li><span><b>Dismiss</b> opens your last note. Read-only links behave the same, in zen, with Save in the zen bar.</span></li>
+  </ul>
+</section>
+
+<section class="sec">
+  <h2>A note you already have, different</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:620px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main" style="grid-template-rows:var(--n-bar) auto 1fr var(--n-status)">
+        <div data-part="titlebar" data-name="release-notes.md" data-view="preview" data-state="Shared version"></div>
+        <div class="n-banner warning"><i data-i="alert"></i><span><b>You have a different release-notes.md</b> <span class="sub">· this one is 2 days newer</span></span><span class="grow"></span><button class="n-btn ghost sm">Show mine</button><button class="n-btn sm">Keep both</button><button class="n-btn sm">Replace mine</button></div>
+        <div data-part="preview"></div>
+        <div data-part="status" data-kind="preview"></div>
+      </div>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>Same words as import</b>: Replace and Keep both. Replace is undoable from the toast.</span></li>
+    <li><span><b>Older link than yours</b>: today it's silently ignored. Now the banner says “Yours is newer” with Show mine and Keep both.</span></li>
+  </ul>
+</section>

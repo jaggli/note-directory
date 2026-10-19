@@ -1,0 +1,79 @@
+<h1 class="pg-title">Drawing</h1>
+<p class="pg-lede">The canvas keeps the whole middle. Chrome sits in three corners and the bottom edge, leaving the top left for the error badge when the source has problems.</p>
+
+<section class="sec">
+  <h2>Two shapes selected</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="architecture.draw"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="architecture.draw"></div>
+        <div class="n-canvas">
+          <div data-part="canvas" data-sel="1"></div>
+          <div class="n-inspector">
+            <div class="head">2 shapes<button class="n-btn ghost sm icon"><i data-i="x" class="sm"></i></button></div>
+            <div><h5>Colour</h5><div class="n-colors">
+              <span class="n-color" style="background:var(--p-text)"></span><span class="n-color" style="background:var(--p-gutter)"></span><span class="n-color" style="background:var(--p-red)"></span><span class="n-color" style="background:var(--p-peach)"></span><span class="n-color" style="background:var(--p-yellow)"></span><span class="n-color" style="background:var(--p-green)"></span>
+              <span class="n-color" style="background:var(--p-teal)"></span><span class="n-color" style="background:var(--p-sky)"></span><span class="n-color" style="background:var(--p-blue)"></span><span class="n-color" style="background:var(--p-lavender)"></span><span class="n-color on" style="background:var(--p-mauve)"></span><span class="n-color" style="background:var(--p-pink)"></span>
+            </div></div>
+            <div><h5>Stroke</h5><div class="n-seg"><button>S</button><button aria-pressed="true">M</button><button>L</button><button>XL</button></div></div>
+            <div><h5>Fill</h5><div class="n-seg"><button aria-pressed="true">None</button><button>Semi</button><button>Solid</button></div></div>
+            <div class="acts"><button class="n-btn ghost sm icon"><i data-i="copy" class="sm"></i></button><button class="n-btn ghost sm icon"><i data-i="layers" class="sm"></i></button><button class="n-btn ghost sm">Arrange<i data-i="chev-down" class="sm"></i></button><span style="flex:1"></span><button class="n-btn ghost sm icon" style="color:var(--n-danger)"><i data-i="trash" class="sm"></i></button></div>
+          </div>
+          <div class="n-zoom"><button class="n-btn ghost sm icon"><i data-i="minus" class="sm"></i></button><button class="pct">100%</button><button class="n-btn ghost sm icon"><i data-i="plus" class="sm"></i></button><button class="n-btn ghost sm icon"><i data-i="fit" class="sm"></i></button></div>
+          <div class="n-dock">
+            <button class="n-tool" aria-pressed="true"><i data-i="cursor"></i></button><button class="n-tool"><i data-i="hand"></i></button><span class="sep"></span>
+            <button class="n-tool"><i data-i="pen"></i></button><button class="n-tool"><i data-i="highlighter"></i></button><button class="n-tool"><i data-i="eraser"></i></button><span class="sep"></span>
+            <button class="n-tool hover" style="background:var(--n-hover);color:var(--n-text)"><i data-i="rect"></i><span class="n-tip">Rectangle <span class="n-kbd">R</span></span></button><button class="n-tool"><i data-i="ellipse"></i></button><button class="n-tool"><i data-i="diamond"></i></button><button class="n-tool"><i data-i="line"></i></button><button class="n-tool"><i data-i="arrow"></i></button><button class="n-tool"><i data-i="text"></i></button>
+          </div>
+        </div>
+        <div data-part="status" data-kind="draw" data-info="2 of 9 shapes selected"></div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section class="sec">
+  <h2>Empty, and source with errors</h2>
+  <div class="pair">
+    <div class="frame"><div class="n" data-theme style="--w:900px;--h:560px">
+      <div class="n-app no-side"><div class="n-main">
+        <div data-part="titlebar" data-name="drawing1.draw" data-side="closed"></div>
+        <div class="n-canvas" style="display:grid;place-items:center">
+          <div class="n-empty"><i data-i="file-draw" class="lg"></i><p>Pick a tool below, or double-click anywhere to write</p><div class="keys"><span class="n-kbd boxed">D</span><span>Draw</span><span class="n-kbd boxed">R</span><span>Rectangle</span><span class="n-kbd boxed">A</span><span>Arrow</span><span class="n-kbd boxed">T</span><span>Text</span></div></div>
+          <div class="n-zoom"><button class="n-btn ghost sm icon"><i data-i="minus" class="sm"></i></button><button class="pct">100%</button><button class="n-btn ghost sm icon"><i data-i="plus" class="sm"></i></button><button class="n-btn ghost sm icon"><i data-i="fit" class="sm"></i></button></div>
+          <div class="n-dock"><button class="n-tool" aria-pressed="true"><i data-i="cursor"></i></button><button class="n-tool"><i data-i="hand"></i></button><span class="sep"></span><button class="n-tool"><i data-i="pen"></i></button><button class="n-tool"><i data-i="eraser"></i></button><span class="sep"></span><button class="n-tool"><i data-i="rect"></i></button><button class="n-tool"><i data-i="ellipse"></i></button><button class="n-tool"><i data-i="arrow"></i></button><button class="n-tool"><i data-i="text"></i></button></div>
+        </div>
+        <div data-part="status" data-kind="draw" data-info="Empty"></div>
+      </div></div>
+    </div></div>
+    <div class="frame"><div class="n" data-theme style="--w:900px;--h:560px">
+      <div class="n-app no-side"><div class="n-main">
+        <div data-part="titlebar" data-name="architecture.draw" data-view="source" data-side="closed"></div>
+        <div style="display:grid;grid-template-rows:auto 1fr;min-height:0">
+          <div class="n-banner warning"><i data-i="alert"></i><span><b>2 lines can't be drawn</b> <span class="sub">· they're kept, the canvas skips them</span></span><span class="grow"></span><button class="n-btn ghost sm">Next problem</button></div>
+          <div class="n-editor"><div class="gutter" style="white-space:pre">1
+2
+3
+4
+<b>5</b>
+6
+7
+8</div><div class="text"><span class="h-kw">draw</span> <span class="h-num">1</span>
+<span class="h-kw">grid</span> on
+<span class="h-kw">r</span> tab <span class="h-num">110 90 190 70</span> <span class="h-fn">c</span>=blue <span class="h-fn">f</span>=semi <span class="h-str">"Browser tab"</span>
+<span class="h-kw">r</span> idb <span class="h-num">110 300 190 70</span> <span class="h-fn">c</span>=green <span class="h-fn">f</span>=semi <span class="h-str">"IndexedDB"</span>
+<span class="cur"><span class="h-kw">r</span> worker <span class="h-num" style="text-decoration:wavy underline var(--p-peach)">470 90</span> <span class="h-fn">c</span>=mauve <span class="h-str">"Worker"</span></span>
+<span class="h-kw">e</span> drive <span class="h-num">470 300 190 70</span> <span class="h-fn">c</span>=peach <span class="h-str">"Google Drive"</span>
+<span class="h-kw">a</span> a1 tab idb
+<span class="h-kw">a</span> a2 worker <span style="text-decoration:wavy underline var(--p-peach)">driev</span> <span class="h-fn">d</span>=dash</div></div>
+        </div>
+        <div data-part="status" data-kind="code" data-pos="Ln 5 · a rectangle needs x, y, width and height"></div>
+      </div></div>
+    </div></div>
+  </div>
+  <ul class="notes">
+    <li><span><b>Source</b> is a place now: the segmented control shows you're there and takes you back to Canvas.</span></li>
+    <li><span><b>Errors</b> sit on the lines themselves; the status bar reads the one under the cursor.</span></li>
+  </ul>
+</section>

@@ -1,0 +1,81 @@
+<h1 class="pg-title">Palette and find</h1>
+<p class="pg-lede">Two tools, two jobs. The <b>palette</b> (⌘P) goes somewhere: a note, a line in any note, or a command. <b>Find</b> (⌘F) stays here: it walks matches in the open note and replaces them.</p>
+
+<section class="sec">
+  <h2>Palette — searching notes</h2>
+  <div class="board">
+    <div class="n-palette">
+      <div class="n-palette-input"><i data-i="search"></i><input value="deploy" /><span class="n-kbd">Tab: this note</span></div>
+      <div class="n-palette-list">
+        <div class="n-palette-group">Notes</div>
+        <div class="n-hit on"><i data-i="file-code" class="kind" style="color:var(--n-kind-code)"></i><span class="title"><mark>deploy</mark><span class="ext">.sh</span></span><span class="aside">3h</span></div>
+        <div class="n-palette-group">In notes</div>
+        <div class="n-hit"><i data-i="note" style="color:var(--n-kind-md)"></i><span class="title">release-notes<span class="ext">.md</span></span><span class="aside">2 lines</span>
+          <span class="line"><i>16</i>Rollback plan lives in [<mark>deploy</mark>.sh](<mark>deploy</mark>.sh).</span>
+          <span class="line"><i>20</i>./<mark>deploy</mark>.sh --env prod --tag v4.2.0</span></div>
+        <div class="n-hit"><i data-i="note" style="color:var(--n-kind-md)"></i><span class="title">meeting-2026-10-14<span class="ext">.md</span></span><span class="aside">1 line</span>
+          <span class="line"><i>7</i>Who owns the <mark>deploy</mark> freeze on Fridays?</span></div>
+        <div class="n-hit"><i data-i="file-draw" style="color:var(--n-kind-draw)"></i><span class="title">architecture<span class="ext">.draw</span></span><span class="aside">1 shape</span>
+          <span class="line"><i>◇</i><mark>Deploy</mark> worker</span></div>
+      </div>
+      <div class="n-palette-foot"><span>↑↓ to move</span><span>↵ to open</span><span class="grow"></span><span>&gt; for commands</span></div>
+    </div>
+  </div>
+  <ul class="notes">
+    <li><span><b>Names first, then lines</b> — today's ranking, now with group labels so you see why something matched.</span></li>
+    <li><span><b>Drawings match on their labels</b> and open with the shape selected and centred, as today.</span></li>
+    <li><span><b>Empty input</b> lists recent notes, so ⌘P ↵ flips to the previous note.</span></li>
+  </ul>
+</section>
+
+<section class="sec">
+  <h2>Palette — this note, and commands</h2>
+  <div class="board">
+    <div class="n-palette" style="width:520px">
+      <div class="n-palette-input"><span class="n-scope"><i data-i="note" class="sm"></i>release-notes.md</span><input value="search" /></div>
+      <div class="n-palette-list">
+        <div class="n-hit on"><span style="font:var(--n-code-sm);color:var(--n-text-3)">11</span><span class="title" style="font:var(--n-code-sm)">  - [ ] <mark>Search</mark></span><span></span></div>
+        <div class="n-hit"><span style="font:var(--n-code-sm);color:var(--n-text-3)">23</span><span class="title" style="font:var(--n-code-sm)">&gt; <mark>Search</mark> index rebuild takes ~12 min.</span><span></span></div>
+      </div>
+      <div class="n-palette-foot"><span>Backspace: all notes</span><span class="grow"></span><span>2 lines</span></div>
+    </div>
+    <div class="n-palette" style="width:520px">
+      <div class="n-palette-input"><i data-i="chev-right"></i><input value="&gt; form" /></div>
+      <div class="n-palette-list">
+        <div class="n-hit on"><i data-i="format"></i><span class="title"><mark>Form</mark>at markdown</span><span class="n-kbd">⌥⇧F</span></div>
+        <div class="n-hit"><i data-i="settings"></i><span class="title">Settings: <mark>form</mark>at markdown on save</span><span class="aside">On</span></div>
+        <div class="n-palette-group">Also try</div>
+        <div class="n-hit"><i data-i="note"></i><span class="title">Markdown guide</span><span class="aside">was :mddemo</span></div>
+      </div>
+      <div class="n-palette-foot"><span>↵ to run</span><span class="grow"></span><span>Esc to close</span></div>
+    </div>
+    <div class="n-palette" style="width:520px">
+      <div class="n-palette-input"><i data-i="search"></i><input value="kubernetes" /></div>
+      <div class="n-palette-empty">No notes match “kubernetes”<br /><button class="n-btn" style="margin-top:12px"><i data-i="plus" class="sm"></i>New note “kubernetes.md”</button></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Find widget</h2>
+  <p class="lede">Floats at the top right of the text, never pushes it down. Same matching as today (case-insensitive, plain text).</p>
+  <div class="board" style="background:var(--n-bg)">
+    <div class="spec"><div class="n-find" style="grid-template-columns:22px 1fr">
+      <button class="n-btn ghost sm icon toggle"><i data-i="chev-right" class="sm"></i></button>
+      <div class="row"><div class="n-field focus"><input value="search" /></div><span class="count">2 of 3</span><button class="n-btn ghost sm icon"><i data-i="chev-down" class="sm" style="transform:rotate(180deg)"></i></button><button class="n-btn ghost sm icon"><i data-i="chev-down" class="sm"></i></button><button class="n-btn ghost sm icon"><i data-i="x" class="sm"></i></button></div>
+    </div><span class="cap">Find — ⌘F</span></div>
+    <div class="spec"><div class="n-find">
+      <button class="n-btn ghost sm icon toggle"><i data-i="chev-down" class="sm"></i></button>
+      <div class="row"><div class="n-field"><input value="staging" /></div><span class="count">1 of 1</span><button class="n-btn ghost sm icon"><i data-i="chev-down" class="sm" style="transform:rotate(180deg)"></i></button><button class="n-btn ghost sm icon"><i data-i="chev-down" class="sm"></i></button><button class="n-btn ghost sm icon"><i data-i="x" class="sm"></i></button></div>
+      <div class="row"><div class="n-field focus"><input value="production" /></div><button class="n-btn sm">Replace</button><button class="n-btn sm">All</button></div>
+    </div><span class="cap">Replace — ⌘⌥F, Ctrl+H, or the chevron</span></div>
+    <div class="spec"><div class="n-find" style="grid-template-columns:22px 1fr">
+      <button class="n-btn ghost sm icon toggle"><i data-i="chev-right" class="sm"></i></button>
+      <div class="row"><div class="n-field error"><input value="stagnig" /></div><span class="count none">No results</span><button class="n-btn ghost sm icon" disabled><i data-i="chev-down" class="sm" style="transform:rotate(180deg)"></i></button><button class="n-btn ghost sm icon" disabled><i data-i="chev-down" class="sm"></i></button><button class="n-btn ghost sm icon"><i data-i="x" class="sm"></i></button></div>
+    </div><span class="cap">No match</span></div>
+  </div>
+  <ul class="notes">
+    <li><span><b>Replace</b> replaces the current match and moves on — no more “first press selects, second replaces”.</span></li>
+    <li><span><b>All</b> replaces and reports in the toast: <i>Replaced 4 · Undo</i>.</span></li>
+  </ul>
+</section>

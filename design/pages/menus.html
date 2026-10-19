@@ -1,0 +1,83 @@
+<h1 class="pg-title">Menus</h1>
+<p class="pg-lede">Three menus, split by what they act on. Every item that has a shortcut shows it. Items that don't apply are hidden when they never apply to this kind of note (Download as SVG on markdown), and disabled with a reason when they could (Sync now while offline).</p>
+
+<section class="sec">
+  <h2>note ▾ — the app</h2>
+  <div class="board" style="background:var(--n-panel)">
+    <div class="n-menu">
+      <button class="n-menu-item"><i data-i="note"></i><span class="label">New note</span><span class="n-kbd">⌃N</span></button>
+      <button class="n-menu-item"><i data-i="file-draw"></i><span class="label">New drawing</span></button>
+      <button class="n-menu-item"><i data-i="import"></i><span class="label">Import files…</span></button>
+      <button class="n-menu-item"><i data-i="archive"></i><span class="label">Export all as ZIP</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><i data-i="settings"></i><span class="label">Settings…</span></button>
+      <button class="n-menu-item hover"><i data-i="contrast"></i><span class="label">Theme</span><i data-i="chev-right" class="sub"></i></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><i data-i="keyboard"></i><span class="label">Keyboard shortcuts</span><span class="n-kbd">⌘/</span></button>
+      <button class="n-menu-item"><i data-i="help"></i><span class="label">Help</span></button>
+      <button class="n-menu-item"><i data-i="note"></i><span class="label">Markdown guide</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><span class="tick"></span><span class="label">Privacy policy</span></button>
+      <button class="n-menu-item"><span class="tick"></span><span class="label">Terms</span></button>
+    </div>
+    <div class="n-menu" style="min-width:200px;margin-top:150px">
+      <button class="n-menu-item"><span class="tick"></span><span class="label">Match system</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><span class="tick"><i data-i="check"></i></span><span class="label">Mocha</span><span class="n-swatch-dot" style="background:#1e1e2e"></span></button>
+      <button class="n-menu-item"><span class="tick"></span><span class="label">Macchiato</span><span class="n-swatch-dot" style="background:#24273a"></span></button>
+      <button class="n-menu-item"><span class="tick"></span><span class="label">Frappé</span><span class="n-swatch-dot" style="background:#303446"></span></button>
+      <button class="n-menu-item"><span class="tick"></span><span class="label">Latte</span><span class="n-swatch-dot" style="background:#ffffff"></span></button>
+      <button class="n-menu-item"><span class="tick"></span><span class="label">Espresso</span><span class="n-swatch-dot" style="background:#1f1f1f"></span></button>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>⋯ — this note</h2>
+  <p class="lede">The same menu opens from the title bar ⋯, a row's ⋯ and right-click on a row. Delete is last, red, and separated.</p>
+  <div class="board" style="background:var(--n-bg)">
+    <div class="spec"><div class="n-menu">
+      <button class="n-menu-item"><i data-i="pencil"></i><span class="label">Rename</span><span class="n-kbd">F2</span></button>
+      <button class="n-menu-item"><i data-i="pin"></i><span class="label">Pin</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><i data-i="link"></i><span class="label">Copy link</span></button>
+      <button class="n-menu-item"><i data-i="download"></i><span class="label">Download</span></button>
+      <button class="n-menu-item"><i data-i="download"></i><span class="label">Download as HTML</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><i data-i="format"></i><span class="label">Format markdown</span><span class="n-kbd">⌥⇧F</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item danger hover"><i data-i="trash"></i><span class="label">Delete</span><span class="n-kbd">⌘⇧D</span></button>
+    </div><span class="cap">Markdown</span></div>
+    <div class="spec"><div class="n-menu">
+      <button class="n-menu-item"><i data-i="pencil"></i><span class="label">Rename</span><span class="n-kbd">F2</span></button>
+      <button class="n-menu-item"><i data-i="pin-on"></i><span class="label">Unpin</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><i data-i="link"></i><span class="label">Copy link</span></button>
+      <button class="n-menu-item"><i data-i="image"></i><span class="label">Copy as PNG</span></button>
+      <button class="n-menu-item"><i data-i="download"></i><span class="label">Download</span></button>
+      <button class="n-menu-item"><i data-i="download"></i><span class="label">Download as SVG</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item danger"><i data-i="trash"></i><span class="label">Delete</span><span class="n-kbd">⌘⇧D</span></button>
+    </div><span class="cap">Drawing, pinned</span></div>
+    <div class="spec"><div class="n-menu" style="min-width:240px">
+      <div class="n-menu-label">Google Drive</div>
+      <button class="n-menu-item"><i data-i="cloud"></i><span class="label">Sync now</span><span class="n-kbd">⌘S</span></button>
+      <button class="n-menu-item"><i data-i="settings"></i><span class="label">Sync settings…</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><i data-i="cloud-off"></i><span class="label">Disconnect</span></button>
+      <div class="n-menu-note">Notes stay in this browser. Your Drive copy stays in Drive.</div>
+    </div><span class="cap">Sync line in the sidebar footer</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>+ ▾ — new</h2>
+  <div class="board" style="background:var(--n-panel)">
+    <div class="n-menu" style="min-width:200px">
+      <button class="n-menu-item hover"><i data-i="note"></i><span class="label">New note</span><span class="n-kbd">⌃N</span></button>
+      <button class="n-menu-item"><i data-i="file-draw"></i><span class="label">New drawing</span></button>
+      <div class="n-menu-sep"></div>
+      <button class="n-menu-item"><i data-i="import"></i><span class="label">Import files…</span></button>
+    </div>
+  </div>
+</section>

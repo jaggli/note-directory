@@ -1,0 +1,37 @@
+<h1 class="pg-title">Sync and storage</h1>
+<p class="pg-lede">Sync and storage are about all notes, so they live at the bottom of the list of notes. Each state says what happened and what to do — “sync failed” with no reason is gone.</p>
+
+<section class="sec">
+  <h2>Sign-in expired, and a conflict</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:720px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes (conflict).md" data-foot="fail" data-notes='[["todo.md","2m",true],["release-notes.md","now"],["release-notes (conflict).md","now",false,{"badge":"Conflict"}],["architecture.draw","1h"],["deploy.sh","3h"],["ideas.md","2w"],["scratch.txt","1mo"]]'></div>
+      <div class="n-main" style="grid-template-rows:var(--n-bar) auto 1fr var(--n-status)">
+        <div data-part="titlebar" data-name="release-notes (conflict).md" data-state="Conflict copy"></div>
+        <div class="n-banner warning"><i data-i="conflict"></i><span><b>Edited on two devices</b> <span class="sub">· this is the other version of release-notes.md</span></span><span class="grow"></span><button class="n-btn ghost sm">Open release-notes.md</button><button class="n-btn sm">Use this one</button><button class="n-btn sm">Delete this copy</button></div>
+        <div data-part="editor" data-caret="none"></div>
+        <div data-part="status"></div>
+      </div>
+    </div>
+    <span class="n-tip rich" style="position:absolute;left:150px;top:214px;z-index:6"><b>Edited on two devices</b><span>This copy holds the other version of release-notes.md</span></span>
+    <div class="n-toast" style="position:absolute;left:calc(50% + 124px);bottom:44px;transform:translateX(-50%)">1 note changed on two devices — both kept<button class="act">Show</button></div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>The merge doesn't change.</b> The newer version wins, the other becomes <code>name (conflict).ext</code> — but now with a badge, a toast and a banner that resolves it in one click.</span></li>
+    <li><span><b>Use this one</b> replaces the original with this copy and deletes the copy; both undoable.</span></li>
+    <li><span><b>Reconnect</b> is in the footer where the problem shows, not in a status-bar menu.</span></li>
+  </ul>
+</section>
+
+<section class="sec">
+  <h2>Footer states</h2>
+  <div class="frames">
+    <div class="frame" style="width:auto"><div class="n" data-theme style="--w:248px;--h:300px;display:grid"><div data-part="sidebar" data-active="release-notes.md" data-foot="local" data-notes='[["release-notes.md","now"],["architecture.draw","1h"],["ideas.md","2w"]]'></div></div></div>
+    <div class="frame" style="width:auto"><div class="n" data-theme style="--w:248px;--h:300px;display:grid"><div data-part="sidebar" data-active="release-notes.md" data-foot="busy" data-notes='[["release-notes.md","now"],["architecture.draw","1h"],["ideas.md","2w"]]'></div></div></div>
+    <div class="frame" style="width:auto"><div class="n" data-theme style="--w:248px;--h:300px;display:grid"><div data-part="sidebar" data-active="release-notes.md" data-foot="storage" data-notes='[["release-notes.md","now"],["architecture.draw","1h"],["ideas.md","2w"]]'></div></div></div>
+  </div>
+  <ul class="notes">
+    <li><span><b>Only in this browser</b> replaces the help note's warning with a standing fact, and <i>Back up…</i> opens Settings › Sync, where Export and Drive sit side by side.</span></li>
+    <li><span><b>Storage</b> appears at today's thresholds and clicks through to Settings › Storage.</span></li>
+  </ul>
+</section>

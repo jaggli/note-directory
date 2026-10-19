@@ -1,0 +1,54 @@
+<h1 class="pg-title">Search and commands</h1>
+<p class="pg-lede">⌘P goes somewhere, ⌘F stays here. Typing <code>&gt;</code> turns the palette into a command list, so every action — including the ones only vim users could reach — has a name you can search for.</p>
+
+<section class="sec">
+  <h2>⌘P over the editor</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md"></div>
+        <div data-part="editor" data-caret="none"></div>
+        <div data-part="status"></div>
+      </div>
+    </div>
+    <div class="n-scrim" style="padding-top:90px;background:color-mix(in srgb, var(--n-scrim) 60%, transparent)">
+      <div class="n-palette">
+        <div class="n-palette-input"><i data-i="search"></i><input value="deploy" /><span class="n-kbd">Tab: this note</span></div>
+        <div class="n-palette-list">
+          <div class="n-palette-group">Notes</div>
+          <div class="n-hit on"><i data-i="file-code" style="color:var(--n-kind-code)"></i><span class="title"><mark>deploy</mark><span class="ext">.sh</span></span><span class="aside">3h</span></div>
+          <div class="n-palette-group">In notes</div>
+          <div class="n-hit"><i data-i="note" style="color:var(--n-kind-md)"></i><span class="title">release-notes<span class="ext">.md</span></span><span class="aside">2 lines</span><span class="line"><i>16</i>Rollback plan lives in [<mark>deploy</mark>.sh](<mark>deploy</mark>.sh).</span><span class="line"><i>20</i>./<mark>deploy</mark>.sh --env prod --tag v4.2.0</span></div>
+          <div class="n-hit"><i data-i="file-draw" style="color:var(--n-kind-draw)"></i><span class="title">architecture<span class="ext">.draw</span></span><span class="aside">1 shape</span><span class="line"><i>◇</i><mark>Deploy</mark> worker</span></div>
+        </div>
+        <div class="n-palette-foot"><span>↑↓ to move</span><span>↵ to open</span><span class="grow"></span><span>&gt; for commands</span></div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section class="sec">
+  <h2>⌘F with Replace open</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md"></div>
+        <div style="position:relative;display:grid;min-height:0">
+          <div data-part="editor" data-find="1" data-cur="11" data-caret="none"></div>
+          <div class="n-find" style="position:absolute;right:20px;top:10px">
+            <button class="n-btn ghost sm icon toggle"><i data-i="chev-down" class="sm"></i></button>
+            <div class="row"><div class="n-field"><input value="search" /></div><span class="count">1 of 2</span><button class="n-btn ghost sm icon"><i data-i="chev-down" class="sm" style="transform:rotate(180deg)"></i></button><button class="n-btn ghost sm icon"><i data-i="chev-down" class="sm"></i></button><button class="n-btn ghost sm icon"><i data-i="x" class="sm"></i></button></div>
+            <div class="row"><div class="n-field focus"><input value="Search UI" /></div><button class="n-btn sm">Replace</button><button class="n-btn sm">All</button></div>
+          </div>
+        </div>
+        <div data-part="status" data-pos="Ln 11, Col 9" data-sel="6 selected"></div>
+      </div>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>The widget floats</b> over the text's top right; the editor never jumps down, unlike today's bar.</span></li>
+    <li><span><b>Matches are marked</b> in the text and on the scrollbar, reusing today's occurrence overlay.</span></li>
+  </ul>
+</section>

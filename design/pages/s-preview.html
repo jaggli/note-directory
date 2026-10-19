@@ -1,0 +1,46 @@
+<h1 class="pg-title">Preview and zen</h1>
+<p class="pg-lede">Preview is a way of looking at the note inside the app. Zen is leaving the app to read — the same page, chrome gone, and the two things you do with a finished note: share it and download it.</p>
+
+<section class="sec">
+  <h2>Preview</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div class="n-app">
+      <div data-part="sidebar" data-active="release-notes.md"></div>
+      <div class="n-main">
+        <div data-part="titlebar" data-name="release-notes.md" data-view="preview"></div>
+        <div data-part="preview"></div>
+        <div data-part="status" data-kind="preview"></div>
+      </div>
+    </div>
+    <div class="n-toast" style="position:absolute;left:calc(50% + 124px);bottom:44px;transform:translateX(-50%)"><i data-i="check"></i>Link to “Checklist” copied</div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>Reading face</b> for preview: the platform sans at 15 px, 680 px measure. Code stays in Victor Mono.</span></li>
+    <li><span><b>Tasks</b> use the same check as the rest of the UI and still toggle with the cascade.</span></li>
+    <li><span><b>Heading anchors and code copy</b> confirm in the toast instead of changing their own label.</span></li>
+  </ul>
+</section>
+
+<section class="sec">
+  <h2>Zen</h2>
+  <div class="frame"><div class="n" data-theme style="--w:1280px;--h:800px">
+    <div style="display:grid;grid-template-rows:44px 1fr;height:100%">
+      <div style="display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--n-text-3)">
+        <img src="../img/favicon-32x32.png" style="width:16px;height:16px;border-radius:3px" alt="" />
+        <span style="font:var(--n-body)">release-notes<span style="opacity:.7">.md</span></span>
+        <span style="flex:1"></span>
+        <span class="n-kbd">Esc to leave</span>
+        <button class="n-btn ghost icon"><i data-i="x"></i></button>
+      </div>
+      <div data-part="preview"></div>
+    </div>
+    <div style="position:absolute;right:20px;bottom:20px;display:flex;gap:6px;padding:4px;border-radius:var(--n-r-xl);background:var(--n-raised);box-shadow:var(--n-shadow-1)">
+      <button class="n-btn ghost"><i data-i="share" class="sm"></i>Share</button>
+      <button class="n-btn ghost"><i data-i="download" class="sm"></i>Download</button>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><span><b>The top line fades</b> after 2 s without the pointer moving and comes back on movement. The note never shifts.</span></li>
+    <li><span><b>Share</b> opens the same popover as in the app. A read-only link opens exactly this screen for the recipient.</span></li>
+  </ul>
+</section>
