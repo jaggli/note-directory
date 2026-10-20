@@ -2269,11 +2269,13 @@ function startTimestampRefresh() {
   }, 30000);
 }
 
+// An installed app's window already shows the app name in front of the title
+const installedApp = matchMedia("(display-mode: standalone)").matches;
+
 function updateTitle() {
   const note = getActiveNote();
-  document.title = note
-    ? note.name + " \u00b7 note \u2014 minimal editor"
-    : "note \u2014 minimal editor";
+  const app = "note \u2014 minimal editor";
+  document.title = installedApp ? note?.name || "" : note ? note.name + " \u00b7 " + app : app;
 }
 
 let lastRenderedId = null;
