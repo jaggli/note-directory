@@ -516,6 +516,40 @@ test("rotating a stroke turns its box with it", async ({ page }) => {
   expect(await page.evaluate(() => Draw._state.selRot?.f.rot)).toBe(turned);
 });
 
+test("free arrows turn alone and box along a turned selection", async ({ page }) => {
+  await openDrawing(page, "draw 1\nr r 300 0 40 40\na a 0,0 100,0\nr b 0 100 40 40\na c r b\n");
+  const r = await page.locator("#drawHost").boundingBox();
+  const turn = async (dx, dy) => {
+    const h = await page.evaluate(() => Draw._state.handles.find((h) => h.kind === "rotate"));
+    await page.mouse.move(r.x + h.x, r.y + h.y);
+    await page.mouse.down();
+    await page.mouse.move(r.x + h.x + dx, r.y + h.y + dy, { steps: 6 });
+    await page.mouse.up();
+  };
+  // A bound arrow has no rotate handle
+  await click(page, 170, 70);
+  expect(await page.evaluate(() => Draw._state.handles.some((h) => h.kind === "rotate"))).toBe(false);
+  await click(page, 50, 0);
+  // Drag the handle from straight above the centre to its right: a quarter turn
+  const h = await page.evaluate(() => Draw._state.handles.find((h) => h.kind === "rotate"));
+  const c = await at(page, 50, 0);
+  await page.keyboard.down("Shift");
+  await turn(c[0] - r.x - h.x + 200, c[1] - r.y - h.y - 1);
+  await page.keyboard.up("Shift");
+  const a = (await shapes(page)).find((s) => s.id === "a");
+  expect(Math.round(a.from[0])).toBe(Math.round(a.to[0]));
+  // In a turned multi-selection the arrow's outline is turned too
+  await page.keyboard.press("Control+a");
+  await turn(150, 150);
+  const rot = await page.evaluate(() => Draw._state.selRot.f.rot);
+  expect(rot % 90).not.toBe(0);
+  const outlines = await page.evaluate(() =>
+    [...Draw._state.overlay.querySelectorAll("polygon[stroke-opacity='0.5']")].map((p) => p.getAttribute("points")),
+  );
+  const ax = outlines.map((o) => o.split(/[ ,]/).map(Number)).filter((n) => n[0] !== n[6] && n[1] !== n[3]);
+  expect(ax.length).toBe(outlines.length);
+});
+
 test("arrowheads and label alignment render", async ({ page }) => {
   await openDrawing(
     page,

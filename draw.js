@@ -1613,23 +1613,30 @@
     // A turned multi-selection keeps its turned box while the shapes are
     // exactly those it was turned (or then moved) as
     const r = E.selRot;
-    if (r && sel.length === r.shapes.size && sel.every((s) => r.shapes.has(s))) return { ...r.f, resizable: true };
-    return { ...unionBounds(sel.map((s) => bounds(s, E.model))), rot: 0, resizable: true };
+    const resizable = sel.length > 1;
+    if (r && sel.length === r.shapes.size && sel.every((s) => r.shapes.has(s))) return { ...r.f, resizable };
+    return { ...unionBounds(sel.map((s) => bounds(s, E.model))), rot: 0, resizable };
   }
 
+  // Lines and free arrows have no rotation of their own but turn as a whole
+  const turnable = (s) => s.k === "l" || (s.k === "a" && typeof s.from !== "string" && typeof s.to !== "string");
+
   function keepSelRot(f) {
-    E.selRot = f && E.sel.size > 1 ? { shapes: new Set(selected()), f } : null;
+    E.selRot = f && { shapes: new Set(selected()), f };
   }
 
   function polygon(pts, attrs) {
     return el("polygon", { points: pts.map((p) => P(toScreen(p))).join(" "), fill: "none", stroke: ACCENT, ...attrs }, E.overlay);
   }
 
-  function outlineOf(s, attrs) {
+  function outlineOf(s, attrs, rot = 0) {
     const f = frame(s);
     if (f) return polygon(corners(f), attrs);
-    const b = bounds(s, E.model);
-    return polygon(corners({ ...b, rot: 0 }), attrs);
+    if (!rot) return polygon(corners({ ...bounds(s, E.model), rot: 0 }), attrs);
+    // Box lines and arrows along the turned selection
+    const pts = (s.k === "a" ? arrowPts(arrowGeom(s, E.model)) : s.pts).map((p) => rotPt(p[0], p[1], 0, 0, -rot));
+    const b = ptsBounds(pts, s.k === "a" ? strokeW(s) * 3 : lineWidth(s) / 2);
+    return polygon(corners({ ...b, rot: 0 }).map((p) => rotPt(p[0], p[1], 0, 0, rot)), attrs);
   }
 
   function handle(kind, p, data, round) {
@@ -1656,7 +1663,8 @@
     if (E.readonly || (op && !["move", "resize", "rotate", "marquee", "point", "bend"].includes(op.type))) return;
     const sel = selected();
     if (!sel.length) return;
-    if (sel.length > 1) for (const s of sel) outlineOf(s, { "stroke-width": 1, "stroke-opacity": 0.5 });
+    const f = selFrame(sel);
+    if (sel.length > 1) for (const s of sel) outlineOf(s, { "stroke-width": 1, "stroke-opacity": 0.5 }, f.rot);
     const one = sel.length === 1 ? sel[0] : null;
     if (one && (one.k === "l" || one.k === "a")) {
       if (one.k === "l") {
@@ -1668,10 +1676,9 @@
         handle("point", g.p1, { idx: 1 }, true);
         handle("bend", g.mid, {}, true);
       }
-      return;
+      if (!turnable(one)) return;
     }
-    const f = selFrame(sel);
-    polygon(corners(f), { "stroke-width": 1 });
+    polygon(corners(f), { "stroke-width": 1, "stroke-opacity": one && !frame(one) ? 0.5 : 1 });
     if (op && op.type !== "resize" && op.type !== "rotate") return;
     const cx = f.x + f.w / 2;
     const cy = f.y + f.h / 2;
@@ -2282,7 +2289,7 @@
   function startMove(sp, w) {
     const ids = new Set(E.sel);
     const sel = selected();
-    const turned = sel.length > 1 && selFrame(sel).rot ? selFrame(sel) : null;
+    const turned = selFrame(sel).rot ? selFrame(sel) : null;
     const orig = sel.map((s) => unbindLoose(s, ids));
     const b = unionBounds(orig.map(geomBounds));
     startOp({ type: "move", start: w, startScreen: sp, orig, b, turned, moved: false, before: E.model.shapes.slice() });
@@ -2504,7 +2511,7 @@
     let delta = ((Math.atan2(w[1] - op.c[1], w[0] - op.c[0]) - op.a0) * 180) / Math.PI;
     if (e.shiftKey) {
       // Snap the resulting angle (single shape) or the turn itself to 15°
-      const baseRot = op.orig.length === 1 ? op.orig[0].rot || 0 : 0;
+      const baseRot = op.orig.length === 1 ? op.f.rot : 0;
       delta = Math.round((baseRot + delta) / 15) * 15 - baseRot;
     }
     const fn = (p) => rotPt(p[0], p[1], op.c[0], op.c[1], delta);
