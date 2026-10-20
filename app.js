@@ -1854,13 +1854,16 @@ function updateOccurrenceMarkers(force) {
     return;
   }
 
+  // Outside the editor (e.g. typing in find) its selection isn't painted: the overlay marks it
+  const away = document.activeElement !== editor;
   // Skip if same query (scrolling forces a redraw of the visible part)
-  if (selected === lastOccurrenceQuery && !force) return;
-  lastOccurrenceQuery = selected;
+  const key = selected + "\0" + start + away;
+  if (key === lastOccurrenceQuery && !force) return;
+  lastOccurrenceQuery = key;
 
   const matches = findAll(text, selected);
   const trackHeight = occurrenceTrack.clientHeight;
-  if (matches.length < 2 || !trackHeight) {
+  if (matches.length < (away ? 1 : 2) || !trackHeight) {
     occurrenceTrack.innerHTML = "";
     occurrenceOverlay.innerHTML = "";
     return;
@@ -1885,7 +1888,8 @@ function updateOccurrenceMarkers(force) {
   let overlayHtml = "";
   for (const m of matches) {
     const li = vimLineOf(m.start);
-    if (li < first || li > last || m.start === start) continue;
+    const current = m.start === start;
+    if (li < first || li > last || (current && !away)) continue;
     const a = highlightNodeAt(m.start);
     const b = highlightNodeAt(m.end);
     if (!a || !b) continue;
@@ -1893,7 +1897,9 @@ function updateOccurrenceMarkers(force) {
     range.setEnd(b.node, b.offset);
     for (const rect of range.getClientRects()) {
       overlayHtml +=
-        '<div class="occurrence-highlight" style="top:' +
+        '<div class="occurrence-highlight' +
+        (current ? " current" : "") +
+        '" style="top:' +
         (rect.top - layerRect.top + highlightLayer.scrollTop) +
         "px;left:" +
         (rect.left - layerRect.left + highlightLayer.scrollLeft) +
@@ -7370,6 +7376,8 @@ document.addEventListener("keydown", (e) => {
 }, true);
 
 editor.addEventListener("focus", () => closeAllMenus());
+editor.addEventListener("focus", scheduleOccurrenceUpdate);
+editor.addEventListener("blur", scheduleOccurrenceUpdate);
 
 // The ⋯ menu: the title bar's, a row's, and right-click on a row
 function openNoteMenu(note, anchor, at) {

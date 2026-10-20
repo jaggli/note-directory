@@ -361,3 +361,17 @@ test("selecting a task's text in the preview doesn't tick it; clicking does", as
   await page.mouse.click(b.x + 60, b.y + b.height / 2);
   expect(await content()).toBe("- [x] select this text");
 });
+
+test("find marks the current match while typing, even a single one", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    createNote("f.md", "- [ ] one\n- [ ] settings: add top\n- [ ] top again");
+    openFindReplace();
+  });
+  await page.locator("#findInput").pressSequentially("sett");
+  await expect(page.locator("#occurrenceOverlay .occurrence-highlight.current")).toHaveCount(1);
+  await page.fill("#findInput", "");
+  await page.locator("#findInput").pressSequentially("top");
+  await expect(page.locator("#occurrenceOverlay .occurrence-highlight")).toHaveCount(2);
+  await expect(page.locator("#occurrenceOverlay .current")).toHaveCount(1);
+});
