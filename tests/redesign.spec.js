@@ -343,3 +343,21 @@ test("share explains a note too large for a link instead of hiding", async ({ pa
   await expect(page.locator("#sharePop")).toContainText("too large for a link");
   await expect(page.locator('#sharePop [data-share="download"]')).toBeVisible();
 });
+
+test("selecting a task's text in the preview doesn't tick it; clicking does", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    createNote("t.md", "- [ ] select this text");
+    switchMdTab("view");
+  });
+  const li = page.locator("#mdPreview li.task-item");
+  const b = await li.boundingBox();
+  await page.mouse.move(b.x + 30, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 120, b.y + b.height / 2, { steps: 5 });
+  await page.mouse.up();
+  const content = () => page.evaluate(() => getActiveNote().content);
+  expect(await content()).toBe("- [ ] select this text");
+  await page.mouse.click(b.x + 60, b.y + b.height / 2);
+  expect(await content()).toBe("- [x] select this text");
+});

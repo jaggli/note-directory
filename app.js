@@ -3343,6 +3343,8 @@ function switchMdTab(tab, pushHistory) {
 
   // Task checkbox handler shared by view and zen
   function attachCheckboxHandler() {
+    let down = null;
+    mdPreview.onmousedown = (e) => (down = [e.clientX, e.clientY]);
     mdPreview.onclick = (e) => {
       const li = e.target.closest("li.task-item");
       const input =
@@ -3350,6 +3352,8 @@ function switchMdTab(tab, pushHistory) {
           ? e.target
           : null;
       if (!li && !input) return;
+      // Dragging over a task's text selects it, it isn't a click
+      if (!input && down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
       e.preventDefault();
 
       // In zen mode, persist the note first if ephemeral
