@@ -2480,6 +2480,7 @@ function setPreviewHtml(html) {
   mdPreview.innerHTML = html;
   externalizeLinks(mdPreview);
   hydrateDrawEmbeds();
+  if (findMatches.length && inPreviewFind()) updateFindMatches(false);
 }
 
 // ?view= value for the current tab
@@ -3156,17 +3157,17 @@ function renderMarkdown(src) {
     )
     .join("");
 
-  // Bold & italic
+  // Bold & italic: * works inside words, _ doesn't (CommonMark)
   text = text.replace(
-    /(?<![a-zA-Z0-9])\*\*\*(.+?)\*\*\*(?![a-zA-Z0-9])/g,
+    /\*\*\*(?!\s)(.+?)(?<!\s)\*\*\*/g,
     "<strong><em>$1</em></strong>",
   );
   text = text.replace(
-    /(?<![a-zA-Z0-9])\*\*(.+?)\*\*(?![a-zA-Z0-9])/g,
+    /\*\*(?!\s)(.+?)(?<!\s)\*\*/g,
     "<strong>$1</strong>",
   );
   text = text.replace(
-    /(?<![a-zA-Z0-9])\*(.+?)\*(?![a-zA-Z0-9])/g,
+    /\*(?!\s)(.+?)(?<!\s)\*/g,
     "<em>$1</em>",
   );
   text = text.replace(
@@ -4795,10 +4796,16 @@ function isFindMatchSelected() {
   );
 }
 
+// The preview finds in its rendered text, painted with the CSS Highlight API;
+// replacing (and zen, which has no find bar) goes to the source
+function inPreviewFind() {
+  return mdViewActive && !zenModeActive && !!window.CSS?.highlights && !isDrawFile(getActiveNote()?.name);
+}
+
 // ⌘F finds; ⌘⌥F / Ctrl+H (or the chevron) adds the replace row
 function openFindReplace(withReplace = false) {
   if (!getActiveNote()) return;
-  if (mdViewActive) switchMdTab("edit", true);
+  if (mdViewActive && (withReplace === true || !inPreviewFind())) switchMdTab("edit", true);
   if (withReplace === true) findReplaceBar.classList.add("replace");
   else if (!findReplaceBar.classList.contains("visible"))
     findReplaceBar.classList.remove("replace");
@@ -4816,10 +4823,9 @@ function openFindReplace(withReplace = false) {
   findInput.focus();
 
   // If there's a selection, pre-fill find input
-  const sel = editor.value.substring(
-    editor.selectionStart,
-    editor.selectionEnd,
-  );
+  const sel = mdViewActive
+    ? getSelection().toString()
+    : editor.value.substring(editor.selectionStart, editor.selectionEnd);
   if (sel && !sel.includes("\n")) {
     findInput.value = sel;
     updateFindMatches();
@@ -4831,11 +4837,18 @@ function closeFindReplace(focus = true) {
   findReplaceBar.classList.remove("visible");
   findMatches = [];
   findMatchIdx = -1;
+  paintPreviewFind();
   setFindCount("");
-  if (focus) editor.focus();
+  if (focus && !mdViewActive) editor.focus();
 }
 
 function toggleReplace() {
+  if (mdViewActive) {
+    const query = findInput.value;
+    openFindReplace(true);
+    findInput.value = query;
+    return updateFindMatches();
+  }
   findReplaceBar.classList.toggle("replace");
   (findReplaceBar.classList.contains("replace") ? replaceInput : findInput).focus();
 }
@@ -4851,13 +4864,22 @@ function updateFindMatches(select = true) {
   findMatches = [];
   findMatchIdx = -1;
   if (!query) {
+    paintPreviewFind();
     setFindCount("");
     return;
   }
-  findMatches = findAll(editor.value, query);
+  const preview = inPreviewFind();
+  findMatches = preview ? previewFindAll(query) : findAll(editor.value, query);
   if (findMatches.length === 0) {
+    paintPreviewFind();
     setFindCount("No results", true);
     return;
+  }
+  if (preview) {
+    // Start at the first match on screen
+    const top = mdPreview.getBoundingClientRect().top;
+    findMatchIdx = Math.max(0, findMatches.findIndex((r) => r.getBoundingClientRect().bottom > top));
+    return selectFindMatch();
   }
   // Find nearest match to cursor
   const cursor = editor.selectionStart;
@@ -4875,9 +4897,50 @@ function updateFindMatches(select = true) {
     );
 }
 
+// Ranges over the preview's text nodes; a match may span inline formatting
+function previewFindAll(query) {
+  const nodes = [];
+  let text = "";
+  const walker = document.createTreeWalker(mdPreview, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walker.nextNode()); text += n.nodeValue) nodes.push([n, text.length]);
+  let i = 0;
+  const at = (pos) => {
+    while (i < nodes.length - 1 && nodes[i + 1][1] <= pos) i++;
+    return [nodes[i][0], pos - nodes[i][1]];
+  };
+  return findAll(text, query).map((m) => {
+    const r = new Range();
+    r.setStart(...at(m.start));
+    r.setEnd(...at(m.end));
+    return r;
+  });
+}
+
+function paintPreviewFind() {
+  const hl = window.CSS?.highlights;
+  if (!hl) return;
+  const current = findMatches[findMatchIdx];
+  if (!inPreviewFind() || !current) {
+    hl.delete("find");
+    hl.delete("find-current");
+    return;
+  }
+  hl.set("find", new Highlight(...findMatches.filter((r) => r !== current)));
+  hl.set("find-current", new Highlight(current));
+}
+
 function selectFindMatch(focusEditor) {
   if (findMatchIdx < 0 || findMatchIdx >= findMatches.length) return;
   const m = findMatches[findMatchIdx];
+  if (inPreviewFind()) {
+    paintPreviewFind();
+    const r = m.getBoundingClientRect();
+    const box = mdPreview.getBoundingClientRect();
+    if (r.top < box.top || r.bottom > box.bottom)
+      mdPreview.scrollTop += r.top - box.top - box.height / 2;
+    setFindCount(findMatchIdx + 1 + " of " + findMatches.length);
+    return;
+  }
   editor.setSelectionRange(m.start, m.end);
   // Scroll the match into view by temporarily focusing the editor
   // (focus triggers native caret-scroll), then return focus to find input.
@@ -4901,7 +4964,7 @@ function findNext() {
     return;
   }
   // After edits findMatchIdx points at the first match after the cursor
-  if (isFindMatchSelected())
+  if (inPreviewFind() || isFindMatchSelected())
     findMatchIdx = (findMatchIdx + 1) % findMatches.length;
   selectFindMatch(true);
 }

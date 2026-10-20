@@ -375,3 +375,37 @@ test("find marks the current match while typing, even a single one", async ({ pa
   await expect(page.locator("#occurrenceOverlay .occurrence-highlight")).toHaveCount(2);
   await expect(page.locator("#occurrenceOverlay .current")).toHaveCount(1);
 });
+
+test("find in the preview stays in the preview and steps through its text", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    createNote("p.md", "# Top\n\n- [ ] add **top** separator\n\nsome top text");
+    switchMdTab("view");
+  });
+  await page.keyboard.press("ControlOrMeta+f");
+  await page.locator("#findInput").pressSequentially("top");
+  const hl = () => page.evaluate(() => [CSS.highlights.get("find")?.size, CSS.highlights.get("find-current")?.size, mdViewActive]);
+  expect(await hl()).toEqual([2, 1, true]);
+  await expect(page.locator("#findReplaceCount")).toHaveText("1 of 3");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#findReplaceCount")).toHaveText("2 of 3");
+  await page.keyboard.press("Escape");
+  expect(await hl()).toEqual([undefined, undefined, true]);
+});
+
+test("emphasis: * works inside words, _ and lone stars don't", async ({ page }) => {
+  await openApp(page);
+  const html = await page.evaluate(() =>
+    ["**to**p", "a *b*c", "***x***", "snake_case_name", "a * b * c", "**bold** and *it*"].map((s) =>
+      renderMarkdown(s).replace(/<\/?p>|\n/g, ""),
+    ),
+  );
+  expect(html).toEqual([
+    "<strong>to</strong>p",
+    "a <em>b</em>c",
+    "<strong><em>x</em></strong>",
+    "snake_case_name",
+    "a * b * c",
+    "<strong>bold</strong> and <em>it</em>",
+  ]);
+});

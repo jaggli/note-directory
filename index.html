@@ -984,6 +984,15 @@
         border-radius: 2px;
       }
 
+      ::highlight(find) {
+        background-color: color-mix(in srgb, var(--blue) 15%, transparent);
+      }
+
+      ::highlight(find-current) {
+        background-color: var(--blue);
+        color: var(--bg);
+      }
+
       .occurrence-highlight.current {
         background: color-mix(in srgb, var(--blue) 40%, transparent);
         box-shadow: 0 0 0 1px var(--blue);
