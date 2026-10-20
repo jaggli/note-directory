@@ -244,3 +244,25 @@ test("zen header and buttons fade together and wake on pointer move", async ({
   await page.mouse.move(420, 420);
   expect(await faded()).toEqual([false, false]);
 });
+
+test("a zen link to one of your own notes offers no save", async ({ page }) => {
+  await openApp(page);
+  const url = await page.evaluate(async () => {
+    await createNote("mine.md", "# Mine\n");
+    return (
+      location.origin +
+      location.pathname +
+      "?view=zen#name=mine.md&note=" +
+      (await compress("# Mine\n"))
+    );
+  });
+  await page.goto(url);
+  await expect(page.locator("#mdPreview h1")).toHaveText("Mine");
+  await expect(page.locator("#zenActions")).toBeVisible();
+  await expect(page.locator("#zenSave")).toBeHidden();
+  // A different note under the same name is still offered
+  await page.goto(url.replace(/note=.*/, "note=") + (await page.evaluate(() => compress("# Theirs\n"))));
+  await page.reload();
+  await expect(page.locator("#mdPreview h1")).toHaveText("Theirs");
+  await expect(page.locator("#zenSave")).toBeVisible();
+});

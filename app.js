@@ -8278,16 +8278,28 @@ async function loadFromUrl() {
   try {
     const content = plain ? plain.text : await decompress(noteData);
 
-    // Zen mode from URL: don't persist, store ephemerally
+    const urlTs = Number(hashMap.get("ts")) || 0;
+    const existing = state.notes.find((n) => n.name === name);
+
+    // Zen mode from URL: don't persist, store ephemerally — unless it is
+    // one of your notes (same content, or the URL is an older snapshot)
     if (viewParam === "zen") {
+      if (
+        existing &&
+        (existing.content === content ||
+          (urlTs && existing.updatedAt >= urlTs))
+      ) {
+        sharedNote = null;
+        state.activeId = existing.id;
+        saveState();
+        return true;
+      }
       zenFromUrl = true;
       zenEphemeralNote = { name, content };
       if (fromOldFormat) await updateUrl();
       return true;
     }
 
-    const urlTs = Number(hashMap.get("ts")) || 0;
-    const existing = state.notes.find((n) => n.name === name);
     if (existing) {
       if (existing.content === content) {
         sharedNote = null;
