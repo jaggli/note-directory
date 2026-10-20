@@ -2438,8 +2438,39 @@ function hydrateDrawEmbeds() {
     .catch(() => {});
 }
 
+// Query params whose only job is to follow the click
+const TRACKING_PARAM =
+  /^(utm_.*|fbclid|gclid|gclsrc|dclid|gbraid|wbraid|msclkid|yclid|twclid|ttclid|igshid|li_fat_id|mc_cid|mc_eid|_hsenc|_hsmi|mkt_tok|oly_anr_id|oly_enc_id|rb_clickid|s_cid|vero_id|srsltid)$/i;
+
+function stripTracking(href) {
+  try {
+    const url = new URL(href);
+    const keys = [...url.searchParams.keys()].filter((k) =>
+      TRACKING_PARAM.test(k),
+    );
+    if (!keys.length) return href;
+    keys.forEach((k) => url.searchParams.delete(k));
+    return url.href;
+  } catch {
+    return href;
+  }
+}
+
+// External links leave in a new tab, sending no referrer and no trackers
+function externalizeLinks(root) {
+  root.querySelectorAll("a[href]").forEach((a) => {
+    const href = a.getAttribute("href");
+    if (!/^https?:\/\//i.test(href)) return;
+    a.setAttribute("href", stripTracking(href));
+    a.target = "_blank";
+    a.rel = "noopener noreferrer nofollow";
+    a.referrerPolicy = "no-referrer";
+  });
+}
+
 function setPreviewHtml(html) {
   mdPreview.innerHTML = html;
+  externalizeLinks(mdPreview);
   hydrateDrawEmbeds();
 }
 
@@ -7959,17 +7990,29 @@ function toggleView() {
   switchMdTab(mdViewActive ? "edit" : "view", true);
 }
 
-// Zen's top line fades while you read and comes back when the pointer moves
+// Zen's top line and buttons fade while you read and come back when the
+// pointer moves. Faded chrome takes no clicks, so a tap only wakes it
 let zenFadeTimer = null;
 function wakeZenBar() {
-  const bar = document.getElementById("zenBar");
-  bar.classList.remove("faded");
+  const chrome = [
+    document.getElementById("zenBar"),
+    document.getElementById("zenActions"),
+  ];
+  chrome.forEach((el) => el.classList.remove("faded"));
   clearTimeout(zenFadeTimer);
   zenFadeTimer = setTimeout(() => {
-    if (zenModeActive && !bar.matches(":hover")) bar.classList.add("faded");
+    if (!zenModeActive) return;
+    if (chrome.some((el) => el.matches(":hover, :has(:focus-visible)"))) return;
+    chrome.forEach((el) => el.classList.add("faded"));
   }, 2000);
 }
 document.addEventListener("pointermove", () => {
+  if (zenModeActive) wakeZenBar();
+});
+document.addEventListener("pointerdown", () => {
+  if (zenModeActive) wakeZenBar();
+});
+document.addEventListener("focusin", () => {
   if (zenModeActive) wakeZenBar();
 });
 

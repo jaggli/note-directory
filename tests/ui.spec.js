@@ -218,3 +218,29 @@ test("tab at the start of a list item changes its nesting level", async ({
   await page.keyboard.press("Tab");
   expect((await state())[0]).toBe("- a  \n- \n- [ ] b\nplain");
 });
+
+test("zen header and buttons fade together and wake on pointer move", async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.evaluate(async () => {
+    await createNote("calm.md", "# Calm\n\nJust reading.\n");
+    switchMdTab("zen");
+  });
+  await page.mouse.move(400, 400);
+  const faded = () =>
+    page.evaluate(() =>
+      ["zenBar", "zenActions"].map((id) =>
+        document.getElementById(id).classList.contains("faded"),
+      ),
+    );
+  expect(await faded()).toEqual([false, false]);
+  await page.waitForTimeout(2300);
+  expect(await faded()).toEqual([true, true]);
+  // Faded buttons can't be hit blind
+  expect(
+    await page.$eval("#zenActions", (el) => getComputedStyle(el).pointerEvents),
+  ).toBe("none");
+  await page.mouse.move(420, 420);
+  expect(await faded()).toEqual([false, false]);
+});

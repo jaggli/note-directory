@@ -399,6 +399,11 @@
         margin-top: 44px;
       }
 
+      /* Zen shows the drawing, not the drafting aid */
+      .zen-mode .draw-grid {
+        display: none;
+      }
+
       .draw-embed {
         display: block;
         margin: 1em 0;
@@ -2815,8 +2820,10 @@
         transition: opacity 0.3s;
       }
 
-      .zen-bar.faded {
+      .zen-bar.faded,
+      .zen-actions.faded {
         opacity: 0;
+        pointer-events: none;
       }
 
       .zen-bar-logo {
@@ -2846,6 +2853,7 @@
         border-radius: calc(var(--n-r-md) + 4px);
         background: var(--n-raised);
         box-shadow: var(--n-shadow-1);
+        transition: opacity 0.3s;
       }
 
       /* Drop to import */

@@ -87,3 +87,32 @@ test("the app stays hidden when framed by another page", async ({ page }) => {
     await frame.evaluate(() => getComputedStyle(document.documentElement).visibility),
   ).toBe("hidden");
 });
+
+test("external links in preview and zen open in a new tab without referrer or trackers", async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.evaluate(async () => {
+    await createNote(
+      "links.md",
+      "[ext](https://example.com/x?utm_source=a&id=1&fbclid=z)\nhttps://example.com/y?gclid=q\n[local](other-note.md) [top](#links)\n",
+    );
+  });
+  for (const tab of ["view", "zen"]) {
+    await page.evaluate((t) => switchMdTab(t), tab);
+    const links = await page.$$eval("#mdPreview a:not(.heading-anchor)", (as) =>
+      as.map((a) => [
+        a.getAttribute("href"),
+        a.target,
+        a.rel,
+        a.referrerPolicy,
+      ]),
+    );
+    expect(links).toEqual([
+      ["https://example.com/x?id=1", "_blank", "noopener noreferrer nofollow", "no-referrer"],
+      ["https://example.com/y", "_blank", "noopener noreferrer nofollow", "no-referrer"],
+      ["other-note.md", "", "noopener noreferrer", ""],
+      ["#links", "", "noopener noreferrer", ""],
+    ]);
+  }
+});

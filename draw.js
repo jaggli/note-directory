@@ -1170,7 +1170,7 @@
     const defs = el("defs", {}, svg);
     E.pattern = el("pattern", { id: "drawGridPattern", patternUnits: "userSpaceOnUse", width: GRID, height: GRID }, defs);
     E.patternDot = el("circle", { cx: 1, cy: 1, r: 1, style: "fill: var(--surface1)" }, E.pattern);
-    E.gridRect = el("rect", { width: "100%", height: "100%", fill: "url(#drawGridPattern)" }, svg);
+    E.gridRect = el("rect", { class: "draw-grid", width: "100%", height: "100%", fill: "url(#drawGridPattern)" }, svg);
     E.world = el("g", {}, svg);
     E.shapesG = el("g", {}, E.world);
     E.overlay = el("g", {}, svg);

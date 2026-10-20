@@ -695,3 +695,18 @@ test("a shared link replacing a drawing shows the new shapes", async ({ page }) 
   expect(box.x).toBeGreaterThan(host.x);
   expect(box.x + box.width).toBeLessThan(host.x + host.width);
 });
+
+test("zen hides the grid and leaving zen brings it back", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(async () => {
+    await createNote("grid.draw", "draw 1\ngrid on\nr 0 0 40 40\n");
+    switchMdTab("view");
+  });
+  const gridShown = () =>
+    page.$eval(".draw-host .draw-grid", (el) => getComputedStyle(el).display !== "none");
+  await expect.poll(gridShown).toBe(true);
+  await page.evaluate(() => switchMdTab("zen"));
+  await expect.poll(gridShown).toBe(false);
+  await page.evaluate(() => switchMdTab("view"));
+  await expect.poll(gridShown).toBe(true);
+});
