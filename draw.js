@@ -2915,7 +2915,8 @@
     const at = (deg, r) => rotPt(...wedgePt(s, deg, r), c[0], c[1], s.rot || 0);
     const ir = (s.ir || 0) / 100;
     const edge = ir ? (1 + ir) / 2 : 0.75;
-    handle("wedge", at((s.a0 + s.a1) / 2, Math.max(ir, 0.2)), { part: "ir" }, true);
+    // On the hole's edge, at the tip while there's no hole
+    handle("wedge", at((s.a0 + s.a1) / 2, ir), { part: "ir" }, true);
     handle("wedge", at(s.a0, edge), { part: "a0" }, true);
     handle("wedge", at(s.a1, edge), { part: "a1" }, true);
   }
@@ -2932,7 +2933,7 @@
       const mid = (((s.a0 + s.a1) / 2) * Math.PI) / 180;
       let ir = Math.round(Math.min(0.95, Math.max(0, nx * Math.sin(mid) - ny * Math.cos(mid))) * 100);
       if (e.shiftKey) ir = Math.round(ir / 10) * 10;
-      replaceShape({ ...s, ir: ir < 5 ? undefined : ir });
+      replaceShape({ ...s, ir: ir < 2 ? undefined : ir });
     } else {
       const raw = (Math.atan2(nx, -ny) * 180) / Math.PI;
       const deg = e.shiftKey ? Math.round(raw / 15) * 15 : Math.round(raw);

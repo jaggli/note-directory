@@ -929,6 +929,15 @@ test("wedge tool, and handles for its edges and hole", async ({ page }) => {
   await page.mouse.move(...(await at(page, 35, 0)), { steps: 5 });
   await page.mouse.up();
   expect((await shapes(page))[0].ir).toBe(50);
+  // The handle sits on the hole's edge and follows it all the way back to the tip
+  const [, hx, hy] = (await handles()).find((h) => h[0] === "ir");
+  const edge = await at(page, 35, 0);
+  expect(Math.hypot(hx - edge[0], hy - edge[1])).toBeLessThan(2);
+  await page.mouse.move(hx, hy);
+  await page.mouse.down();
+  await page.mouse.move(...(await at(page, 0, 0)), { steps: 5 });
+  await page.mouse.up();
+  expect((await shapes(page))[0].ir).toBeUndefined();
 });
 
 test("touch: taps place points, the first point closes, a double-tap finishes", async ({ page }) => {
