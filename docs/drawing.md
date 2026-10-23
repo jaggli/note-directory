@@ -85,7 +85,10 @@ stays the same and is only moved; resizing it returns to an upright box.
 | Input                         | Result                                   |
 | ----------------------------- | ---------------------------------------- |
 | Drag with a tool              | Create; box/line/arrow/text return to select |
-| Click with box tool           | Default-size shape                       |
+| Click with box tool           | Default-size shape (a wedge: a ¾ pie)    |
+| Click with line tool          | Path: each click adds a point; click the first point to close (takes the fill), Enter / Esc / double-click finishes, Backspace removes the last point |
+| Double-click a line / a point | Add a point there / remove the point     |
+| Drag a wedge's round handles  | Edges: start / end angle (shift: 15°); middle: the hole |
 | Double-click shape / empty    | Edit label / new text                    |
 | Double-click grouped shape    | Select just that member                  |
 | Drag empty space              | Marquee select (shift adds)              |
@@ -96,7 +99,7 @@ stays the same and is only moved; resizing it returns to an upright box.
 | Right-click                   | Menu: stacking, duplicate, group, delete; selects the shape under the pointer first |
 
 Keys only act while the canvas has focus (it takes focus on mount and
-after toolbar clicks): tools `v h d D e r o m l a t`, `Delete`, `Enter`
+after toolbar clicks): tools `v h d D e r o m w l a t`, `Delete`, `Enter`
 (edit label), arrows (nudge; shift ×10, grid steps when the grid is on),
 `Alt+↑/↓` or `[ ]` one step forward/backward (shift: to front/back),
 ctrl+a/d/g, ctrl+b/i/u (text style, also while typing), ctrl+shift+g, ctrl+'
@@ -126,6 +129,22 @@ blocks into `<span class="draw-embed">` placeholders (the inline source in
 `setPreviewHtml()` → `hydrateDrawEmbeds()` loads `draw.js` and fills them
 with `Draw.renderStatic()` SVGs built with DOM APIs — labels are text nodes,
 never HTML. Referenced embeds are clickable and open the drawing.
+
+## Style Panel
+
+Every attribute of the format has a control, shown only where it does
+something (`panelAttrs()`):
+
+- **Fill** for boxes, wedges and lines of three or more points (and the line
+  tool, for the shapes it closes). **Line → None** only for fillable shapes,
+  and never together with no fill, so a shape can't turn invisible.
+- **Corners** (round / square) for rectangles; **Opacity** for everything.
+- **Text, Font, Style** once a shape has a label (always for text). Free text
+  aligns left / centre / right only, and keeps its place when realigned.
+- Wedge angles and hole are edited with handles on the shape, path points by
+  dragging and double-clicking. A hint at the top of the canvas explains
+  these gestures while they apply (line tool, a path being built, a selected
+  line or wedge).
 
 ## Search, Export, Import
 

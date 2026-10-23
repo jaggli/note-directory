@@ -121,16 +121,19 @@ behind them and **zen** shows them read-only.
 
 - Tools: select, hand, pen (pressure-sensitive with a
   stylus), highlighter, eraser, rectangle, ellipse,
-  diamond, line, arrow, text
+  diamond, wedge (pie / donut slices with handles for
+  the edges and the hole), line (drag, or click points
+  for a polyline or a closed, fillable shape), arrow, text
 - Move, resize and rotate (shift: keep proportions, 15°
   steps); marquee and shift-click selection
 - Arrows attach to shapes and follow them; drag the middle
   handle to curve them; labels on arrows
 - Text inside shapes (double-click), free text anywhere
-- 12 colours, 4 sizes, fill (none / light / solid), solid /
-  dashed / dotted lines, label alignment in boxes (left /
-  center / right, top / middle / bottom), arrowheads per
-  end (open, triangle, dot, diamond, bar), bold / italic /
+- 12 colours, 5 sizes, fill (none / light / solid), solid /
+  dashed / dotted / no outline, opacity, round or square
+  corners, label alignment (left / center / right, top /
+  middle / bottom), arrowheads per end (open, triangle,
+  dot, diamond, bar), mono / sans / serif, bold / italic /
   underline for any text
 - Group / ungroup, duplicate, copy & paste (as drawing
   text), bring forward / backward / to front / to back
@@ -149,8 +152,9 @@ behind them and **zen** shows them read-only.
 | --------------------- | ----------------------------------- |
 | v h d e               | select, hand, draw, eraser          |
 | Shift+D               | highlighter                         |
-| r o m l a t           | rectangle, ellipse, diamond, line, arrow, text |
+| r o m w l a t         | rectangle, ellipse, diamond, wedge, line, arrow, text |
 | Enter / double-click  | write in the selected shape         |
+| Double-click a line   | add a point (on a point: remove it) |
 | Delete                | delete selection                    |
 | Ctrl+D / Ctrl+G       | duplicate / group (Shift: ungroup)  |
 | Alt+↓ / Alt+↑ or [ / ] | backward / forward (Shift: to back / front) |

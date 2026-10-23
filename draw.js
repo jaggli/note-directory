@@ -661,7 +661,8 @@
     return inside;
   }
 
-  const isFilled = (s) => !!s.f && s.f !== "none";
+  // A line fills once it has an area: three points or more
+  const isFilled = (s) => !!s.f && s.f !== "none" && (s.k !== "l" || s.pts.length > 2);
 
   // 0: miss, 1: hit, 2: inside a hollow shape (picked only if nothing else is)
   function hitShape(s, p, tol, model) {
@@ -815,6 +816,7 @@
 
   function dashArray(s) {
     const w = strokeW(s);
+    if (s.d === "none") return null;
     if (s.d === "dash") return `${f1(w * 3)} ${f1(w * 2.5)}`;
     if (s.d === "dot") return `0 ${f1(w * 2.5)}`;
     return null;
@@ -900,11 +902,11 @@
     };
     // Opacity fades the shape; its label stays readable on top
     const body = s.o ? el("g", { opacity: s.o / 100 }, g) : g;
-    // Filled shapes: a solid fill gets an outline a shade darker; d=none: no outline at all
-    if (s.d === "none") stroke.stroke = "none";
+    // Filled shapes: a solid fill gets an outline a shade darker; d=none drops it (never on an unfilled shape)
+    const noOutline = s.d === "none" && isFilled(s);
     const fill = {
       ...stroke,
-      stroke: s.d === "none" ? "none" : s.f === "solid" ? darker(color) : color,
+      stroke: noOutline ? "none" : s.f === "solid" ? darker(color) : color,
       fill: isFilled(s) ? color : "none",
       "fill-opacity": s.f === "semi" ? 0.2 : null,
     };
@@ -929,7 +931,9 @@
       const t = textSize(s);
       const f = frame(s);
       if (s.rot) g.setAttribute("transform", `rotate(${s.rot} ${f1(f.x + t.w / 2)} ${f1(f.y + t.h / 2)})`);
-      textLines(body, t.lines, t.size, f1(f.x), f.y, "start", readable(color), s);
+      // Lines line up on the side the text is anchored to
+      const ta = s.ta || "left";
+      textLines(body, t.lines, t.size, f1(f.x + f.w * ALIGN[ta]), f.y, ta === "left" ? "start" : ta === "right" ? "end" : "middle", readable(color), s);
     } else if (s.k === "l") {
       el("path", { ...(isFilled(s) ? fill : stroke), d: "M" + s.pts.map(P).join("L") + (isFilled(s) ? "Z" : "") }, body);
     } else if (s.k === "a") {
@@ -1095,6 +1099,7 @@
     rect: '<rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/>',
     ellipse: '<ellipse cx="8" cy="8" rx="5.5" ry="4.5"/>',
     diamond: '<path d="M8 2l6 6-6 6-6-6z"/>',
+    wedge: '<path d="M8 8V2.5A5.5 5.5 0 1 1 2.5 8z"/>',
     line: '<path d="M3 13L13 3"/>',
     arrow: '<path d="M3 13L13 3M7 3h6v6"/>',
     text: '<path d="M3.5 4.5V3h9v1.5M8 3v10M6 13h4"/>',
@@ -1130,6 +1135,7 @@
     ["rect", "Rectangle", "R"],
     ["ellipse", "Ellipse", "O"],
     ["diamond", "Diamond", "M"],
+    ["wedge", "Wedge", "W"],
     ["line", "Line", "L"],
     ["arrow", "Arrow", "A"],
     ["text", "Text", "T"],
@@ -1137,8 +1143,8 @@
   const TOOL_LABEL = Object.fromEntries(TOOLS.filter(Boolean).map(([id, label]) => [id, label]));
   const KIND_LABEL = { r: "Rectangle", e: "Ellipse", m: "Diamond", w: "Wedge", l: "Line", a: "Arrow", t: "Text", p: "Drawing", h: "Highlight" };
   const PINNED_TOOLS = new Set(["select", "hand"]);
-  const TOOL_KEYS = { v: "select", h: "hand", d: "pen", D: "highlight", e: "eraser", r: "rect", o: "ellipse", m: "diamond", l: "line", a: "arrow", t: "text" };
-  const TOOL_KIND = { rect: "r", ellipse: "e", diamond: "m", line: "l", arrow: "a", text: "t", pen: "p", highlight: "h" };
+  const TOOL_KEYS = { v: "select", h: "hand", d: "pen", D: "highlight", e: "eraser", r: "rect", o: "ellipse", m: "diamond", w: "wedge", l: "line", a: "arrow", t: "text" };
+  const TOOL_KIND = { rect: "r", ellipse: "e", diamond: "m", wedge: "w", line: "l", arrow: "a", text: "t", pen: "p", highlight: "h" };
   const STYLE_KEY = "notepad_draw_style";
   // Right-click menu: [action, label, shortcut]; null is a separator. The first four are the Arrange menu.
   const MENU = [
@@ -1188,6 +1194,9 @@
 .draw-seg+.draw-seg{margin-top:6px}
 .draw-ui .draw-seg button{flex:1;min-width:0;height:22px;border-radius:var(--n-r-sm);font:var(--n-body-strong)}
 .draw-ui .draw-seg button:hover{background:none}
+.draw-ui .draw-seg button:disabled{opacity:.35;cursor:default}
+.draw-status{position:absolute;top:14px;left:50%;transform:translateX(-50%);max-width:calc(100% - 28px);padding:5px 10px;border-radius:var(--n-r-lg);background:var(--n-raised);color:var(--n-text-2);box-shadow:0 0 0 1px var(--n-line);font:var(--n-caption);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;display:none}
+.draw-status.visible{display:block}
 .draw-ui .draw-seg button.active{background:var(--n-raised);color:var(--n-text);box-shadow:0 0 0 1px var(--n-line-strong),0 1px 2px rgb(0 0 0/15%)}
 .draw-seg svg{width:24px;height:12px}
 .draw-actions{display:flex;align-items:center;gap:2px;padding-top:10px;border-top:1px solid var(--n-line)}
@@ -1275,15 +1284,20 @@
     cache: new Map(),
     index: new Map(),
     fontEpoch: 0,
+    // Line tool placing points by clicks: { id } of the line being built
+    path: null,
     touch: false,
   };
 
   function loadStyle() {
-    const style = { c: "text", s: "m", f: "none", d: "solid", hs: "none", he: "open", ta: "center", va: "middle", st: "", fo: "mono" };
+    const style = { c: "text", s: "m", f: "none", d: "solid", hs: "none", he: "open", ta: "center", va: "middle", st: "", fo: "mono", o: 100, rx: "round" };
     try {
       const saved = JSON.parse(localStorage.getItem(STYLE_KEY) || "{}");
       for (const k in style) if (ENUMS[k]?.includes(saved[k])) style[k] = saved[k];
       if (/^[biu]{0,3}$/.test(saved.st)) style.st = textStyle(saved.st);
+      if (Number.isInteger(saved.o) && saved.o >= 1 && saved.o <= 100) style.o = saved.o;
+      if (saved.rx === "square") style.rx = "square";
+      if (style.f === "none" && style.d === "none") style.d = "solid";
     } catch {}
     return style;
   }
@@ -1292,6 +1306,12 @@
     try {
       localStorage.setItem(STYLE_KEY, JSON.stringify(E.style));
     } catch {}
+  }
+
+  // Style panel icons (28×14): a line style
+  function dashIcon(d) {
+    const a = { solid: "", dash: 'stroke-dasharray="4.5 3.5"', dot: 'stroke-dasharray="0 4" stroke-width="2.2"' }[d];
+    return `<path d="M3 7H25" stroke="currentColor" stroke-width="1.5" stroke-linecap="${d === "dash" ? "butt" : "round"}" ${a}/>`;
   }
 
   // Style panel icons (28×14): an arrow end, text alignment
@@ -1359,6 +1379,7 @@
     E.badge.dataset.draw = "source";
     E.badge.innerHTML = icon("alert");
     E.badgeText = h("span", "", E.badge);
+    E.status = h("div", "draw-status", ui);
 
     // Hover label and shortcut come from the app's tooltip
     const tip = (b, label, key) => {
@@ -1433,7 +1454,14 @@
     E.segs = {
       s: seg(row("Stroke", ["s"]), "s", [["xs", "XS", "Extra small"], ["s", "S", "Small"], ["m", "M", "Medium"], ["l", "L", "Large"], ["xl", "XL", "Extra large"]]),
       f: seg(row("Fill", ["f"]), "f", words(ENUMS.f, ["None", "Semi", "Solid"])),
-      d: seg(row("Line", ["d"]), "d", words(["solid", "dash", "dot"], ["Solid", "Dashed", "Dotted"])),
+      d: seg(row("Line", ["d"]), "d", [
+        ["solid", dashIcon("solid"), "Solid"],
+        ["dash", dashIcon("dash"), "Dashed"],
+        ["dot", dashIcon("dot"), "Dotted"],
+        ["none", "None", "No outline"],
+      ]),
+      rx: seg(row("Corners", ["rx"]), "rx", [["round", "Round"], ["square", "Square"]]),
+      o: seg(row("Opacity", ["o"]), "o", [20, 40, 60, 80, 100].map((v) => [v, String(v), v + " %"])),
       hs: seg(row("Start", ["hs"]), "hs", HEADS.map((k) => [k, headIcon(k, true), HEAD_NAMES[k]])),
       he: seg(row("End", ["he"]), "he", HEADS.map((k) => [k, headIcon(k, false), HEAD_NAMES[k]])),
       ta: seg((textRow = row("Text", ["ta", "va"])), "ta", words(ENUMS.ta, ["Left", "Centre", "Right"])),
@@ -1570,6 +1598,7 @@
     closeMenu();
     finishTextEdit();
     if (E.op) cancelOp();
+    finishPath();
     E.views.set(E.key, { ...E.cam });
     E.pointers.clear();
     E.mounted = false;
@@ -1593,6 +1622,7 @@
       E.pending = content;
       return;
     }
+    E.path = null;
     load(content);
     // Replaced content (another tab, a shared link) may lie outside the old view
     if (lost()) fit(true);
@@ -1833,7 +1863,16 @@
       const t = E.model.byId.get(E.bindTarget);
       if (t) outlineOf(t, { "stroke-width": 2 });
     }
-    if (E.readonly || (op && !["move", "resize", "rotate", "marquee", "point", "bend"].includes(op.type))) return;
+    if (E.path) {
+      // Where clicking closes the shape
+      const s = E.model.byId.get(E.path.id);
+      if (s && s.pts.length > 3) {
+        const [x, y] = toScreen(s.pts[0]);
+        el("circle", { cx: f1(x), cy: f1(y), r: E.touch ? 8 : 6, fill: BG, stroke: ACCENT, "stroke-width": 2 }, E.overlay);
+      }
+      return;
+    }
+    if (E.readonly || (op && !["move", "resize", "rotate", "marquee", "point", "bend", "wedge"].includes(op.type))) return;
     const sel = selected();
     if (!sel.length) return;
     const f = selFrame(sel);
@@ -1842,7 +1881,9 @@
     if (one && (one.k === "l" || one.k === "a")) {
       if (one.k === "l") {
         polygon(one.pts, { "stroke-width": 1, "stroke-opacity": 0 });
-        one.pts.forEach((p, i) => handle("point", p, { idx: i }, true));
+        // A closed shape's last point is its first
+        const n = closedPath(one) ? one.pts.length - 1 : one.pts.length;
+        one.pts.slice(0, n).forEach((p, i) => handle("point", p, { idx: i }, true));
       } else {
         const g = arrowGeom(one, E.model);
         handle("point", g.p0, { idx: 0 }, true);
@@ -1852,6 +1893,7 @@
       if (!turnable(one)) return;
     }
     polygon(corners(f), { "stroke-width": 1, "stroke-opacity": one && !frame(one) ? 0.5 : 1 });
+    if (one?.k === "w") wedgeHandles(one);
     if (op && op.type !== "resize" && op.type !== "rotate") return;
     const cx = f.x + f.w / 2;
     const cy = f.y + f.h / 2;
@@ -1869,17 +1911,45 @@
     handle("rotate", rh, {}, true);
   }
 
-  // A text's alignment moves it around its anchor: that's left to the source
-  const panelAttrs = (k) => (k === "t" ? ATTRS.t.filter((a) => a !== "ta" && a !== "va") : ATTRS[k]);
+  // What the panel offers for a shape, or for the tool's next one: label settings once there is
+  // a label, free text only aligns horizontally (vertically it would only move its anchor), and
+  // a two-point line has nothing to fill
+  const LABEL_KEYS = ["ta", "va", "fo", "st"];
+  function panelAttrs(s) {
+    let a = ATTRS[s.k];
+    if (s.k === "t") a = a.filter((k) => k !== "va");
+    else if (!s.label) a = a.filter((k) => !LABEL_KEYS.includes(k));
+    if (s.k === "l" && s.pts && s.pts.length < 3) a = a.filter((k) => k !== "f");
+    return a;
+  }
+
+  // A shape's value as the panel shows it
+  function styleValue(s, key) {
+    if (key === "o") return s.o ?? 100;
+    if (key === "rx") return s.rx === undefined ? "round" : s.rx === 0 ? "square" : null;
+    return s[key] ?? defaultOf(s, key);
+  }
+
+  // The change a panel value makes to a shape
+  function stylePatch(s, key, v) {
+    if (key === "o") return { o: v === 100 ? undefined : v };
+    if (key === "rx") return { rx: v === "square" ? 0 : undefined };
+    // Free text keeps its place: the anchor moves to the new side of the same box
+    if (key === "ta" && s.k === "t") {
+      const f = frame(s);
+      return { ta: v, x: R(f.x + f.w * ALIGN[v]) };
+    }
+    return { [key]: v };
+  }
 
   // Values shared by the selection (or the tool), per style key
   function styleState() {
     const sel = selected();
-    const kinds = sel.length ? sel.map((s) => s.k) : TOOL_KIND[E.tool] ? [TOOL_KIND[E.tool]] : [];
+    const items = sel.length ? sel : TOOL_KIND[E.tool] ? [{ k: TOOL_KIND[E.tool] }] : [];
     const out = {};
-    for (const key of ["c", "s", "f", "d", "ta", "va", "fo", "st", "hs", "he"]) {
-      const relevant = kinds.some((k) => panelAttrs(k).includes(key));
-      if (!relevant) continue;
+    for (const key of ["c", "s", "f", "d", "rx", "o", "ta", "va", "fo", "st", "hs", "he"]) {
+      const has = items.filter((s) => panelAttrs(s).includes(key));
+      if (!has.length) continue;
       if (!sel.length) {
         out[key] = E.style[key];
         continue;
@@ -1889,17 +1959,19 @@
         out.st = ["b", "i", "u"].filter((f) => texts.every((s) => (s.st || "").includes(f))).join("");
         continue;
       }
-      const vals = new Set(sel.filter((s) => panelAttrs(s.k).includes(key)).map((s) => s[key] ?? DEFAULTS[key]));
+      const vals = new Set(has.map((s) => styleValue(s, key)));
       out[key] = vals.size === 1 ? [...vals][0] : null;
     }
-    return { out, sel, kinds };
+    // No outline only where everything selected can be filled
+    const fillable = items.length > 0 && items.every((s) => panelAttrs(s).includes("f"));
+    return { out, sel, fillable };
   }
 
   function renderUI() {
     if (!E.mounted) return;
     for (const [id, b] of Object.entries(E.toolBtns)) b.classList.toggle("active", id === E.tool);
     for (const b of E.toolGrid.children) b.classList.toggle("active", b.dataset.draw === "tool:" + E.tool);
-    const { out, sel } = styleState();
+    const { out, sel, fillable } = styleState();
     const wanted = !E.readonly && Object.keys(out).length > 0;
     const show = wanted && !E.styleClosed;
     E.styleEl.classList.toggle("visible", show);
@@ -1918,12 +1990,20 @@
             key === "st" ? (out.st || "").includes(b.dataset.draw.slice(-1)) : b.dataset.draw === `style:${key}:${out[key]}`,
           );
       }
+      // No outline: only for fillable shapes, and never together with no fill
+      const noLine = E.segs.d.querySelector('[data-draw="style:d:none"]');
+      noLine.style.display = fillable ? "" : "none";
+      noLine.disabled = out.f === "none";
+      E.segs.f.querySelector('[data-draw="style:f:none"]').disabled = out.d === "none";
       E.actionsEl.style.display = sel.length ? "" : "none";
       const grouped = sel.some((s) => s.gr);
       const groupBtn = E.actionsEl.querySelector('[data-draw="act:group"]');
       groupBtn.style.display = sel.length > 1 && !(grouped && new Set(sel.map((s) => s.gr)).size === 1) ? "" : "none";
       E.actionsEl.querySelector('[data-draw="act:ungroup"]').style.display = grouped ? "" : "none";
     }
+    const tip = statusText(sel);
+    E.status.textContent = tip;
+    E.status.classList.toggle("visible", !!tip);
     E.gridBtn.classList.toggle("active", E.model.grid);
     const empty = !E.model.shapes.some((s) => s.k !== "raw");
     E.hint.classList.toggle("visible", empty && !E.readonly && !E.op);
@@ -1935,6 +2015,18 @@
         ? "Read-only · " + errs[errs.length - 1].msg
         : `${errs.length} line${errs.length > 1 ? "s" : ""} can't be drawn · Open source`;
     updateCursor();
+  }
+
+  // How to use what's at hand, for the gestures nothing else shows
+  function statusText(sel) {
+    if (E.readonly || E.editing) return "";
+    const [click, dbl] = E.touch ? ["Tap", "Double-tap"] : ["Click", "Double-click"];
+    if (E.path) return `${click} to add points · ${click.toLowerCase()} the first point to close · ${E.touch ? "double-tap" : "Enter"} to finish`;
+    if (E.tool === "line") return `Drag for a straight line, or ${click.toLowerCase()} to place points`;
+    const one = sel.length === 1 && E.tool === "select" ? sel[0] : null;
+    if (one?.k === "l") return `${dbl} the line to add a point, a point to remove it`;
+    if (one?.k === "w") return "Drag the round handles to resize the slice or open a hole";
+    return "";
   }
 
   function updateCursor() {
@@ -1949,6 +2041,7 @@
 
   function setTool(tool) {
     finishTextEdit();
+    finishPath();
     E.tool = tool;
     if (tool !== "select") {
       E.sel.clear();
@@ -1981,12 +2074,23 @@
 
   function setStyle(key, v) {
     if (key === "st") return toggleTextStyle(v);
+    if (key === "o") v = Number(v);
     E.style[key] = v;
+    // A shape always keeps a fill or an outline
+    if (key === "f" && v === "none" && E.style.d === "none") E.style.d = "solid";
     saveStyle();
     let changed = false;
     for (const s of selected()) {
-      if (!panelAttrs(s.k).includes(key) || (s[key] ?? DEFAULTS[key]) === v) continue;
-      replaceShape({ ...s, [key]: v });
+      if (!panelAttrs(s).includes(key) || styleValue(s, key) === v) continue;
+      const n = { ...s, ...stylePatch(s, key, v) };
+      if (key === "d" && v === "none" && !isFilled(n)) continue;
+      if (key === "f" && !isFilled(n) && n.d === "none") delete n.d;
+      replaceShape(n);
+      changed = true;
+    }
+    const path = E.path && E.model.byId.get(E.path.id);
+    if (path && key !== "f" && panelAttrs(path).includes(key)) {
+      replaceShape({ ...path, ...stylePatch(path, key, key === "d" && v === "none" ? undefined : v) });
       changed = true;
     }
     if (changed) {
@@ -2376,6 +2480,7 @@
       (E.touch && E.sawPen);
     if (pan) return startOp({ type: "pan", start: sp, cam: { ...E.cam } });
     if (e.button !== 0) return;
+    if (E.path) return pathClick(e, sp, w, dbl);
 
     const tool = E.tool;
     if (tool === "select") return downSelect(e, sp, w, dbl);
@@ -2392,7 +2497,7 @@
     if (tool === "pen" || tool === "highlight") {
       const pressure = e.pointerType === "pen";
       const p = pressure ? [...w, pressureOf(e)] : w;
-      const s = { k: TOOL_KIND[tool], id: newId(), pts: [p], c: E.style.c, s: E.style.s };
+      const s = { k: TOOL_KIND[tool], id: newId(), pts: [p], c: E.style.c, s: E.style.s, o: opacity() };
       startOp({ type: "pen", id: s.id, raw: [p], pressure, before: E.model.shapes.slice() });
       addShape(s);
       renderShapes();
@@ -2403,19 +2508,26 @@
       const id = newId();
       const s =
         tool === "line"
-          ? { k: "l", id, pts: [start, start], c: E.style.c, s: E.style.s, d: E.style.d }
-          : { k: "a", id, from: bindAt(w, id) || start, to: start, c: E.style.c, s: E.style.s, d: E.style.d, hs: E.style.hs, he: E.style.he, st: E.style.st || undefined, fo: E.style.fo };
+          ? { k: "l", id, pts: [start, start], c: E.style.c, s: E.style.s, d: lineDash(), o: opacity() }
+          : { k: "a", id, from: bindAt(w, id) || start, to: start, c: E.style.c, s: E.style.s, d: lineDash(), hs: E.style.hs, he: E.style.he, st: E.style.st || undefined, fo: E.style.fo, o: opacity() };
       startOp({ type: "line", id, start: sp, before: E.model.shapes.slice() });
       addShape(s);
       renderShapes();
       return;
     }
     const k = TOOL_KIND[tool];
-    const s = { k, id: newId(), x: R(start[0]), y: R(start[1]), w: 1, h: 1, c: E.style.c, s: E.style.s, f: E.style.f, d: E.style.d, ta: E.style.ta, va: E.style.va, st: E.style.st || undefined, fo: E.style.fo };
+    const s = { k, id: newId(), x: R(start[0]), y: R(start[1]), w: 1, h: 1, c: E.style.c, s: E.style.s, f: E.style.f, d: E.style.d, ta: E.style.ta, va: E.style.va, st: E.style.st || undefined, fo: E.style.fo, o: opacity() };
+    if (k === "r" && E.style.rx === "square") s.rx = 0;
+    // A wedge starts as a pie with a quarter out, so it reads as one
+    if (k === "w") Object.assign(s, { a0: 0, a1: 270 });
     startOp({ type: "box", id: s.id, origin: start, start: sp, before: E.model.shapes.slice() });
     addShape(s);
     renderShapes();
   }
+
+  const opacity = () => (E.style.o === 100 ? undefined : E.style.o);
+  // Lines and arrows have nothing to fill, so they always keep their stroke
+  const lineDash = () => (E.style.d === "none" ? undefined : E.style.d);
 
   function pressureOf(e) {
     return Math.min(9, Math.max(1, Math.round((e.pressure || 0.5) * 9)));
@@ -2423,6 +2535,8 @@
 
   function downSelect(e, sp, w, dbl) {
     const hd = handleAt(sp);
+    const one = selected()[0];
+    if (hd && dbl && hd.kind === "point" && one?.k === "l") return removePoint(one, hd.idx);
     if (hd && !dbl) return startHandle(hd, w);
     const hit = hitTest(w);
     if (dbl) return onDouble(hit, w);
@@ -2455,6 +2569,7 @@
       E.focusGroup = hit.gr;
       return selectIds([hit.id]);
     }
+    if (hit.k === "l") return insertPoint(hit, w);
     if (hit.k === "t" || hit.k === "a" || BOX.has(hit.k)) startTextEdit(hit);
   }
 
@@ -2477,6 +2592,7 @@
     const before = E.model.shapes.slice();
     if (hd.kind === "point") return startOp({ type: "point", id: sel[0].id, idx: hd.idx, before });
     if (hd.kind === "bend") return startOp({ type: "bend", id: sel[0].id, before });
+    if (hd.kind === "wedge") return startOp({ type: "wedge", id: sel[0].id, part: hd.part, before });
     const f = selFrame(sel);
     const c = [f.x + f.w / 2, f.y + f.h / 2];
     const ids = new Set(E.sel);
@@ -2504,6 +2620,7 @@
     const sp = screenPt(e);
     if (E.pointers.has(e.pointerId)) E.pointers.set(e.pointerId, sp);
     const op = E.op;
+    if (!op && E.path) return pathPreview(e, toWorld(...sp));
     if (!op) return hoverCursor(sp);
     if (op.type === "pinch") {
       if (E.pointers.size < 2) return;
@@ -2567,6 +2684,7 @@
     }
     if (op.type === "rotate") return rotateTo(e, w);
     if (op.type === "resize") return resizeTo(e, w);
+    if (op.type === "wedge") return wedgeTo(e, w);
   }
 
   function hoverCursor(sp) {
@@ -2574,7 +2692,7 @@
     const hd = handleAt(sp);
     let c = "default";
     if (hd?.kind === "rotate") c = "grab";
-    else if (hd?.kind === "point" || hd?.kind === "bend") c = "pointer";
+    else if (hd?.kind === "point" || hd?.kind === "bend" || hd?.kind === "wedge") c = "pointer";
     else if (hd) {
       const f = selFrame(selected());
       const a = (((Math.atan2(hd.hy, hd.hx) * 180) / Math.PI + f.rot) % 180 + 180) % 180;
@@ -2671,6 +2789,7 @@
       const pts = s.pts.slice();
       const other = pts[op.idx === 0 ? 1 : op.idx - 1];
       pts[op.idx] = (e.shiftKey && other ? angleSnap(other, w) : snapPt(w)).map(R);
+      if (op.idx === 0 && closedPath(s)) pts[pts.length - 1] = pts[0];
       replaceShape({ ...s, pts });
     } else {
       const key = op.idx === 0 ? "from" : "to";
@@ -2694,6 +2813,137 @@
     const fn = (p) => rotPt(p[0], p[1], op.c[0], op.c[1], delta);
     for (const s of op.orig) replaceShape(mapShape(s, fn, delta));
     keepSelRot({ ...op.f, rot: (((op.f.rot + delta) % 360) + 360) % 360 });
+    renderShapes();
+    renderOverlay();
+  }
+
+  // ── Paths: the line tool placing points one click at a time ──
+
+  const closedPath = (s) => s.pts.length > 3 && s.pts[0][0] === s.pts.at(-1)[0] && s.pts[0][1] === s.pts.at(-1)[1];
+
+  // The last point of a path being built follows the pointer
+  function pathPoint(e, w, placed) {
+    return (e.shiftKey ? angleSnap(placed.at(-1), w) : snapPt(w)).map(R);
+  }
+
+  function pathPreview(e, w) {
+    const s = E.model.byId.get(E.path.id);
+    const placed = s.pts.slice(0, -1);
+    replaceShape({ ...s, pts: [...placed, pathPoint(e, w, placed)] });
+    renderShapes();
+  }
+
+  function pathClick(e, sp, w, dbl) {
+    const s = E.model.byId.get(E.path.id);
+    const placed = s.pts.slice(0, -1);
+    if (dbl) return finishPath();
+    const first = toScreen(placed[0]);
+    if (placed.length > 2 && Math.hypot(first[0] - sp[0], first[1] - sp[1]) <= (E.touch ? 16 : 9)) return finishPath(true);
+    const p = pathPoint(e, w, placed);
+    replaceShape({ ...s, pts: [...placed, p, p] });
+    renderShapes();
+    renderOverlay();
+    renderUI();
+  }
+
+  // Closing it gives the shape the fill picked for the tool
+  function finishPath(close) {
+    const path = E.path;
+    if (!path) return;
+    E.path = null;
+    const s = E.model.byId.get(path.id);
+    if (!s) return;
+    const pts = s.pts.slice(0, -1).filter((p, i, a) => !i || p[0] !== a[i - 1][0] || p[1] !== a[i - 1][1]);
+    if (close) pts.push(pts[0]);
+    if (pts.length < 2) {
+      removeShapes([s.id]);
+      renderAll();
+      return;
+    }
+    const n = { ...s, pts };
+    if (close && E.style.f !== "none") Object.assign(n, { f: E.style.f, d: E.style.d === "none" ? "none" : n.d });
+    replaceShape(n);
+    E.sel = new Set([s.id]);
+    E.tool = "select";
+    renderAll();
+    commit();
+  }
+
+  function popPathPoint() {
+    const s = E.model.byId.get(E.path.id);
+    const placed = s.pts.slice(0, -1);
+    if (placed.length < 2) {
+      E.path = null;
+      removeShapes([s.id]);
+    } else replaceShape({ ...s, pts: [...placed.slice(0, -1), s.pts.at(-1)] });
+    renderAll();
+  }
+
+  // Double-click on a line: a new point where the pointer is, on the nearest segment
+  function insertPoint(s, w) {
+    let best = 1;
+    for (let i = 1, d = Infinity; i < s.pts.length; i++) {
+      const di = segDist(w, s.pts[i - 1], s.pts[i]);
+      if (di < d) [d, best] = [di, i];
+    }
+    const pts = s.pts.slice();
+    pts.splice(best, 0, snapPt(w).map(R));
+    replaceShape({ ...s, pts });
+    selectIds([s.id]);
+    renderShapes();
+    commit();
+  }
+
+  function removePoint(s, idx) {
+    const closed = closedPath(s);
+    // Keep at least a line, or a triangle once closed
+    if (s.pts.length - 1 < (closed ? 4 : 2)) return;
+    const pts = s.pts.slice();
+    pts.splice(idx, 1);
+    if (closed && idx === 0) pts[pts.length - 1] = pts[0];
+    replaceShape({ ...s, pts });
+    renderShapes();
+    renderOverlay();
+    renderUI();
+    commit();
+  }
+
+  // ── Wedges: handles for both edges and the hole ──
+
+  function wedgeHandles(s) {
+    const c = [s.x + s.w / 2, s.y + s.h / 2];
+    const at = (deg, r) => rotPt(...wedgePt(s, deg, r), c[0], c[1], s.rot || 0);
+    const ir = (s.ir || 0) / 100;
+    const edge = ir ? (1 + ir) / 2 : 0.75;
+    handle("wedge", at((s.a0 + s.a1) / 2, Math.max(ir, 0.2)), { part: "ir" }, true);
+    handle("wedge", at(s.a0, edge), { part: "a0" }, true);
+    handle("wedge", at(s.a1, edge), { part: "a1" }, true);
+  }
+
+  function wedgeTo(e, w) {
+    const op = E.op;
+    const s = E.model.byId.get(op.id);
+    const c = [s.x + s.w / 2, s.y + s.h / 2];
+    const [lx, ly] = rotPt(w[0], w[1], c[0], c[1], -(s.rot || 0));
+    // Position on the unit circle the ellipse is stretched from
+    const nx = (lx - c[0]) / Math.max(s.w / 2, 1);
+    const ny = (ly - c[1]) / Math.max(s.h / 2, 1);
+    if (op.part === "ir") {
+      const mid = (((s.a0 + s.a1) / 2) * Math.PI) / 180;
+      let ir = Math.round(Math.min(0.95, Math.max(0, nx * Math.sin(mid) - ny * Math.cos(mid))) * 100);
+      if (e.shiftKey) ir = Math.round(ir / 10) * 10;
+      replaceShape({ ...s, ir: ir < 5 ? undefined : ir });
+    } else {
+      const raw = (Math.atan2(nx, -ny) * 180) / Math.PI;
+      const deg = e.shiftKey ? Math.round(raw / 15) * 15 : Math.round(raw);
+      const mod = (v) => ((v % 360) + 360) % 360;
+      let { a0, a1 } = s;
+      if (op.part === "a0") a0 = a1 - (mod(a1 - deg) || 360);
+      else a1 = a0 + (mod(deg - a0) || 360);
+      // Start within one turn, so the numbers stay readable
+      const turn = Math.floor(a0 / 360) * 360;
+      replaceShape({ ...s, a0: a0 - turn, a1: a1 - turn });
+    }
     renderShapes();
     renderOverlay();
   }
@@ -2769,13 +3019,17 @@
     } else if (op.type === "box") {
       const s = E.model.byId.get(op.id);
       if (!op.moved) {
-        const [w, hh] = s.k === "r" ? [160, 100] : s.k === "e" ? [140, 100] : [140, 120];
+        const [w, hh] = s.k === "r" ? [160, 100] : s.k === "e" ? [140, 100] : s.k === "w" ? [140, 140] : [140, 120];
         replaceShape({ ...s, x: R(op.origin[0] - w / 2), y: R(op.origin[1] - hh / 2), w, h: hh });
       }
       E.sel = new Set([op.id]);
       E.tool = "select";
     } else if (op.type === "line") {
-      if (!op.moved) {
+      if (!op.moved && E.model.byId.get(op.id).k === "l") {
+        // A click instead of a drag: place points one click at a time
+        E.path = { id: op.id };
+        changed = false;
+      } else if (!op.moved) {
         removeShapes([op.id]);
         changed = false;
       } else {
@@ -2844,6 +3098,10 @@
       return done();
     }
     if (E.readonly) return;
+    if (E.path && !E.op && (k === "Escape" || k === "Enter" || k === "Backspace" || k === "Delete")) {
+      k === "Escape" || k === "Enter" ? finishPath() : popPathPoint();
+      return done();
+    }
     if (k === "Escape") {
       if (E.menu.classList.contains("visible") || E.arrange.classList.contains("visible")) closeMenu();
       else if (E.op) cancelOp();
@@ -2920,7 +3178,7 @@
     const center = toWorld(vw / 2, vh / 2);
     if (!shapes.length || !/^\s*draw\s/.test(text)) {
       const label = text.slice(0, MAX_LABEL).replace(/\r/g, "");
-      const s = { k: "t", id: newId(), x: 0, y: 0, c: E.style.c, s: E.style.s, st: E.style.st || undefined, fo: E.style.fo, label };
+      const s = { k: "t", id: newId(), x: 0, y: 0, c: E.style.c, s: E.style.s, st: E.style.st || undefined, fo: E.style.fo, o: opacity(), label };
       const t = textSize(s);
       insertShapes([{ ...s, x: R(center[0] - t.w / 2), y: R(center[1] - t.h / 2) }]);
       return;
@@ -2946,7 +3204,7 @@
   // ── Text editing ──
 
   function createText(w) {
-    const s = { k: "t", id: newId(), x: 0, y: 0, c: E.style.c, s: E.style.s, st: E.style.st || undefined, fo: E.style.fo };
+    const s = { k: "t", id: newId(), x: 0, y: 0, c: E.style.c, s: E.style.s, st: E.style.st || undefined, fo: E.style.fo, o: opacity() };
     const size = fontSize(s);
     const p = snapPt([w[0], w[1] - (size * LINE_H) / 2]);
     s.x = R(p[0]);
@@ -3076,6 +3334,7 @@
     replaceShape(n);
     renderShapes();
     renderOverlay();
+    renderUI();
     placeText();
   }
 

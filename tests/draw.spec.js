@@ -786,10 +786,14 @@ test("labels stay readable: light theme, solid fills, faded shapes", async ({ pa
 
 test("aligned text sits around its anchor and keeps it when moved", async ({ page }) => {
   await openDrawing(page, 'draw 1\nt a 200 100 ta=center va=middle s=xs "mid"\nt b 200 200 ta=right "end"\n');
+  // From the text's own position and advance: Firefox pads getBBox() horizontally
   const box = (id) =>
     page.locator(`#drawHost [data-id=${id}] text`).evaluate((t) => {
       const b = t.getBBox();
-      return [b.x + b.width / 2, b.y + b.height / 2, b.x + b.width];
+      const len = t.getComputedTextLength();
+      const x = +t.getAttribute("x");
+      const left = { start: x, middle: x - len / 2, end: x - len }[t.getAttribute("text-anchor")];
+      return [left + len / 2, b.y + b.height / 2, left + len];
     });
   const [cx, cy] = await box("a");
   expect(Math.abs(cx - 200)).toBeLessThan(2);
@@ -797,8 +801,13 @@ test("aligned text sits around its anchor and keeps it when moved", async ({ pag
   expect(Math.abs((await box("b"))[2] - 200)).toBeLessThan(2);
   await drag(page, [200, 100], [240, 140]);
   expect((await shapes(page))[0]).toMatchObject({ x: 240, y: 140, ta: "center", va: "middle" });
-  // The panel doesn't offer alignment for text: it would move it
-  await expect(page.locator('.draw-seg[data-key="ta"]')).toBeHidden();
+  // The panel aligns free text horizontally only, and the text stays where it is
+  await expect(page.locator('.draw-seg[data-key="va"]')).toBeHidden();
+  const before = await box("a");
+  await page.click('[data-draw="style:ta:left"]');
+  const after = await box("a");
+  expect((await shapes(page))[0].ta ?? "left").toBe("left");
+  expect(Math.abs(after[0] - before[0])).toBeLessThan(2);
 });
 
 test("fonts: picked in the panel, embedded in exports when used", async ({ page }) => {
@@ -814,4 +823,139 @@ test("fonts: picked in the panel, embedded in exports when used", async ({ page 
   expect(svgs[0]).toContain('@font-face{font-family:"Source Serif 4";src:url(data:');
   expect(svgs[0]).not.toContain("Victor Mono\";src");
   expect(svgs[1]).not.toContain("@font-face");
+});
+
+test("line tool: clicks place points, the first point closes a filled shape", async ({ page }) => {
+  await openDrawing(page);
+  await page.keyboard.press("l");
+  await expect(page.locator(".draw-status")).toContainText("click to place points");
+  // The line tool offers a fill, for the shapes it closes
+  await page.click('[data-draw="style:f:semi"]');
+  for (const [x, y] of [[0, 0], [200, 0], [200, 150], [0, 150]]) await click(page, x, y);
+  await expect(page.locator(".draw-status")).toContainText("first point to close");
+  await click(page, 1, 1);
+  const s = (await shapes(page))[0];
+  expect(s.pts).toEqual([[0, 0], [200, 0], [200, 150], [0, 150], [0, 0]]);
+  expect(s.f).toBe("semi");
+  // One undo step for the whole shape, and it is selected with the select tool back
+  expect(await page.evaluate(() => [Draw._state.tool, [...Draw._state.sel]])).toEqual(["select", [s.id]]);
+  // Its corners are handles; the closing point isn't a second one
+  expect(await page.evaluate(() => Draw._state.handles.filter((h) => h.kind === "point").length)).toBe(4);
+});
+
+test("line tool: Enter finishes an open path, Backspace takes back a point, a drag is still a line", async ({ page }) => {
+  await openDrawing(page);
+  await page.keyboard.press("l");
+  await page.click('[data-draw="style:f:solid"]');
+  for (const [x, y] of [[0, 0], [100, 50], [200, 0], [300, 50]]) await click(page, x, y);
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Enter");
+  let s = (await shapes(page))[0];
+  expect(s.pts).toEqual([[0, 0], [100, 50], [200, 0]]);
+  // Open paths aren't filled even with a fill picked
+  expect(s.f).toBeUndefined();
+  await page.keyboard.press("l");
+  await drag(page, [0, 200], [150, 200]);
+  s = (await shapes(page))[1];
+  expect(s.pts).toEqual([[0, 200], [150, 200]]);
+  expect(s.f).toBeUndefined();
+  // A two-point line has nothing to fill: no Fill row
+  await expect(page.locator('.draw-seg[data-key="f"]')).toBeHidden();
+});
+
+test("double-click adds a point to a line and removes one from it", async ({ page }) => {
+  await openDrawing(page, "draw 1\nl a 0,0 200,0 c=blue\n");
+  await click(page, 100, 0);
+  await expect(page.locator(".draw-status")).toContainText("add a point");
+  await page.mouse.dblclick(...(await at(page, 100, 0)));
+  expect((await shapes(page))[0].pts).toEqual([[0, 0], [100, 0], [200, 0]]);
+  // Three points: now it can be filled
+  await expect(page.locator('.draw-seg[data-key="f"]')).toBeVisible();
+  await page.mouse.dblclick(...(await at(page, 100, 0)));
+  expect((await shapes(page))[0].pts).toEqual([[0, 0], [200, 0]]);
+  // Never fewer than two
+  await page.mouse.dblclick(...(await at(page, 200, 0)));
+  expect((await shapes(page))[0].pts).toHaveLength(2);
+});
+
+test("panel: opacity, square corners, and no outline only next to a fill", async ({ page }) => {
+  await openDrawing(page, "draw 1\nr a 0 0 160 100 c=blue\na b 0,200 200,200\n");
+  await click(page, 80, 0);
+  await page.click('[data-draw="style:o:40"]');
+  await page.click('[data-draw="style:rx:square"]');
+  const none = page.locator('[data-draw="style:d:none"]');
+  await expect(none).toBeDisabled();
+  await page.click('[data-draw="style:f:solid"]');
+  await none.click();
+  expect((await shapes(page))[0]).toMatchObject({ o: 40, rx: 0, f: "solid", d: "none" });
+  // Without an outline, "no fill" would hide the shape
+  await expect(page.locator('[data-draw="style:f:none"]')).toBeDisabled();
+  expect(await content(page)).toContain("r a 0 0 160 100 c=blue f=solid d=none o=40 rx=0");
+  await page.click('[data-draw="style:o:100"]');
+  await page.click('[data-draw="style:rx:round"]');
+  expect((await shapes(page))[0].o).toBeUndefined();
+  expect((await shapes(page))[0].rx).toBeUndefined();
+  // Arrows have nothing to fill: no "None" outline, no corners
+  await click(page, 100, 200);
+  await expect(none).toBeHidden();
+  await expect(page.locator('.draw-seg[data-key="rx"]')).toBeHidden();
+});
+
+test("wedge tool, and handles for its edges and hole", async ({ page }) => {
+  await openDrawing(page);
+  await page.keyboard.press("w");
+  await click(page, 0, 0);
+  let s = (await shapes(page))[0];
+  expect(s).toMatchObject({ k: "w", x: -70, y: -70, w: 140, h: 140, a0: 0, a1: 270 });
+  await expect(page.locator(".draw-status")).toContainText("round handles");
+  // Handles are kept in canvas coordinates
+  const handles = () =>
+    page.evaluate(() => {
+      const r = document.getElementById("drawHost").getBoundingClientRect();
+      return Draw._state.handles.filter((h) => h.kind === "wedge").map((h) => [h.part, r.left + h.x, r.top + h.y]);
+    });
+  const hs = Object.fromEntries((await handles()).map(([p, x, y]) => [p, [x, y]]));
+  // End edge (at 270°, left) dragged to 180° (bottom)
+  await page.mouse.move(...hs.a1);
+  await page.mouse.down();
+  await page.mouse.move(...(await at(page, 0, 60)), { steps: 5 });
+  await page.mouse.up();
+  s = (await shapes(page))[0];
+  expect([s.a0, s.a1]).toEqual([0, 180]);
+  // Hole handle dragged outwards along the middle (at 90°, right)
+  const ir = (await handles()).find((h) => h[0] === "ir");
+  await page.mouse.move(ir[1], ir[2]);
+  await page.mouse.down();
+  await page.mouse.move(...(await at(page, 35, 0)), { steps: 5 });
+  await page.mouse.up();
+  expect((await shapes(page))[0].ir).toBe(50);
+});
+
+test("touch: taps place points, the first point closes, a double-tap finishes", async ({ page }) => {
+  await openDrawing(page);
+  await page.keyboard.press("l");
+  let id = 10;
+  // A tap: a touch pointer going down and up at a world point
+  const tap = (x, y) =>
+    page.evaluate(
+      ([x, y, id]) => {
+        const svg = document.querySelector(".draw-svg");
+        const r = svg.getBoundingClientRect();
+        const c = Draw._state.cam;
+        const o = { pointerId: id, pointerType: "touch", clientX: r.left + (x - c.x) * c.z, clientY: r.top + (y - c.y) * c.z, bubbles: true, isPrimary: true };
+        svg.dispatchEvent(new PointerEvent("pointerdown", o));
+        svg.dispatchEvent(new PointerEvent("pointerup", o));
+      },
+      [x, y, id++],
+    );
+  const wait = () => page.waitForTimeout(400);
+  for (const [x, y] of [[0, 0], [120, 0], [120, 100]]) await tap(x, y), await wait();
+  await expect(page.locator(".draw-status")).toHaveText("Tap to add points · tap the first point to close · double-tap to finish");
+  await tap(3, 3);
+  expect((await shapes(page))[0].pts).toEqual([[0, 0], [120, 0], [120, 100], [0, 0]]);
+  await page.keyboard.press("l");
+  for (const [x, y] of [[0, 200], [100, 220]]) await tap(x, y), await wait();
+  await tap(200, 200);
+  await tap(200, 200);
+  expect((await shapes(page))[1].pts).toEqual([[0, 200], [100, 220], [200, 200]]);
 });
