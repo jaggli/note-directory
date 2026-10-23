@@ -82,12 +82,15 @@ t note 0 120 c=grey "deployed on k8s"
 ```
 
 - Line: `<kind> <id> <values> [key=value…] ["label"]`; ids are unique, `A-Z a-z 0-9 _ -`.
-- `r` rectangle, `e` ellipse, `m` diamond: `x y width height`, label is drawn inside (`ta=left|center|right`, `va=top|middle|bottom`; default centred).
-- `t` text: `x y` (top-left). `l` line: `x,y x,y …`.
-- `a` arrow: `start end`, each `x,y` or the id of an `r/e/m/t` shape — ids attach the arrow to the shape's edge. `bend=<n>` curves it; `hs=` / `he=` set the start / end head: `none open triangle dot diamond bar` (default: none at the start, open at the end).
+- `r` rectangle, `e` ellipse, `m` diamond: `x y width height`, label is drawn inside (`ta=left|center|right`, `va=top|middle|bottom`; default centred). `rx=0` square corners.
+- `w` wedge (pie slice): `x y width height from to`, degrees clockwise from 12 o'clock; `ir=<0-99>` % hole for donuts.
+- `t` text: `x y` is its anchor, top-left by default; `ta=center va=middle` centres it on the point, `ta=right` ends it there. `l` line: `x,y x,y …`; with `f=semi|solid` it closes and fills (areas).
+- `a` arrow: `start end`, each `x,y` or the id of an `r/e/m/w/t` shape — ids attach the arrow to the shape's edge. `bend=<n>` curves it; `hs=` / `he=` set the start / end head: `none open triangle dot diamond bar` (default: none at the start, open at the end).
 - `p` pen / `h` highlighter: first point absolute, then deltas — rarely useful to write by hand.
-- `c=` `text grey red peach yellow green teal sky blue lavender mauve pink` · `s=` `s m l xl` · `f=` `none semi solid` · `d=` `solid dash dot` · `st=` text style, any of `b i u` (bold, italic, underline; e.g. `st=b`) · `rot=<deg>` · `gr=<group id>`.
-- Integer coordinates, y grows downwards. Size `m` text is ~13px per character, so make boxes wide enough (≈ 13 × characters + 40) or let labels wrap at spaces. Leave ~100 units between shapes for arrows, more for a labelled arrow (≈ 13 × label characters + 80).
+- `c=` `text grey red peach yellow green teal sky blue lavender mauve pink` · `s=` `xs s m l xl` · `fo=` `mono sans serif` · `o=<1-100>` opacity · `f=` `none semi solid` · `d=` `solid dash dot none` (none: fill without outline) · `st=` text style, any of `b i u` (bold, italic, underline; e.g. `st=b`) · `rot=<deg>` · `gr=<group id>`.
+- Colours follow the reader's theme (dark by default, light Latte too): never write "white", "darker" or "lighter" in labels; opacity scales read "fainter = less, stronger = more". Series colours in order `blue peach green pink yellow`; never `teal`/`sky`, `blue`/`lavender`, `lavender`/`mauve`, `green`/`teal` or `blue`/`grey` as two different series; `grey` for axes and "other".
+- Charts: baseline at `y=0`, bars upwards with `rx=0`; place labels by anchor (`ta=center va=bottom` above a bar, `ta=right va=middle` for axis ticks) instead of guessing text width; gridlines `l … s=xs c=grey d=dash`. Recipes: https://note.directory/llms.txt
+- Integer coordinates, y grows downwards. Size `m` mono text is 12 units per character (0.545 × font size), so make boxes wide enough (≈ 12 × characters + 40) or let labels wrap at spaces. Leave ~100 units between shapes for arrows, more for a labelled arrow (≈ 13 × label characters + 80).
 - Labels escape `\"`, `\\` and use `\n` for a line break.
 - Full spec: https://github.com/jaggli/note-directory/blob/main/docs/drawing-format.md
 

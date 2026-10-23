@@ -2424,6 +2424,7 @@ function hydrateDrawEmbeds() {
   const embeds = mdPreview.querySelectorAll(".draw-embed");
   if (!embeds.length) return;
   loadDraw()
+    .then(() => Draw.fontsReady())
     .then(() => {
       for (const el of embeds) {
         if (!el.isConnected) continue;
@@ -8135,7 +8136,7 @@ async function drawDownloadSvg(note = getActiveNote()) {
   if (!note || !isDrawFile(note.name)) return;
   await loadDraw();
   triggerDownload(
-    new Blob([Draw.svgString(note.content)], { type: "image/svg+xml" }),
+    new Blob([await Draw.svgString(note.content)], { type: "image/svg+xml" }),
     note.name.replace(/\.draw$/i, "") + ".svg",
   );
 }
@@ -8146,17 +8147,22 @@ async function noteHtml(note) {
   const doc = document.createElement("div");
   doc.innerHTML = renderMarkdown(note.content);
   const embeds = doc.querySelectorAll(".draw-embed");
-  if (embeds.length) {
+  // Fonts go in as data URLs: code is in Victor Mono, drawings use their own
+  const fonts = new Set(doc.querySelector("code, pre") ? ["mono"] : []);
+  let fontCss = "";
+  if (embeds.length || fonts.size) {
     try {
       await loadDraw();
+      await Draw.fontsReady();
       for (const el of embeds) {
         const ref =
           el.dataset.ref && state.notes.find((n) => n.name === el.dataset.ref);
         if (el.dataset.ref && !ref) continue;
-        el.replaceChildren(
-          Draw.renderStatic(ref ? ref.content : el.dataset.draw),
-        );
+        const content = ref ? ref.content : el.dataset.draw;
+        el.replaceChildren(Draw.renderStatic(content));
+        for (const f of Draw.usedFonts(content)) fonts.add(f);
       }
+      fontCss = await Draw.fontFaces(fonts);
     } catch {}
   }
   for (const el of doc.querySelectorAll(".draw-embed")) {
@@ -8200,10 +8206,11 @@ async function noteHtml(note) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:">
 <title>${title}</title>
 <style>
 body { margin: 0; background: var(--bg); color: var(--text); }
+${fontCss}
 ${css.join("\n")}
 .md-preview { overflow: visible; }
 </style>
@@ -8235,7 +8242,7 @@ async function zenDownload() {
   if (isDrawFile(note.name)) {
     await loadDraw();
     return triggerDownload(
-      new Blob([Draw.svgString(note.content)], { type: "image/svg+xml" }),
+      new Blob([await Draw.svgString(note.content)], { type: "image/svg+xml" }),
       note.name.replace(/\.draw$/i, "") + ".svg",
     );
   }
@@ -8260,7 +8267,7 @@ async function downloadAll() {
         if (state.notes.some((o) => o.name === name)) continue;
         if (renders.includes(name)) continue;
         renders.push(name);
-        files.push({ name, content: Draw.svgString(n.content) });
+        files.push({ name, content: await Draw.svgString(n.content) });
       }
     } catch {}
   }

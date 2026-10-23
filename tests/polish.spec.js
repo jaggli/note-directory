@@ -120,6 +120,32 @@ test("html export looks like zen and runs nothing", async ({ page }) => {
   expect(text).toContain(".hl-kw");
 });
 
+test("html export carries the fonts it uses", async ({ page, context }) => {
+  await openApp(page);
+  const exportHtml = (md) =>
+    page.evaluate(async (md) => {
+      await createNote("pic.draw", 'draw 1\nt a 0 0 fo=serif "serif"\n');
+      const note = { name: "doc.md", content: md };
+      return noteHtml(note);
+    }, md);
+  const plain = await exportHtml("# just text\n");
+  expect(plain).not.toContain("@font-face");
+  const html = await exportHtml("```\ncode\n```\n\n![p](pic.draw)\n");
+  expect(html).toContain("font-src data:");
+  expect(html).toContain('@font-face{font-family:"Victor Mono";src:url(data:');
+  expect(html).toContain('@font-face{font-family:"Source Serif 4";src:url(data:');
+  expect(html).not.toContain('"Source Sans 3";src');
+  // Opened on its own, under its CSP, with no network: the fonts still load
+  const file = await context.newPage();
+  await file.route("**/*", (r) => r.abort());
+  await file.setContent(html);
+  const loaded = await file.evaluate(async () => {
+    await document.fonts.ready;
+    return [...document.fonts].filter((f) => f.status === "loaded").map((f) => f.family.replace(/"/g, ""));
+  });
+  expect(loaded.sort()).toEqual(["Source Serif 4", "Victor Mono"]);
+});
+
 test("note menu: download as html only for markdown", async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => createNote("a.md", "# a"));

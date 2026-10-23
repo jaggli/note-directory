@@ -101,36 +101,111 @@ A line is: kind, id, values, `key=value` attributes, and an optional `"label"`. 
 
 | Kind | Shape       | Values                                      | Label | Attributes            |
 | ---- | ----------- | ------------------------------------------- | ----- | --------------------- |
-| `r`  | rectangle   | `x y width height`                          | yes   | c s f d ta va st rot gr |
-| `e`  | ellipse     | `x y width height`                          | yes   | c s f d ta va st rot gr |
-| `m`  | diamond     | `x y width height`                          | yes   | c s f d ta va st rot gr |
-| `t`  | text        | `x y` (top-left)                            | yes   | c s st rot gr         |
-| `l`  | line        | two or more points `x,y`                    | no    | c s d gr              |
-| `a`  | arrow       | `start end`, each `x,y` or a shape id       | yes   | c s d hs he st bend gr |
-| `p`  | pen stroke  | first point absolute, then deltas `dx,dy`   | no    | c s rot gr            |
-| `h`  | highlighter | like `p`                                    | no    | c s rot gr            |
+| `r`  | rectangle   | `x y width height`                          | yes   | c s f d ta va st fo o rx rot gr |
+| `e`  | ellipse     | `x y width height`                          | yes   | c s f d ta va st fo o rot gr |
+| `m`  | diamond     | `x y width height`                          | yes   | c s f d ta va st fo o rot gr |
+| `w`  | wedge (pie slice) | `x y width height from to`            | yes   | c s f d st fo o ir rot gr |
+| `t`  | text        | `x y`: its anchor, top-left unless `ta`/`va` say otherwise | yes | c s ta va st fo o rot gr |
+| `l`  | line        | two or more points `x,y`; with `f` a closed, filled polygon | no | c s f d o gr |
+| `a`  | arrow       | `start end`, each `x,y` or a shape id       | yes   | c s d hs he st fo o bend gr |
+| `p`  | pen stroke  | first point absolute, then deltas `dx,dy`   | no    | c s o rot gr          |
+| `h`  | highlighter | like `p`                                    | no    | c s o rot gr          |
 
-- **Arrows** given a shape id start/end at that shape's outline and follow it when it moves (`r e m t` shapes only).
+- **Arrows** given a shape id start/end at that shape's outline and follow it when it moves (`r e m w t` shapes only).
+- **Wedges** are slices of the ellipse in their box. `from` and `to` are degrees clockwise from 12 o'clock, `to` after `from` and at most 360 more (`300 390` crosses the top; `from` may also be negative). Like all numbers they may have decimals and are rounded to integers. A label sits in the middle of the slice; with `ir` in the middle of the ring.
+- **Filled lines** (`f=semi|solid`) close back to the first point, outline included; use `d=none` for a fill alone.
 - **Pen points** may carry pressure 1–9 as a third value (`10,20,5`); then every point has one.
 
 | Key    | Values | Default |
 | ------ | ------ | ------- |
 | `c`    | `text grey red peach yellow green teal sky blue lavender mauve pink` | `text` |
-| `s`    | size `s m l xl` (stroke width and font size) | `m` |
-| `f`    | fill `none semi solid` | `none` |
-| `d`    | dash `solid dash dot` | `solid` |
-| `ta`   | label alignment in a box `left center right` | `center` |
-| `va`   | label alignment in a box `top middle bottom` | `middle` |
+| `s`    | size `xs s m l xl`: stroke 1 2 3.5 5 8, font 12 16 22 30 44 | `m` |
+| `f`    | fill `none semi solid`: `semi` is the colour at 20 %, `solid` full with an outline a shade darker and labels in the background colour | `none` |
+| `d`    | outline `solid dash dot none` (`none`: a fill without outline) | `solid` |
+| `ta`   | label alignment in a box `left center right`; for `t` which side of the text `x` is | `center`, `t`: `left` |
+| `va`   | label alignment in a box `top middle bottom`; for `t` which side of the text `y` is | `middle`, `t`: `top` |
 | `st`   | text style, any of `b` bold, `i` italic, `u` underline, e.g. `st=bu` | — |
+| `fo`   | font `mono` (Victor Mono) `sans` (Source Sans 3) `serif` (Source Serif 4) | `mono` |
+| `o`    | opacity 1–100 of the shape (fill and outline; multiplies with `semi`); its label stays at full strength. On `t` it fades the text | `100` |
+| `rx`   | rectangle corner radius (`0` square) | up to 8 |
+| `ir`   | wedge inner radius in % of its radius (donut, gauge), 0–99 | `0` |
 | `hs`   | arrowhead at the start `none open triangle dot diamond bar` | `none` |
 | `he`   | arrowhead at the end, same values | `open` |
-| `bend` | arrow curve: how far its middle sits off the straight line | `0` |
-| `rot`  | rotation in degrees, clockwise around the centre | `0` |
+| `bend` | arrow curve: how far its middle sits off the straight line; positive curves to the right of the direction of travel (a left-to-right arrow sags down) | `0` |
+| `rot`  | rotation in degrees, clockwise around the centre of the shape's box (for `t`: of the text as drawn, wherever its anchor is); `rot=270` reads bottom to top | `0` |
 | `gr`   | group id: shapes with the same `gr` move together | — |
 
 Labels: `"…"`; escape `\"` and `\\`, `\n` is a line break. Labels wrap inside their shape at spaces.
 
-Layout tips for generated diagrams: medium text is about 13 units per character, so make boxes about 13 × characters + 40 wide; leave about 100 units between shapes for arrows, more if the arrow has a label (about 13 × label characters + 80).
+Layout tips for generated diagrams: `mono` characters are exactly 0.545 × font size wide (xs 6.5, s 8.7, m 12, l 16.4, xl 24 units), `sans` about 0.45 ×, `serif` about 0.5 ×. Make boxes about 12 × characters + 40 wide; leave about 100 units between shapes for arrows, more if the arrow has a label (about 13 × label characters + 80).
+
+### Charts
+
+Build charts from the shapes above. These conventions were tested across all themes and chart types:
+
+**Layout**
+- Put the baseline at `y=0` and draw bars upwards: a bar of value `v` at scale `k` is `r id x -(v·k) width v·k`, with `f=solid d=none rx=0` (flat, flush when stacked). Horizontal bars: start at `x=0`, names `ta=right va=middle` left of it, values `ta=left va=middle` just after the bar end.
+- Draw order is z-order: gridlines first, then areas, bars and lines, then markers, then labels.
+- Place every label by its anchor instead of estimating text width: values `ta=center va=bottom` 6 units above a bar, ticks `ta=right va=middle` left of the axis, categories `ta=center` 8 units under it.
+- Keep labels off lines and gridlines: a value label must clear the gridline above it (where it can't, leave that gridline out), and a series name goes at the end of its line (`va=middle`), not on it. Labels need at least their own line height between them (`s` 21, `xs` 16 units); nudge close ones apart. Labelled line ends replace the legend.
+- Vertical rhythm: title (`s=l`, 39 units tall) → 8 → subtitle (`s=s`, 21) → 24 → legend → 24 → plot. Text is `1.3 ×` its font size tall per line; `va=bottom` is the bottom of that box.
+- Values may have decimals; they are rounded to integers. Keep plots at least 300 units wide so `xs` labels stay readable.
+
+**Marks**
+- Axes and gridlines: `l` with `s=xs c=grey`, gridlines also `d=dash`. Ticks and axis titles `s=xs` or `s=s`, `c=grey`; rotated y titles `t … ta=center va=middle rot=270`.
+- Reference lines (median, target, today): `l … c=text s=xs d=dash` with a label at one end, so they stand apart from grey gridlines.
+- Line charts: one `l` through the points, `s=s`; markers small `e` (8–10 units) `f=solid s=xs`, centred on the point. Areas: the same points closed down to the baseline, `f=semi d=none`, before the line. Stacked areas: each layer's polygon runs along its own top edge and back along the layer below.
+- Pie and donut: one `w` per slice in the same box, each `from` where the last one ended (`360 × share`). `ir=60` makes a donut; the total goes in the middle with `t … ta=center va=middle`. Label slices under about 8 % outside, with a short `l` leader line and the labels stacked in a column.
+- Gauges: wedges from `270` to `450` (left, over the top, to the right): a `grey f=semi` track, the value as a second wedge on top, `ir=70`.
+- Closed outlines without fill (radar rings): repeat the first point at the end.
+- Legends: a 12-unit `r` swatch (`f=solid d=none rx=2`) and a `t` 6 units right of it with `va=middle`; for a line series a short `l` sample instead of the swatch.
+
+**Colour**
+- Colours follow the reader's theme (Catppuccin; four dark themes and the light Latte; dark Mocha unless the reader picked another), so never name what they look like: `text` is the theme's text colour, not "white". Opacity fades towards the background, which is darker on dark themes and lighter on Latte: describe scales as "fainter = less, stronger = more".
+- Text and labels stay readable by themselves: on light themes pale colours are darkened for text, and a label inside a solid fill picks a light or dark colour to suit the fill. Any palette colour is fine for text.
+- Series colours, in this order: `blue peach green pink yellow`. These five stay clearly apart in every theme. With more series, either sum the rest into one "Other" series or draw them as thin `grey` lines labelled at their ends.
+- Never use these pairs for different series in one chart, they look alike in some themes: `teal`/`sky`, `blue`/`lavender`, `lavender`/`mauve`, `green`/`teal`, `blue`/`grey`. Grey for axes, gridlines and frames next to blue data is fine.
+- Ordered categories (priorities, ratings, ranges) and one-colour scales (heatmaps): one colour in `o=` steps, e.g. 20 40 60 80 100. Sub-groups of a series (an inner and outer donut ring): the series colour in `o=` steps.
+- Roles: `text` strongest contrast (titles, key numbers, reference lines), `grey` muted, `red` bad or alert, `green` good, `yellow` warning. Red and green look alike to many readers: add a word or a sign (+/−) so colour isn't the only cue.
+- Heatmaps: cells `f=solid d=none rx=0`, 2 units apart, with the number as the cell's own label; leave empty cells blank or `grey o=10`. Bin values into 4–6 equal ranges, one `o` step each, and show the steps as a row of swatches with their ranges. Column headers `ta=center va=bottom` above, row headers `ta=right va=middle` to the left.
+- A label inside any filled shape (`r e m w`) picks a readable colour itself, also on `o`-faded fills, so labels can go straight into cells, slices and bars.
+
+**Text**
+- Titles `fo=sans st=b s=l`, subtitles and legends `fo=sans s=s`, numbers in `mono` so digits line up.
+- Labels are UTF-8; `–`, `°`, `×`, `·`, `€` are in all three fonts (URI-encode them in `text=` links). Symbols such as `▲ ▼ → ● ■ ✓` come from a system font: they show, but break the mono grid, so draw shapes instead.
+
+```
+draw 1
+t title 0 -200 fo=sans st=b s=l "Visits by day"
+l g1 -10,-100 330,-100 c=grey s=xs d=dash
+t y1 -16 -100 ta=right va=middle s=xs c=grey "100"
+l axis -10,0 330,0 c=grey s=xs
+r b1 0 -60 60 60 c=blue f=solid rx=0
+t v1 30 -66 ta=center va=bottom s=s "60"
+t x1 30 8 ta=center s=s c=grey "Mon"
+r b2 90 -140 60 140 c=blue f=solid rx=0
+t v2 120 -146 ta=center va=bottom s=s "140"
+t x2 120 8 ta=center s=s c=grey "Tue"
+w p1 400 -160 160 160 0 216 c=blue f=solid "60%"
+w p2 400 -160 160 160 216 360 c=peach f=solid "40%"
+```
+
+Line with area, markers, a rotated axis title, a legend and a heatmap row:
+
+```
+draw 1
+l area 0,0 0,-60 100,-90 200,-70 300,-130 300,0 c=blue f=semi d=none
+l line 0,-60 100,-90 200,-70 300,-130 c=blue s=s
+e m1 -5 -65 10 10 c=blue f=solid s=xs
+e m2 95 -95 10 10 c=blue f=solid s=xs
+l axis 0,0 300,0 c=grey s=xs
+t ytitle -40 -70 ta=center va=middle rot=270 s=xs c=grey fo=sans "Revenue"
+r sw1 0 30 12 12 c=blue f=solid d=none rx=2
+t lg1 18 36 va=middle s=s fo=sans "Product A"
+r h1 400 -40 40 40 c=blue f=solid d=none rx=0 o=15
+r h2 442 -40 40 40 c=blue f=solid d=none rx=0 o=55
+r h3 484 -40 40 40 c=blue f=solid d=none rx=0
+```
 
 Lines the app can't read are kept as they are and flagged, not deleted.
 

@@ -305,7 +305,7 @@ test("png and svg export", async ({ page }) => {
     await loadDraw();
     const c = 'draw 1\nr a 0 0 100 50 c=red "x"\n';
     const blob = await Draw.pngBlob(c);
-    return { type: blob.type, size: blob.size, svg: Draw.svgString(c) };
+    return { type: blob.type, size: blob.size, svg: await Draw.svgString(c) };
   });
   expect(out.type).toBe("image/png");
   expect(out.size).toBeGreaterThan(100);
@@ -343,7 +343,7 @@ test("only palette colors reach the SVG", async ({ page }) => {
   const out = await page.evaluate(async () => {
     await loadDraw();
     const m = Draw.parse('draw 1\nr a 0 0 1 1 c=url(javascript:x)\nr b 0 0 1 1 c=red\n');
-    return { errors: m.errors.length, svg: Draw.svgString("draw 1\nr b 0 0 1 1 c=red\n") };
+    return { errors: m.errors.length, svg: await Draw.svgString("draw 1\nr b 0 0 1 1 c=red\n") };
   });
   expect(out.errors).toBe(1);
   expect(out.svg).not.toContain("javascript");
@@ -743,4 +743,75 @@ test("zen hides the grid and leaving zen brings it back", async ({ page }) => {
   await expect.poll(gridShown).toBe(false);
   await page.evaluate(() => switchMdTab("view"));
   await expect.poll(gridShown).toBe(true);
+});
+
+test("chart shapes: wedges, filled lines, opacity, square corners", async ({ page }) => {
+  const src =
+    "draw 1\nw a 0 0 200 200 0 90 c=blue f=solid ir=50\nw b 0 0 200 200 90 450 c=red\n" +
+    "l c 300,200 300,100 400,50 400,200 c=sky f=semi o=40\nr d 500 0 40 120 f=solid d=none rx=0\nr e 600 0 40 120\n";
+  await openDrawing(page, src);
+  expect(await content(page)).toBe(src);
+  const bad = await page.evaluate(() =>
+    Draw.parse("draw 1\nw a 0 0 9 9 90 90\nw b 0 0 9 9 0 361\nr c 0 0 9 9 o=0\nw d 0 0 9 9 0 90 ir=100\n").errors.length,
+  );
+  expect(bad).toBe(4);
+  expect(await page.locator("#drawHost [data-id=a] path").getAttribute("d")).toMatch(/A100 100 0 0 1 .*A50 50 0 0 0/);
+  expect(await page.locator("#drawHost [data-id=c] path").getAttribute("d")).toMatch(/Z$/);
+  expect(await page.locator("#drawHost [data-id=c] > g").getAttribute("opacity")).toBe("0.4");
+  expect(await page.locator("#drawHost [data-id=d] rect").getAttribute("rx")).toBe("0");
+  expect(await page.locator("#drawHost [data-id=d] rect").getAttribute("stroke")).toBe("none");
+  expect(await page.locator("#drawHost [data-id=e] rect").getAttribute("rx")).toBe("8");
+  // Filled lines and wedges are picked inside, not only on their outline
+  await click(page, 370, 150);
+  expect(await page.evaluate(() => [...Draw._state.sel])).toEqual(["c"]);
+  await click(page, 150, 60);
+  expect(await page.evaluate(() => [...Draw._state.sel])).toEqual(["a"]);
+});
+
+test("labels stay readable: light theme, solid fills, faded shapes", async ({ page }) => {
+  await openDrawing(page, 'draw 1\nt a 0 0 c=yellow "pale"\nr b 0 60 120 60 c=yellow f=solid "on yellow"\nr c 0 160 120 60 c=blue f=solid o=30 "faded"\n');
+  const fill = (id) => page.locator(`#drawHost [data-id=${id}] text`).getAttribute("fill");
+  const dark = { a: await fill("a"), b: await fill("b") };
+  expect(dark.a).toBe(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--yellow").trim()));
+  // The label of a faded shape isn't faded with it
+  expect(await page.locator("#drawHost [data-id=c] text").evaluate((t) => t.closest("[opacity]"))).toBeNull();
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "latte";
+    Draw.setTheme();
+  });
+  // Pale text darkens towards the text colour on white; a label on yellow turns dark, not white
+  expect(await fill("a")).not.toBe(dark.a);
+  expect(["#4c4f69", "#000000"]).toContain(await fill("b"));
+});
+
+test("aligned text sits around its anchor and keeps it when moved", async ({ page }) => {
+  await openDrawing(page, 'draw 1\nt a 200 100 ta=center va=middle s=xs "mid"\nt b 200 200 ta=right "end"\n');
+  const box = (id) =>
+    page.locator(`#drawHost [data-id=${id}] text`).evaluate((t) => {
+      const b = t.getBBox();
+      return [b.x + b.width / 2, b.y + b.height / 2, b.x + b.width];
+    });
+  const [cx, cy] = await box("a");
+  expect(Math.abs(cx - 200)).toBeLessThan(2);
+  expect(Math.abs(cy - 100)).toBeLessThan(3);
+  expect(Math.abs((await box("b"))[2] - 200)).toBeLessThan(2);
+  await drag(page, [200, 100], [240, 140]);
+  expect((await shapes(page))[0]).toMatchObject({ x: 240, y: 140, ta: "center", va: "middle" });
+  // The panel doesn't offer alignment for text: it would move it
+  await expect(page.locator('.draw-seg[data-key="ta"]')).toBeHidden();
+});
+
+test("fonts: picked in the panel, embedded in exports when used", async ({ page }) => {
+  await openDrawing(page, 'draw 1\nr a 0 0 160 80 "box"\n');
+  await click(page, 80, 0);
+  await page.click('[data-draw="style:fo:serif"]');
+  expect((await shapes(page))[0].fo).toBe("serif");
+  expect(await page.locator("#drawHost [data-id=a] text").getAttribute("font-family")).toContain("Source Serif 4");
+  const svgs = await page.evaluate(async () => [
+    await Draw.svgString(getActiveNote().content),
+    await Draw.svgString("draw 1\nr a 0 0 9 9\n"),
+  ]);
+  expect(svgs[0]).toContain('@font-face{font-family:"Source Serif 4";src:url(data:');
+  expect(svgs[0]).not.toContain("Victor Mono\";src");
+  expect(svgs[1]).not.toContain("@font-face");
 });

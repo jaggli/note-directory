@@ -53,7 +53,9 @@ a q api db "query"
 p s1 c=peach 40,160 6,3 8,1
 ```
 
-Kinds: `r` rectangle, `e` ellipse, `m` diamond, `t` text, `l` line, `a` arrow (ends are `x,y` points or shape ids it connects), `p` pen stroke, `h` highlighter. `"…"` at the end is the shape's text. Full spec: https://github.com/jaggli/note-directory/blob/main/docs/drawing-format.md
+Kinds: `r` rectangle, `e` ellipse, `m` diamond, `w` wedge (pie/donut slice: `x y w h from to`, degrees clockwise from 12 o'clock), `t` text, `l` line (filled with `f=` it's an area/polygon), `a` arrow (ends are `x,y` points or shape ids it connects), `p` pen stroke, `h` highlighter. `"…"` at the end is the shape's text. Attributes you may see: `c` colour, `s` size, `f` fill, `fo` font (`mono sans serif`), `o` opacity, `ta`/`va` alignment. Full spec: https://github.com/jaggli/note-directory/blob/main/docs/drawing-format.md
+
+**Charts** (bars on a baseline, wedges, a line with axis ticks): report the data, not the shapes — title, axes, each category with its value (from the value labels, or bar heights against the ticks), wedge shares as `(to − from) / 360`, the line's trend. A table is often the clearest answer.
 
 Don't dump coordinates at the user. Describe the drawing instead: the labelled shapes, what the arrows connect (`a q api db "query"` → "API → Database, labelled *query*"), groups, rough layout (left/right/above), and how many unlabelled strokes there are. Show the raw text only if asked.
 

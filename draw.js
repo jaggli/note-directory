@@ -35,37 +35,50 @@
     ACCENT = v("blue");
   }
   readTheme();
-  const STROKE = { s: 2, m: 3.5, l: 5, xl: 8 };
-  const FONT_SIZE = { s: 16, m: 22, l: 30, xl: 44 };
+  const STROKE = { xs: 1, s: 2, m: 3.5, l: 5, xl: 8 };
+  const FONT_SIZE = { xs: 12, s: 16, m: 22, l: 30, xl: 44 };
+  // Latin subsets with every weight, declared in index.html
+  const FONTS = {
+    mono: { family: "Victor Mono", url: "fonts/VictorMono.woff2", css: '"Victor Mono", "SF Mono", Consolas, monospace', adjust: "90.91%" },
+    sans: { family: "Source Sans 3", url: "fonts/SourceSans3.woff2", css: '"Source Sans 3", system-ui, sans-serif' },
+    serif: { family: "Source Serif 4", url: "fonts/SourceSerif4.woff2", css: '"Source Serif 4", Georgia, serif' },
+  };
   const HEADS = ["none", "open", "triangle", "dot", "diamond", "bar"];
   const ENUMS = {
     c: Object.keys(COLOR_VARS),
     s: Object.keys(STROKE),
     f: ["none", "semi", "solid"],
-    d: ["solid", "dash", "dot"],
+    d: ["solid", "dash", "dot", "none"],
     hs: HEADS,
     he: HEADS,
     ta: ["left", "center", "right"],
     va: ["top", "middle", "bottom"],
+    fo: Object.keys(FONTS),
   };
-  const DEFAULTS = { c: "text", s: "m", f: "none", d: "solid", hs: "none", he: "open", ta: "center", va: "middle", st: "", bend: 0, rot: 0 };
-  const BOX = new Set(["r", "e", "m"]);
+  const DEFAULTS = { c: "text", s: "m", f: "none", d: "solid", hs: "none", he: "open", ta: "center", va: "middle", st: "", fo: "mono", bend: 0, rot: 0, o: 100 };
+  // Text is placed by its top-left corner unless aligned otherwise
+  const TEXT_DEFAULTS = { ...DEFAULTS, ta: "left", va: "top" };
+  const defaultOf = (s, key) => (s.k === "t" ? TEXT_DEFAULTS : DEFAULTS)[key];
+  const BOX = new Set(["r", "e", "m", "w"]);
   const POINTS = new Set(["l", "p", "h"]);
-  const BOX_ATTRS = ["c", "s", "f", "d", "ta", "va", "st", "rot", "gr"];
+  const BOX_ATTRS = ["c", "s", "f", "d", "ta", "va", "st", "fo", "o", "rot", "gr"];
   const ATTRS = {
-    r: BOX_ATTRS,
+    r: [...BOX_ATTRS, "rx"],
     e: BOX_ATTRS,
     m: BOX_ATTRS,
-    t: ["c", "s", "st", "rot", "gr"],
-    l: ["c", "s", "d", "gr"],
-    a: ["c", "s", "d", "hs", "he", "st", "bend", "gr"],
-    p: ["c", "s", "rot", "gr"],
-    h: ["c", "s", "rot", "gr"],
+    w: ["c", "s", "f", "d", "st", "fo", "o", "ir", "rot", "gr"],
+    t: ["c", "s", "ta", "va", "st", "fo", "o", "rot", "gr"],
+    l: ["c", "s", "f", "d", "o", "gr"],
+    a: ["c", "s", "d", "hs", "he", "st", "fo", "o", "bend", "gr"],
+    p: ["c", "s", "o", "rot", "gr"],
+    h: ["c", "s", "o", "rot", "gr"],
   };
   // Caps keep a hostile shared link from freezing the page
   const MAX_LINES = 20000;
   const MAX_POINTS = 200000;
   const MAX_COORD = 1e6;
+  // Number attributes that have a range of their own
+  const RANGES = { o: [1, 100], rx: [0, MAX_COORD], ir: [0, 99] };
   const MAX_LABEL = 5000;
   const ID_RE = /^[A-Za-z0-9_-]{1,16}$/;
   const NUM_RE = /^-?\d{1,9}(\.\d+)?$/;
@@ -153,18 +166,27 @@
         // Text style: any of b(old) i(talic) u(nderline), stored in that order
         if (!/^[biu]{1,3}$/.test(v) || new Set(v).size !== v.length) throw `invalid st=${v}`;
         s.st = textStyle(v);
-      } else s[key] = num(v);
+      } else {
+        s[key] = num(v);
+        const r = RANGES[key];
+        if (r && (s[key] < r[0] || s[key] > r[1])) throw `${key} must be ${r[0]}-${r[1]}`;
+      }
     }
     if (label !== null) {
       if (POINTS.has(k)) throw "this shape has no label";
       if (label.length > MAX_LABEL) throw "label too long";
       if (label) s.label = label;
     }
-    if (BOX.has(k)) {
+    if (k === "w") {
+      if (pos.length !== 6) throw "expected: x y width height from to";
+      [s.x, s.y, s.w, s.h, s.a0, s.a1] = pos.map(num);
+      if (s.a1 <= s.a0 || s.a1 - s.a0 > 360) throw "to must be after from, at most 360 more";
+    } else if (BOX.has(k)) {
       if (pos.length !== 4) throw "expected: x y width height";
       [s.x, s.y, s.w, s.h] = pos.map(num);
-      if (s.w < 1 || s.h < 1) throw "width and height must be positive";
-    } else if (k === "t") {
+    }
+    if (BOX.has(k) && (s.w < 1 || s.h < 1)) throw "width and height must be positive";
+    if (k === "t") {
       if (pos.length !== 2) throw "expected: x y";
       [s.x, s.y] = pos.map(num);
     } else if (k === "l") {
@@ -174,7 +196,7 @@
       if (pos.length !== 2) throw "expected: start end";
       s.from = parseEnd(pos[0]);
       s.to = parseEnd(pos[1]);
-    } else {
+    } else if (!BOX.has(k)) {
       // Pen: first point absolute, then deltas; optional pressure 1-9
       if (!pos.length) throw "expected points";
       const pressure = pos[0].split(",").length === 3;
@@ -276,15 +298,17 @@
     const attrs = [];
     for (const key of ATTRS[s.k]) {
       const v = s[key];
-      if (v === undefined || v === DEFAULTS[key]) continue;
+      if (v === undefined || v === defaultOf(s, key)) continue;
       if (key === "rot" || key === "bend") {
         if (R(v)) attrs.push(key + "=" + R(v));
       } else attrs.push(key + "=" + v);
     }
     // Pens: style first, it would be lost at the end of a long point list
     if (s.k === "p" || s.k === "h") parts.push(...attrs);
-    if (BOX.has(s.k)) parts.push(R(s.x), R(s.y), R(s.w), R(s.h));
-    else if (s.k === "t") parts.push(R(s.x), R(s.y));
+    if (BOX.has(s.k)) {
+      parts.push(R(s.x), R(s.y), R(s.w), R(s.h));
+      if (s.k === "w") parts.push(R(s.a0), R(s.a1));
+    } else if (s.k === "t") parts.push(R(s.x), R(s.y));
     else if (s.k === "l") for (const p of s.pts) parts.push(R(p[0]) + "," + R(p[1]));
     else if (s.k === "a")
       for (const e of [s.from, s.to])
@@ -317,7 +341,6 @@
   //  Geometry
   // ═══════════════════════════════════════════════════
 
-  const FONT = '"Victor Mono", "SF Mono", Consolas, monospace';
   const LINE_H = 1.3;
   const GRID = 20;
 
@@ -333,15 +356,16 @@
 
   let measureCtx = null;
   const measureCache = new Map();
-  const fontCss = (size, st = "") =>
-    (st.includes("i") ? "italic " : "") + (st.includes("b") ? "bold " : "") + size + "px " + FONT;
+  // `f`: the shape, for its text style (st) and font (fo)
+  const fontCss = (size, f) =>
+    (f.st?.includes("i") ? "italic " : "") + (f.st?.includes("b") ? "bold " : "") + size + "px " + FONTS[f.fo || "mono"].css;
 
-  function measure(str, size, st = "") {
-    const key = size + st + "|" + str;
+  function measure(str, size, f) {
+    const key = size + (f.st || "") + (f.fo || "") + "|" + str;
     let w = measureCache.get(key);
     if (w === undefined) {
       measureCtx ??= document.createElement("canvas").getContext("2d");
-      measureCtx.font = fontCss(size, st);
+      measureCtx.font = fontCss(size, f);
       w = measureCtx.measureText(str).width;
       if (measureCache.size > 5000) measureCache.clear();
       measureCache.set(key, w);
@@ -350,13 +374,13 @@
   }
 
   // Greedy word wrap at spaces; a word wider than the line overflows it
-  function wrap(label, size, maxW, st) {
+  function wrap(label, size, maxW, f) {
     const out = [];
     for (const para of label.split("\n")) {
       let line = "";
       for (const word of para.split(" ")) {
         const next = line ? line + " " + word : word;
-        if (!line || measure(next, size, st) <= maxW) line = next;
+        if (!line || measure(next, size, f) <= maxW) line = next;
         else {
           out.push(line);
           line = word;
@@ -373,7 +397,7 @@
   function textSize(s) {
     const size = fontSize(s);
     const lines = (s.label || "").split("\n");
-    const w = Math.max(size * 0.6, ...lines.map((l) => measure(l, size, s.st)));
+    const w = Math.max(size * 0.6, ...lines.map((l) => measure(l, size, s)));
     return { w: Math.ceil(w), h: Math.ceil(lines.length * size * LINE_H), lines, size };
   }
 
@@ -382,19 +406,36 @@
   }
 
   // Share of a box's width/height that a label can use
-  const LABEL_AREA = { r: [1, 1], e: [0.75, 0.75], m: [0.55, 0.55] };
+  const LABEL_AREA = { r: [1, 1], e: [0.75, 0.75], m: [0.55, 0.55], w: [0.4, 0.4] };
 
   function labelWidth(s) {
     return Math.max(fontSize(s), s.w * LABEL_AREA[s.k][0] - labelPad(s) * 2);
+  }
+
+  // Point on a wedge's ellipse at `deg` (clockwise from 12 o'clock), `r` of the way out
+  function wedgePt(s, deg, r) {
+    const a = (deg * Math.PI) / 180;
+    return [s.x + (s.w / 2) * (1 + r * Math.sin(a)), s.y + (s.h / 2) * (1 - r * Math.cos(a))];
+  }
+
+  // A wedge's label sits halfway across its ring, or in the middle of a whole disc
+  function wedgeMid(s) {
+    const ir = (s.ir || 0) / 100;
+    const r = s.a1 - s.a0 >= 360 && !ir ? 0 : ir ? (1 + ir) / 2 : 0.6;
+    return wedgePt(s, (s.a0 + s.a1) / 2, r);
   }
 
   // Unrotated anchor of a box label: x for the text anchor, y of its top
   function labelPos(s, lineCount) {
     const [aw, ah] = LABEL_AREA[s.k];
     const pad = labelPad(s);
+    const total = lineCount * fontSize(s) * LINE_H;
+    if (s.k === "w") {
+      const [x, y] = wedgeMid(s);
+      return { x, y: y - total / 2, anchor: "middle", total };
+    }
     const cx = s.x + s.w / 2;
     const cy = s.y + s.h / 2;
-    const total = lineCount * fontSize(s) * LINE_H;
     const ta = s.ta || "center";
     const va = s.va || "middle";
     return {
@@ -405,12 +446,21 @@
     };
   }
 
+  // Where a text's anchor (x y) sits across its box
+  const ALIGN = { left: 0, center: 0.5, right: 1, top: 0, middle: 0.5, bottom: 1 };
+
+  // A text's anchor for the top-left corner (x, y) of its box
+  function textAnchor(s, x, y) {
+    const t = textSize(s);
+    return [R(x + t.w * ALIGN[s.ta || "left"]), R(y + t.h * ALIGN[s.va || "top"])];
+  }
+
   // Unrotated box of a shape that has one, plus its rotation
   function frame(s) {
     if (BOX.has(s.k)) return { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot || 0 };
     if (s.k === "t") {
       const t = textSize(s);
-      return { x: s.x, y: s.y, w: t.w, h: t.h, rot: s.rot || 0 };
+      return { x: s.x - t.w * ALIGN[s.ta || "left"], y: s.y - t.h * ALIGN[s.va || "top"], w: t.w, h: t.h, rot: s.rot || 0 };
     }
     // Strokes keep their points upright and rotate around their centre
     if (s.k === "p" || s.k === "h") return { ...ptsBounds(s.pts, lineWidth(s) / 2), rot: s.rot || 0 };
@@ -472,7 +522,7 @@
     const hw = Math.max(f.w / 2, 0.5);
     const hh = Math.max(f.h / 2, 0.5);
     let t;
-    if (s.k === "e") t = 1 / Math.hypot(lx / hw, ly / hh);
+    if (s.k === "e" || s.k === "w") t = 1 / Math.hypot(lx / hw, ly / hh);
     else if (s.k === "m") t = 1 / (Math.abs(lx) / hw + Math.abs(ly) / hh);
     else
       t = Math.min(
@@ -525,7 +575,20 @@
     return strokeW(s);
   }
 
+  // A wedge's outline as points, unrotated: outer arc, then inner arc or the centre
+  function wedgePts(s) {
+    const n = Math.max(2, Math.ceil((s.a1 - s.a0) / 6));
+    const arc = (r) => Array.from({ length: n + 1 }, (_, i) => wedgePt(s, s.a0 + ((s.a1 - s.a0) * i) / n, r));
+    const ir = (s.ir || 0) / 100;
+    return [...arc(1), ...(ir ? arc(ir).reverse() : [wedgePt(s, 0, 0)])];
+  }
+
   function bounds(s, model) {
+    if (s.k === "w") {
+      const f = frame(s);
+      const c = [f.x + f.w / 2, f.y + f.h / 2];
+      return ptsBounds(wedgePts(s).map((p) => rotPt(p[0], p[1], c[0], c[1], f.rot)), strokeW(s) / 2);
+    }
     const f = frame(s);
     if (f) return ptsBounds(corners(f), BOX.has(s.k) ? strokeW(s) / 2 : 0);
 
@@ -565,8 +628,8 @@
 
   function arrowLabelBox(s, g) {
     const size = fontSize(s);
-    const lines = wrap(s.label, size, size * 14, s.st);
-    const w = Math.max(...lines.map((l) => measure(l, size, s.st))) + size * 0.6;
+    const lines = wrap(s.label, size, size * 14, s);
+    const w = Math.max(...lines.map((l) => measure(l, size, s))) + size * 0.6;
     const h = lines.length * size * LINE_H + size * 0.2;
     return { x: g.mid[0] - w / 2, y: g.mid[1] - h / 2, w, h, lines, size };
   }
@@ -587,9 +650,29 @@
     return d;
   }
 
+  // Even-odd ray casting
+  function inPoly(pts, p) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [xi, yi] = pts[i];
+      const [xj, yj] = pts[j];
+      if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+
+  const isFilled = (s) => !!s.f && s.f !== "none";
+
   // 0: miss, 1: hit, 2: inside a hollow shape (picked only if nothing else is)
   function hitShape(s, p, tol, model) {
     const f = frame(s);
+    if (s.k === "w") {
+      const pts = wedgePts(s);
+      const lp = rotPt(p[0], p[1], f.x + f.w / 2, f.y + f.h / 2, -f.rot);
+      if (polyDist([...pts, pts[0]], lp) <= tol + strokeW(s) / 2) return 1;
+      if (inPoly(pts, lp)) return isFilled(s) || s.label ? 1 : 2;
+      return 0;
+    }
     if (f && POINTS.has(s.k)) {
       p = rotPt(p[0], p[1], f.x + f.w / 2, f.y + f.h / 2, -f.rot);
     } else if (f) {
@@ -617,7 +700,7 @@
         edge = (Math.abs(r - 1) * hw * hh) / Math.hypot(hw, hh) <= t;
       }
       if (edge) return 1;
-      if (inside) return (s.f && s.f !== "none") || s.label ? 1 : 2;
+      if (inside) return isFilled(s) || s.label ? 1 : 2;
       return 0;
     }
     if (s.k === "a") {
@@ -631,6 +714,7 @@
     }
     const b = ptsBounds(s.pts, lineWidth(s) / 2 + tol);
     if (p[0] < b.x || p[1] < b.y || p[0] > b.x + b.w || p[1] > b.y + b.h) return 0;
+    if (s.k === "l" && isFilled(s)) return polyDist([...s.pts, s.pts[0]], p) <= tol + lineWidth(s) / 2 || inPoly(s.pts, p) ? 1 : 0;
     return polyDist(s.pts, p) <= tol + lineWidth(s) / 2 ? 1 : 0;
   }
 
@@ -736,27 +820,53 @@
     return null;
   }
 
-  // Mix a palette colour towards the background: outline of solid fills
-  function darker(hex, t = 0.35) {
-    const c = (h, i) => parseInt(h.slice(i, i + 2), 16);
-    return "#" + [1, 3, 5].map((i) => Math.round(c(hex, i) * (1 - t) + c(BG, i) * t).toString(16).padStart(2, "0")).join("");
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  // Colour `a` mixed towards `b` by t (0-1)
+  const mix = (a, b, t) => "#" + rgb(a).map((v, i) => Math.round(v * (1 - t) + rgb(b)[i] * t).toString(16).padStart(2, "0")).join("");
+  // Outline of solid fills: a shade towards the background
+  const darker = (hex) => mix(hex, BG, 0.35);
+
+  // WCAG contrast ratio
+  function contrast(a, b) {
+    const lum = (hex) => {
+      const [r, g, b] = rgb(hex).map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  // Text in a palette colour, moved towards the theme's text colour until it reads on `bg` (pale colours on light themes)
+  function readable(hex, bg = BG) {
+    for (let t = 0; t < 1; t += 0.1) {
+      const c = mix(hex, COLORS.text, t);
+      if (contrast(c, bg) >= 4.5) return c;
+    }
+    return COLORS.text;
   }
 
   function labelColor(s) {
-    return BOX.has(s.k) && s.f === "solid" ? BG : COLORS[s.c || "text"];
+    const color = COLORS[s.c || "text"];
+    const o = (s.o ?? 100) / 100;
+    if (!BOX.has(s.k) || !isFilled(s)) return readable(color);
+    // The fill as drawn: semi is 20 %, and opacity fades it further
+    const fill = mix(BG, color, (s.f === "semi" ? 0.2 : 1) * o);
+    if (s.f === "semi") return readable(color, fill);
+    // The theme's own colours where they read; mid-tone fills need pure white or black
+    const best = (cs) => cs.reduce((a, b) => (contrast(b, fill) > contrast(a, fill) ? b : a));
+    const own = best([BG, COLORS.text]);
+    return contrast(own, fill) >= 4.5 ? own : best(["#ffffff", "#000000"]);
   }
 
-  function textLines(g, lines, size, x, y, anchor, color, st = "") {
+  // `f`: the shape, for its text style and font
+  function textLines(g, lines, size, x, y, anchor, color, f) {
+    const st = f.st || "";
     const t = el("text", {
       x,
       "font-size": size,
-      "font-family": FONT,
+      "font-family": FONTS[f.fo || "mono"].css,
       "font-weight": st.includes("b") ? "bold" : null,
       "font-style": st.includes("i") ? "italic" : null,
-      // Only the regular weight is bundled: a thin outline makes bold read
-      stroke: st.includes("b") ? color : null,
-      "stroke-width": st.includes("b") ? f1(size * 0.045) : null,
-      "stroke-linejoin": st.includes("b") ? "round" : null,
       "text-anchor": anchor,
       fill: color,
       style: "white-space:pre",
@@ -767,7 +877,7 @@
       span.textContent = line || " ";
       // Drawn, not text-decoration: Safari ignores that in SVG
       if (st.includes("u") && line.trim()) {
-        const w = measure(line, size, st);
+        const w = measure(line, size, f);
         const x0 = anchor === "middle" ? x - w / 2 : anchor === "end" ? x - w : +x;
         const uy = f1(cy + size * 0.45);
         el("path", { d: `M${f1(x0)} ${uy}H${f1(x0 + w)}`, stroke: color, "stroke-width": f1(Math.max(1, size * 0.07)) }, g);
@@ -788,38 +898,44 @@
       "stroke-linejoin": "round",
       fill: "none",
     };
+    // Opacity fades the shape; its label stays readable on top
+    const body = s.o ? el("g", { opacity: s.o / 100 }, g) : g;
+    // Filled shapes: a solid fill gets an outline a shade darker; d=none: no outline at all
+    if (s.d === "none") stroke.stroke = "none";
+    const fill = {
+      ...stroke,
+      stroke: s.d === "none" ? "none" : s.f === "solid" ? darker(color) : color,
+      fill: isFilled(s) ? color : "none",
+      "fill-opacity": s.f === "semi" ? 0.2 : null,
+    };
     if (BOX.has(s.k)) {
       const { x, y, w, h } = s;
       const cx = x + w / 2;
       const cy = y + h / 2;
       if (s.rot) g.setAttribute("transform", `rotate(${s.rot} ${f1(cx)} ${f1(cy)})`);
-      const a = {
-        ...stroke,
-        stroke: s.f === "solid" ? darker(color) : color,
-        fill: s.f === "semi" || s.f === "solid" ? color : "none",
-        "fill-opacity": s.f === "semi" ? 0.2 : null,
-      };
       if (s.k === "r")
-        el("rect", { ...a, x, y, width: w, height: h, rx: f1(Math.min(8, w / 4, h / 4)) }, g);
-      else if (s.k === "e") el("ellipse", { ...a, cx, cy, rx: w / 2, ry: h / 2 }, g);
-      else el("polygon", { ...a, points: `${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}` }, g);
+        el("rect", { ...fill, x, y, width: w, height: h, rx: f1(s.rx === undefined ? Math.min(8, w / 4, h / 4) : Math.min(s.rx, w / 2, h / 2)) }, body);
+      else if (s.k === "e") el("ellipse", { ...fill, cx, cy, rx: w / 2, ry: h / 2 }, body);
+      else if (s.k === "w") el("path", { ...fill, d: wedgeD(s), "fill-rule": "evenodd" }, body);
+      else el("polygon", { ...fill, points: `${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}` }, body);
       if (s.label && !hideLabel) {
         const size = fontSize(s);
-        const lines = wrap(s.label, size, labelWidth(s), s.st);
+        const lines = wrap(s.label, size, labelWidth(s), s);
         const lp = labelPos(s, lines.length);
-        textLines(g, lines, size, f1(lp.x), lp.y, lp.anchor, labelColor(s), s.st);
+        textLines(g, lines, size, f1(lp.x), lp.y, lp.anchor, labelColor(s), s);
       }
     } else if (s.k === "t") {
       if (hideLabel) return g;
       const t = textSize(s);
-      if (s.rot) g.setAttribute("transform", `rotate(${s.rot} ${f1(s.x + t.w / 2)} ${f1(s.y + t.h / 2)})`);
-      textLines(g, t.lines, t.size, s.x, s.y, "start", color, s.st);
+      const f = frame(s);
+      if (s.rot) g.setAttribute("transform", `rotate(${s.rot} ${f1(f.x + t.w / 2)} ${f1(f.y + t.h / 2)})`);
+      textLines(body, t.lines, t.size, f1(f.x), f.y, "start", readable(color), s);
     } else if (s.k === "l") {
-      el("path", { ...stroke, d: "M" + s.pts.map(P).join("L") }, g);
+      el("path", { ...(isFilled(s) ? fill : stroke), d: "M" + s.pts.map(P).join("L") + (isFilled(s) ? "Z" : "") }, body);
     } else if (s.k === "a") {
       const geo = arrowGeom(s, model);
       const { p0, p1, ctrl } = geo;
-      el("path", { ...stroke, d: ctrl ? `M${P(p0)}Q${P(ctrl)} ${P(p1)}` : `M${P(p0)}L${P(p1)}` }, g);
+      el("path", { ...stroke, d: ctrl ? `M${P(p0)}Q${P(ctrl)} ${P(p1)}` : `M${P(p0)}L${P(p1)}` }, body);
       const head = (kind, tip, from) => {
         const dx = tip[0] - from[0];
         const dy = tip[1] - from[1];
@@ -832,31 +948,49 @@
         const solid = { ...stroke, "stroke-dasharray": null };
         const filled = { ...solid, fill: color };
         const half = size * Math.tan((28 * Math.PI) / 180);
-        if (kind === "open") el("path", { ...solid, d: `M${P(at(size, half))}L${P(tip)}L${P(at(size, -half))}` }, g);
-        else if (kind === "triangle") el("path", { ...filled, d: `M${P(tip)}L${P(at(size, half))}L${P(at(size, -half))}Z` }, g);
+        if (kind === "open") el("path", { ...solid, d: `M${P(at(size, half))}L${P(tip)}L${P(at(size, -half))}` }, body);
+        else if (kind === "triangle") el("path", { ...filled, d: `M${P(tip)}L${P(at(size, half))}L${P(at(size, -half))}Z` }, body);
         else if (kind === "diamond")
-          el("path", { ...filled, d: `M${P(tip)}L${P(at(size * 0.7, half * 0.8))}L${P(at(size * 1.4, 0))}L${P(at(size * 0.7, -half * 0.8))}Z` }, g);
-        else if (kind === "dot") el("circle", { ...filled, cx: f1(tip[0]), cy: f1(tip[1]), r: f1(Math.max(2.5, sw * 1.3)) }, g);
-        else if (kind === "bar") el("path", { ...solid, d: `M${P(at(0, half * 1.2))}L${P(at(0, -half * 1.2))}` }, g);
+          el("path", { ...filled, d: `M${P(tip)}L${P(at(size * 0.7, half * 0.8))}L${P(at(size * 1.4, 0))}L${P(at(size * 0.7, -half * 0.8))}Z` }, body);
+        else if (kind === "dot") el("circle", { ...filled, cx: f1(tip[0]), cy: f1(tip[1]), r: f1(Math.max(2.5, sw * 1.3)) }, body);
+        else if (kind === "bar") el("path", { ...solid, d: `M${P(at(0, half * 1.2))}L${P(at(0, -half * 1.2))}` }, body);
       };
       head(s.he || "open", p1, ctrl || p0);
       head(s.hs || "none", p0, ctrl || p1);
       if (s.label && !hideLabel) {
         const b = arrowLabelBox(s, geo);
         el("rect", { x: f1(b.x), y: f1(b.y), width: f1(b.w), height: f1(b.h), rx: 4, fill: BG }, g);
-        textLines(g, b.lines, b.size, f1(geo.mid[0]), b.y + b.size * 0.1, "middle", color, s.st);
+        textLines(g, b.lines, b.size, f1(geo.mid[0]), b.y + b.size * 0.1, "middle", readable(color), s);
       }
     } else if (s.k === "h") {
       rotateStroke(g, s);
-      el("path", { ...stroke, "stroke-dasharray": null, "stroke-width": lineWidth(s), "stroke-opacity": 0.35, d: smoothD(s.pts) }, g);
+      el("path", { ...stroke, "stroke-dasharray": null, "stroke-width": lineWidth(s), "stroke-opacity": 0.35, d: smoothD(s.pts) }, body);
     } else if (s.pts[0].length > 2) {
       rotateStroke(g, s);
-      el("path", { fill: color, d: outlineD(s.pts, lineWidth(s)) }, g);
+      el("path", { fill: color, d: outlineD(s.pts, lineWidth(s)) }, body);
     } else {
       rotateStroke(g, s);
-      el("path", { ...stroke, "stroke-dasharray": null, "stroke-width": lineWidth(s), d: smoothD(s.pts) }, g);
+      el("path", { ...stroke, "stroke-dasharray": null, "stroke-width": lineWidth(s), d: smoothD(s.pts) }, body);
     }
     return g;
+  }
+
+  // Real arcs; a whole ring is two half arcs per circle, its hole cut by evenodd
+  function wedgeD(s) {
+    const rx = s.w / 2;
+    const ry = s.h / 2;
+    const ir = (s.ir || 0) / 100;
+    const sweep = s.a1 - s.a0;
+    const arc = (r, from, to) => {
+      const big = Math.abs(to - from) > 180 ? 1 : 0;
+      const dir = to > from ? 1 : 0;
+      return `A${f1(rx * r)} ${f1(ry * r)} 0 ${big} ${dir} ${P(wedgePt(s, to, r))}`;
+    };
+    const ring = (r) => `M${P(wedgePt(s, 0, r))}${arc(r, 0, 180)}${arc(r, 180, 360)}Z`;
+    if (sweep >= 360) return ring(1) + (ir ? ring(ir) : "");
+    const outer = `M${P(wedgePt(s, s.a0, 1))}${arc(1, s.a0, s.a1)}`;
+    if (!ir) return outer + `L${P(wedgePt(s, 0, 0))}Z`;
+    return outer + `L${P(wedgePt(s, s.a1, ir))}${arc(ir, s.a1, s.a0)}Z`;
   }
 
   function rotateStroke(g, s) {
@@ -879,18 +1013,56 @@
       height: h,
       role: "img",
     });
+    if (opts.css) el("style", {}, svg).textContent = opts.css;
     if (opts.background)
       el("rect", { x: f1(b.x - pad), y: f1(b.y - pad), width: w, height: h, fill: BG }, svg);
     for (const s of model.shapes) if (s.k !== "raw") svg.appendChild(renderShape(s, model));
     return svg;
   }
 
-  function svgString(content) {
-    return new XMLSerializer().serializeToString(renderStatic(content, { background: true }));
+  // Text is measured with the page's fonts: have them all loaded first
+  let fontsLoading = null;
+  const fontsReady = () =>
+    (fontsLoading ??= Promise.all(Object.values(FONTS).map((f) => document.fonts?.load(`16px "${f.family}"`))).then(
+      () => measureCache.clear(),
+      () => {},
+    ));
+
+  const usedFonts = (content) => new Set(parse(content).shapes.filter((s) => s.label).map((s) => s.fo || "mono"));
+
+  // @font-face rules with the fonts (mono/sans/serif) as data URLs, so a file renders the same anywhere
+  const fontUrls = {};
+  async function fontFaces(fonts) {
+    const css = [];
+    for (const fo of fonts) {
+      fontUrls[fo] ??= fetch(FONTS[fo].url)
+        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
+        .then((b) => new Promise((ok, fail) => {
+          const r = new FileReader();
+          r.onload = () => ok(r.result);
+          r.onerror = fail;
+          r.readAsDataURL(b);
+        }))
+        // Offline and not cached: the file falls back to a system font, and the next export retries
+        .catch(() => delete fontUrls[fo]);
+      const url = await fontUrls[fo];
+      if (typeof url === "string")
+        css.push(`@font-face{font-family:"${FONTS[fo].family}";src:url(${url}) format("woff2");font-weight:100 900${FONTS[fo].adjust ? ";size-adjust:" + FONTS[fo].adjust : ""}}`);
+    }
+    return css.join("");
+  }
+
+  async function exportSvg(content) {
+    await fontsReady();
+    return renderStatic(content, { background: true, css: await fontFaces(usedFonts(content)) });
+  }
+
+  async function svgString(content) {
+    return new XMLSerializer().serializeToString(await exportSvg(content));
   }
 
   async function pngBlob(content) {
-    const svg = renderStatic(content, { background: true });
+    const svg = await exportSvg(content);
     const w = +svg.getAttribute("width");
     const h = +svg.getAttribute("height");
     // Canvas size limits: scale down very large drawings
@@ -963,7 +1135,7 @@
     ["text", "Text", "T"],
   ];
   const TOOL_LABEL = Object.fromEntries(TOOLS.filter(Boolean).map(([id, label]) => [id, label]));
-  const KIND_LABEL = { r: "Rectangle", e: "Ellipse", m: "Diamond", l: "Line", a: "Arrow", t: "Text", p: "Drawing", h: "Highlight" };
+  const KIND_LABEL = { r: "Rectangle", e: "Ellipse", m: "Diamond", w: "Wedge", l: "Line", a: "Arrow", t: "Text", p: "Drawing", h: "Highlight" };
   const PINNED_TOOLS = new Set(["select", "hand"]);
   const TOOL_KEYS = { v: "select", h: "hand", d: "pen", D: "highlight", e: "eraser", r: "rect", o: "ellipse", m: "diamond", l: "line", a: "arrow", t: "text" };
   const TOOL_KIND = { rect: "r", ellipse: "e", diamond: "m", line: "l", arrow: "a", text: "t", pen: "p", highlight: "h" };
@@ -1047,7 +1219,7 @@
 .draw-keys kbd{font:var(--n-caption);padding:1px 5px;margin-right:6px;border-radius:var(--n-r-sm);box-shadow:inset 0 0 0 1px var(--n-line-strong)}
 .draw-hint .coarse{display:none}
 @media (pointer:coarse){.draw-hint .fine{display:none}.draw-hint .coarse{display:block}}
-.draw-text{position:absolute;display:none;background:transparent;border:none;outline:none;resize:none;overflow:hidden;padding:0;margin:0;font-family:${FONT};line-height:${LINE_H};transform-origin:center;white-space:pre;caret-color:var(--blue)}
+.draw-text{position:absolute;display:none;background:transparent;border:none;outline:none;resize:none;overflow:hidden;padding:0;margin:0;font-family:${FONTS.mono.css};line-height:${LINE_H};transform-origin:center;white-space:pre;caret-color:var(--blue)}
 .draw-text.wrap{white-space:pre-wrap;text-align:center;word-break:break-word}
 .draw-readonly .draw-tools,.draw-readonly .draw-style,.draw-readonly .draw-edit{display:none!important}
 /* Phones: a bottom sheet with finger-sized targets */
@@ -1107,7 +1279,7 @@
   };
 
   function loadStyle() {
-    const style = { c: "text", s: "m", f: "none", d: "solid", hs: "none", he: "open", ta: "center", va: "middle", st: "" };
+    const style = { c: "text", s: "m", f: "none", d: "solid", hs: "none", he: "open", ta: "center", va: "middle", st: "", fo: "mono" };
     try {
       const saved = JSON.parse(localStorage.getItem(STYLE_KEY) || "{}");
       for (const k in style) if (ENUMS[k]?.includes(saved[k])) style[k] = saved[k];
@@ -1259,19 +1431,21 @@
     const HEAD_NAMES = { none: "None", open: "Arrow", triangle: "Triangle", dot: "Dot", diamond: "Diamond", bar: "Bar" };
     let textRow;
     E.segs = {
-      s: seg(row("Stroke", ["s"]), "s", [["s", "S", "Small"], ["m", "M", "Medium"], ["l", "L", "Large"], ["xl", "XL", "Extra large"]]),
+      s: seg(row("Stroke", ["s"]), "s", [["xs", "XS", "Extra small"], ["s", "S", "Small"], ["m", "M", "Medium"], ["l", "L", "Large"], ["xl", "XL", "Extra large"]]),
       f: seg(row("Fill", ["f"]), "f", words(ENUMS.f, ["None", "Semi", "Solid"])),
-      d: seg(row("Line", ["d"]), "d", words(ENUMS.d, ["Solid", "Dashed", "Dotted"])),
+      d: seg(row("Line", ["d"]), "d", words(["solid", "dash", "dot"], ["Solid", "Dashed", "Dotted"])),
       hs: seg(row("Start", ["hs"]), "hs", HEADS.map((k) => [k, headIcon(k, true), HEAD_NAMES[k]])),
       he: seg(row("End", ["he"]), "he", HEADS.map((k) => [k, headIcon(k, false), HEAD_NAMES[k]])),
       ta: seg((textRow = row("Text", ["ta", "va"])), "ta", words(ENUMS.ta, ["Left", "Centre", "Right"])),
       va: seg(textRow, "va", words(ENUMS.va, ["Top", "Middle", "Bottom"])),
+      fo: seg(row("Font", ["fo"]), "fo", words(ENUMS.fo, ["Mono", "Sans", "Serif"])),
       st: seg(row("Style", ["st"]), "st", [
         ["b", "B", "Bold", "Ctrl+B"],
         ["i", "I", "Italic", "Ctrl+I"],
         ["u", "U", "Underline", "Ctrl+U"],
       ]),
     };
+    for (const b of E.segs.fo.children) b.style.fontFamily = FONTS[b.dataset.draw.split(":")[2]].css;
     const [bold, italic, underline] = E.segs.st.children;
     bold.style.fontWeight = "bold";
     italic.style.fontStyle = "italic";
@@ -1364,8 +1538,7 @@
     });
     E.ta.addEventListener("blur", () => finishTextEdit());
     new ResizeObserver(() => E.mounted && applyCamera()).observe(host);
-    document.fonts?.load(`16px ${FONT}`).then(() => {
-      measureCache.clear();
+    fontsReady().then(() => {
       E.fontEpoch++;
       if (E.mounted) renderAll();
     });
@@ -1696,13 +1869,16 @@
     handle("rotate", rh, {}, true);
   }
 
+  // A text's alignment moves it around its anchor: that's left to the source
+  const panelAttrs = (k) => (k === "t" ? ATTRS.t.filter((a) => a !== "ta" && a !== "va") : ATTRS[k]);
+
   // Values shared by the selection (or the tool), per style key
   function styleState() {
     const sel = selected();
     const kinds = sel.length ? sel.map((s) => s.k) : TOOL_KIND[E.tool] ? [TOOL_KIND[E.tool]] : [];
     const out = {};
-    for (const key of ["c", "s", "f", "d", "ta", "va", "st", "hs", "he"]) {
-      const relevant = kinds.some((k) => ATTRS[k].includes(key));
+    for (const key of ["c", "s", "f", "d", "ta", "va", "fo", "st", "hs", "he"]) {
+      const relevant = kinds.some((k) => panelAttrs(k).includes(key));
       if (!relevant) continue;
       if (!sel.length) {
         out[key] = E.style[key];
@@ -1713,7 +1889,7 @@
         out.st = ["b", "i", "u"].filter((f) => texts.every((s) => (s.st || "").includes(f))).join("");
         continue;
       }
-      const vals = new Set(sel.filter((s) => ATTRS[s.k].includes(key)).map((s) => s[key] ?? DEFAULTS[key]));
+      const vals = new Set(sel.filter((s) => panelAttrs(s.k).includes(key)).map((s) => s[key] ?? DEFAULTS[key]));
       out[key] = vals.size === 1 ? [...vals][0] : null;
     }
     return { out, sel, kinds };
@@ -1809,7 +1985,7 @@
     saveStyle();
     let changed = false;
     for (const s of selected()) {
-      if (!ATTRS[s.k].includes(key) || (s[key] ?? DEFAULTS[key]) === v) continue;
+      if (!panelAttrs(s.k).includes(key) || (s[key] ?? DEFAULTS[key]) === v) continue;
       replaceShape({ ...s, [key]: v });
       changed = true;
     }
@@ -2036,6 +2212,7 @@
         hh = Math.max(1, Math.abs(f.h * (swap ? scale[0] : scale[1])));
       }
       const n = { ...s, x: R(c[0] - w / 2), y: R(c[1] - hh / 2) };
+      if (s.k === "t") [n.x, n.y] = textAnchor(s, n.x, n.y);
       if (BOX.has(s.k)) {
         n.w = R(w);
         n.h = R(hh);
@@ -2227,14 +2404,14 @@
       const s =
         tool === "line"
           ? { k: "l", id, pts: [start, start], c: E.style.c, s: E.style.s, d: E.style.d }
-          : { k: "a", id, from: bindAt(w, id) || start, to: start, c: E.style.c, s: E.style.s, d: E.style.d, hs: E.style.hs, he: E.style.he, st: E.style.st || undefined };
+          : { k: "a", id, from: bindAt(w, id) || start, to: start, c: E.style.c, s: E.style.s, d: E.style.d, hs: E.style.hs, he: E.style.he, st: E.style.st || undefined, fo: E.style.fo };
       startOp({ type: "line", id, start: sp, before: E.model.shapes.slice() });
       addShape(s);
       renderShapes();
       return;
     }
     const k = TOOL_KIND[tool];
-    const s = { k, id: newId(), x: R(start[0]), y: R(start[1]), w: 1, h: 1, c: E.style.c, s: E.style.s, f: E.style.f, d: E.style.d, ta: E.style.ta, va: E.style.va, st: E.style.st || undefined };
+    const s = { k, id: newId(), x: R(start[0]), y: R(start[1]), w: 1, h: 1, c: E.style.c, s: E.style.s, f: E.style.f, d: E.style.d, ta: E.style.ta, va: E.style.va, st: E.style.st || undefined, fo: E.style.fo };
     startOp({ type: "box", id: s.id, origin: start, start: sp, before: E.model.shapes.slice() });
     addShape(s);
     renderShapes();
@@ -2743,7 +2920,7 @@
     const center = toWorld(vw / 2, vh / 2);
     if (!shapes.length || !/^\s*draw\s/.test(text)) {
       const label = text.slice(0, MAX_LABEL).replace(/\r/g, "");
-      const s = { k: "t", id: newId(), x: 0, y: 0, c: E.style.c, s: E.style.s, st: E.style.st || undefined, label };
+      const s = { k: "t", id: newId(), x: 0, y: 0, c: E.style.c, s: E.style.s, st: E.style.st || undefined, fo: E.style.fo, label };
       const t = textSize(s);
       insertShapes([{ ...s, x: R(center[0] - t.w / 2), y: R(center[1] - t.h / 2) }]);
       return;
@@ -2769,7 +2946,7 @@
   // ── Text editing ──
 
   function createText(w) {
-    const s = { k: "t", id: newId(), x: 0, y: 0, c: E.style.c, s: E.style.s, st: E.style.st || undefined };
+    const s = { k: "t", id: newId(), x: 0, y: 0, c: E.style.c, s: E.style.s, st: E.style.st || undefined, fo: E.style.fo };
     const size = fontSize(s);
     const p = snapPt([w[0], w[1] - (size * LINE_H) / 2]);
     s.x = R(p[0]);
@@ -2782,8 +2959,8 @@
 
   // Where a rotated text's top-left corner is drawn
   function textCorner(s) {
-    const t = textSize(s);
-    return rotPt(s.x, s.y, s.x + t.w / 2, s.y + t.h / 2, s.rot);
+    const f = frame(s);
+    return rotPt(f.x, f.y, f.x + f.w / 2, f.y + f.h / 2, s.rot);
   }
 
   function startTextEdit(s) {
@@ -2820,22 +2997,24 @@
     let origin = "";
     if (s.k === "t") {
       // Extra width keeps the caret visible; turn around the text's own centre like the render
-      const t = textSize({ ...s, label: text });
-      w = t.w + size;
-      hh = t.h;
-      cx = s.x + w / 2;
-      cy = s.y + hh / 2;
-      origin = `${f1((t.w / 2) * z)}px ${f1((hh / 2) * z)}px`;
+      const f = frame({ ...s, label: text });
+      // Extra width on the side the text grows to
+      const grow = size * (1 - ALIGN[s.ta || "left"]);
+      w = f.w + size;
+      hh = f.h;
+      cx = f.x - (size - grow) + w / 2;
+      cy = f.y + hh / 2;
+      origin = `${f1((f.w / 2 + size - grow) * z)}px ${f1((hh / 2) * z)}px`;
     } else if (s.k === "a") {
       const g = arrowGeom(s, E.model);
-      const lines = wrap(text || " ", size, size * 14, s.st);
-      w = Math.max(size * 2, ...lines.map((l) => measure(l, size, s.st))) + size * 0.6;
+      const lines = wrap(text || " ", size, size * 14, s);
+      w = Math.max(size * 2, ...lines.map((l) => measure(l, size, s))) + size * 0.6;
       hh = lines.length * lineH;
       [cx, cy] = g.mid;
       rot = 0;
     } else {
       w = labelWidth(s);
-      const lp = labelPos(s, wrap(text || " ", size, w, s.st).length);
+      const lp = labelPos(s, wrap(text || " ", size, w, s).length);
       hh = lp.total;
       const left = lp.anchor === "start" ? lp.x : lp.anchor === "end" ? lp.x - w : lp.x - w / 2;
       // The editor turns around its own centre, the shape around its centre
@@ -2848,14 +3027,14 @@
       width: f1(w * z) + "px",
       height: f1(hh * z) + "px",
       fontSize: size * z + "px",
+      fontFamily: FONTS[s.fo || "mono"].css,
       fontWeight: s.st?.includes("b") ? "bold" : "",
-      webkitTextStroke: s.st?.includes("b") ? f1(size * z * 0.045) + "px " + labelColor(s) : "",
       fontStyle: s.st?.includes("i") ? "italic" : "",
       textDecoration: s.st?.includes("u") ? "underline" : "",
       color: labelColor(s),
       transform: rot ? `rotate(${rot}deg)` : "",
       transformOrigin: origin,
-      textAlign: s.k === "t" ? "left" : BOX.has(s.k) ? s.ta || "center" : "center",
+      textAlign: s.k === "t" ? s.ta || "left" : s.k === "w" ? "center" : BOX.has(s.k) ? s.ta || "center" : "center",
       // Arrow labels sit on the line: keep it out from under the text
       background: s.k === "a" ? BG : "",
       borderRadius: s.k === "a" ? "4px" : "",
@@ -2864,16 +3043,16 @@
 
   // Grow a box around its centre until its label fits
   function fitLabel(n) {
-    if (!BOX.has(n.k) || !n.label) return n;
+    if (!BOX.has(n.k) || n.k === "w" || !n.label) return n;
     const size = fontSize(n);
     const [aw, ah] = LABEL_AREA[n.k];
-    const word = Math.max(...n.label.split(/\s+/).map((w) => measure(w, size, n.st)));
+    const word = Math.max(...n.label.split(/\s+/).map((w) => measure(w, size, n)));
     const needW = R((word + labelPad(n) * 2) / aw);
     if (needW > n.w) {
       n.x = R(n.x - (needW - n.w) / 2);
       n.w = needW;
     }
-    const lines = wrap(n.label, size, labelWidth(n), n.st).length;
+    const lines = wrap(n.label, size, labelWidth(n), n).length;
     const needH = R((lines * size * LINE_H + labelPad(n) * 2) / ah);
     if (needH > n.h) {
       n.y = R(n.y - (needH - n.h) / 2);
@@ -2892,8 +3071,7 @@
     if (corner) {
       const t = textSize(n);
       const [ox, oy] = rotPt(-t.w / 2, -t.h / 2, 0, 0, n.rot);
-      n.x = R(corner[0] - t.w / 2 - ox);
-      n.y = R(corner[1] - t.h / 2 - oy);
+      [n.x, n.y] = textAnchor(n, corner[0] - t.w / 2 - ox, corner[1] - t.h / 2 - oy);
     }
     replaceShape(n);
     renderShapes();
@@ -2943,6 +3121,9 @@
     renderStatic,
     svgString,
     pngBlob,
+    fontsReady,
+    usedFonts,
+    fontFaces,
     setTheme: () => {
       readTheme();
       // Cached shapes carry the old colours

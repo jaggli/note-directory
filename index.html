@@ -58,7 +58,7 @@
     />
     <link
       rel="preload"
-      href="victor-mono/VictorMono-Regular.woff2"
+      href="fonts/VictorMono.woff2"
       as="font"
       type="font/woff2"
       crossorigin
@@ -90,10 +90,27 @@
         visibility: hidden;
       }
 
+      /* Latin subsets, all weights in one file; the Source faces are for drawings */
       @font-face {
         font-family: "Victor Mono";
-        src: url("victor-mono/VictorMono-Regular.woff2") format("woff2");
-        font-weight: 400;
+        src: url("fonts/VictorMono.woff2") format("woff2");
+        font-weight: 100 700;
+        /* This build has 1000 units per em, the original 1100: same glyph size */
+        size-adjust: 90.91%;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Source Sans 3";
+        src: url("fonts/SourceSans3.woff2") format("woff2");
+        font-weight: 200 900;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Source Serif 4";
+        src: url("fonts/SourceSerif4.woff2") format("woff2");
+        font-weight: 200 900;
         font-style: normal;
         font-display: swap;
       }

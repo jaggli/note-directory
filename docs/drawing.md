@@ -131,8 +131,10 @@ never HTML. Referenced embeds are clickable and open the drawing.
 
 - **Search** indexes only labels (`drawSearchLines()`), not coordinates.
 - **⋯ menu** on a drawing: *Copy as PNG* (clipboard, falls back to a
-  download) and *Download as SVG*. Exports use the dark background; the PNG
-  uses the browser's monospace font because SVG images can't load web fonts.
+  download) and *Download as SVG*. Exports use the dark background and embed
+  the fonts their text uses as data URLs (`fontFaces()`), so a file looks the
+  same anywhere and the PNG (an SVG drawn as an image, which can't load web
+  fonts) gets them too.
 - **Export all** adds `name.draw.svg` next to each drawing and lists them in
   `.note.directory` → `renders`; importing that zip skips them.
 
@@ -140,6 +142,6 @@ never HTML. Referenced embeds are clickable and open the drawing.
 
 | Key                  | Content                                   |
 | -------------------- | ----------------------------------------- |
-| `notepad_draw_style` | Last used colour/size/fill/dash/alignment/arrowheads |
+| `notepad_draw_style` | Last used colour/size/fill/dash/alignment/font/arrowheads |
 
 The camera per drawing is kept in memory for the session only.

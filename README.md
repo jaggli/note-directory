@@ -246,9 +246,11 @@ See [skills/README.md](skills/README.md) for usage and install instructions.
 ## Tech
 
 - **Theme**: [Catppuccin Mocha](https://catppuccin.com)
-- **Font**: [Victor Mono](https://github.com/rubjo/victor-mono)
-  by Rune Bjørnerås (served locally, SIL OFL 1.1 — see
-  `victor-mono/OFL.txt`)
+- **Fonts**: [Victor Mono](https://github.com/rubjo/victor-mono)
+  by Rune Bjørnerås; [Source Sans 3](https://github.com/adobe-fonts/source-sans)
+  and [Source Serif 4](https://github.com/adobe-fonts/source-serif)
+  by Adobe for drawings (served locally, Latin subsets,
+  SIL OFL 1.1 — see `fonts/OFL-*.txt`)
 - **Compression**: deflate-raw via `CompressionStream` /
   `DecompressionStream` APIs for URL sharing
 - **Drawing**: hand-written SVG canvas (no libraries);
