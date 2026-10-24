@@ -859,8 +859,9 @@ test("line tool: Enter finishes an open path, Backspace takes back a point, a dr
   s = (await shapes(page))[1];
   expect(s.pts).toEqual([[0, 200], [150, 200]]);
   expect(s.f).toBeUndefined();
-  // A two-point line has nothing to fill: no Fill row
-  await expect(page.locator('.draw-seg[data-key="f"]')).toBeHidden();
+  // A two-point line has nothing to fill yet: the Fill row shows, greyed, saying how to get there
+  await expect(page.locator('[data-draw="style:f:solid"]')).toBeDisabled();
+  await expect(page.locator(".draw-row-hint")).toHaveText("Double-click the line to add a point, then it can be filled");
 });
 
 test("double-click adds a point to a line and removes one from it", async ({ page }) => {
@@ -870,7 +871,8 @@ test("double-click adds a point to a line and removes one from it", async ({ pag
   await page.mouse.dblclick(...(await at(page, 100, 0)));
   expect((await shapes(page))[0].pts).toEqual([[0, 0], [100, 0], [200, 0]]);
   // Three points: now it can be filled
-  await expect(page.locator('.draw-seg[data-key="f"]')).toBeVisible();
+  await expect(page.locator('[data-draw="style:f:solid"]')).toBeEnabled();
+  await expect(page.locator(".draw-row-hint")).toBeHidden();
   await page.mouse.dblclick(...(await at(page, 100, 0)));
   expect((await shapes(page))[0].pts).toEqual([[0, 0], [200, 0]]);
   // Never fewer than two

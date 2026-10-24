@@ -137,7 +137,8 @@ Every attribute of the format has a control, shown only where it does
 something (`panelAttrs()`):
 
 - **Fill** for boxes, wedges and lines of three or more points (and the line
-  tool, for the shapes it closes). **Line → None** only for fillable shapes,
+  tool, for the shapes it closes). A two-point line shows it greyed, with how
+  to get there (add a point). **Line → None** only for fillable shapes,
   and never together with no fill, so a shape can't turn invisible.
 - **Corners** (round / square) for rectangles; **Opacity** for everything.
 - **Pen** for the draw tool and selected strokes: *Pen* (even width and

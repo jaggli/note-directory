@@ -1225,6 +1225,7 @@
 .draw-ui .draw-seg button:disabled{opacity:.35;cursor:default}
 .draw-status{position:absolute;top:14px;left:50%;transform:translateX(-50%);max-width:calc(100% - 28px);padding:5px 10px;border-radius:var(--n-r-lg);background:var(--n-raised);color:var(--n-text-2);box-shadow:0 0 0 1px var(--n-line);font:var(--n-caption);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;display:none}
 .draw-status.visible{display:block}
+.draw-row-hint{margin:6px 0 0;font:var(--n-caption);color:var(--n-text-3)}
 .draw-ui .draw-seg button.active{background:var(--n-raised);color:var(--n-text);box-shadow:0 0 0 1px var(--n-line-strong),0 1px 2px rgb(0 0 0/15%)}
 .draw-seg svg{width:24px;height:12px}
 .draw-actions{display:flex;align-items:center;gap:2px;padding-top:10px;border-top:1px solid var(--n-line)}
@@ -1495,9 +1496,10 @@
     const words = (vals, labels) => vals.map((v, i) => [v, labels[i]]);
     const HEAD_NAMES = { none: "None", open: "Arrow", triangle: "Triangle", dot: "Dot", diamond: "Diamond", bar: "Bar" };
     let textRow;
+    let fillRow;
     E.segs = {
       s: seg(row("Stroke", ["s"]), "s", [["xs", "XS", "Extra small"], ["s", "S", "Small"], ["m", "M", "Medium"], ["l", "L", "Large"], ["xl", "XL", "Extra large"]]),
-      f: seg(row("Fill", ["f"]), "f", words(ENUMS.f, ["None", "Semi", "Solid"])),
+      f: seg((fillRow = row("Fill", ["f"])), "f", words(ENUMS.f, ["None", "Semi", "Solid"])),
       d: seg(row("Line", ["d"]), "d", [
         ["solid", dashIcon("solid"), "Solid"],
         ["dash", dashIcon("dash"), "Dashed"],
@@ -1519,6 +1521,7 @@
       ]),
     };
     for (const b of E.segs.fo.children) b.style.fontFamily = FONTS[b.dataset.draw.split(":")[2]].css;
+    E.fillHint = h("p", "draw-row-hint", fillRow);
     const [bold, italic, underline] = E.segs.st.children;
     bold.style.fontWeight = "bold";
     italic.style.fontStyle = "italic";
@@ -1957,16 +1960,17 @@
   }
 
   // What the panel offers for a shape, or for the tool's next one: label settings once there is
-  // a label, free text only aligns horizontally (vertically it would only move its anchor), and
-  // a two-point line has nothing to fill
+  // a label, and free text only aligns horizontally (vertically it would only move its anchor)
   const LABEL_KEYS = ["ta", "va", "fo", "st"];
   function panelAttrs(s) {
     let a = ATTRS[s.k];
     if (s.k === "t") a = a.filter((k) => k !== "va");
     else if (!s.label) a = a.filter((k) => !LABEL_KEYS.includes(k));
-    if (s.k === "l" && s.pts && s.pts.length < 3) a = a.filter((k) => k !== "f");
     return a;
   }
+
+  // A two-point line has nothing to fill yet: its Fill row shows, greyed, saying how to get there
+  const canFill = (s) => panelAttrs(s).includes("f") && !(s.k === "l" && s.pts && s.pts.length < 3);
 
   // A shape's value as the panel shows it
   function styleValue(s, key) {
@@ -2014,15 +2018,16 @@
       out.pen = modes.size === 1 ? [...modes][0] : null;
     }
     // No outline only where everything selected can be filled
-    const fillable = items.length > 0 && items.every((s) => panelAttrs(s).includes("f"));
-    return { out, sel, fillable };
+    const fillable = items.length > 0 && items.every(canFill);
+    const fillLocked = items.some((s) => panelAttrs(s).includes("f")) && !items.some(canFill);
+    return { out, sel, fillable, fillLocked };
   }
 
   function renderUI() {
     if (!E.mounted) return;
     for (const [id, b] of Object.entries(E.toolBtns)) b.classList.toggle("active", id === E.tool);
     for (const b of E.toolGrid.children) b.classList.toggle("active", b.dataset.draw === "tool:" + E.tool);
-    const { out, sel, fillable } = styleState();
+    const { out, sel, fillable, fillLocked } = styleState();
     const wanted = !E.readonly && Object.keys(out).length > 0;
     const show = wanted && !E.styleClosed;
     E.styleEl.classList.toggle("visible", show);
@@ -2045,7 +2050,9 @@
       const noLine = E.segs.d.querySelector('[data-draw="style:d:none"]');
       noLine.style.display = fillable ? "" : "none";
       noLine.disabled = out.f === "none";
-      E.segs.f.querySelector('[data-draw="style:f:none"]').disabled = out.d === "none";
+      for (const b of E.segs.f.children) b.disabled = fillLocked || (b.dataset.draw === "style:f:none" && out.d === "none");
+      E.fillHint.style.display = fillLocked ? "" : "none";
+      E.fillHint.textContent = `${E.touch ? "Double-tap" : "Double-click"} the line to add a point, then it can be filled`;
       E.actionsEl.style.display = sel.length ? "" : "none";
       const grouped = sel.some((s) => s.gr);
       const groupBtn = E.actionsEl.querySelector('[data-draw="act:group"]');
@@ -2134,6 +2141,7 @@
     let changed = false;
     for (const s of selected()) {
       if (!panelAttrs(s).includes(key) || styleValue(s, key) === v) continue;
+      if (key === "f" && !canFill(s)) continue;
       const n = { ...s, ...stylePatch(s, key, v) };
       if (key === "d" && v === "none" && !isFilled(n)) continue;
       if (key === "f" && !isFilled(n) && n.d === "none") delete n.d;
