@@ -10117,6 +10117,7 @@ const HELP_DESKTOP = [
   "- Double-click a shape to write in it, empty space for text",
   "- Double-click a line to add a point, a point to remove it",
   "- Wedge: drag its round handles for the slice and the hole",
+  "- Draw: pen, sharpie or brush pen (faster is thinner), in the style panel",
   "- Arrow from one shape to another to connect them",
   "- Shift: keep proportions, straight lines, 15° steps",
   "- Ctrl+D duplicate · Ctrl+G group · Del delete",

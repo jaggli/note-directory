@@ -119,8 +119,8 @@ Pick **New drawing** from the ▾ next to + (or `:draw` in vim).
 Drawings open on a **Canvas**; **Source** shows the text
 behind them and **zen** shows them read-only.
 
-- Tools: select, hand, pen (pressure-sensitive with a
-  stylus), highlighter, eraser, rectangle, ellipse,
+- Tools: select, hand, draw (pen, sharpie or brush pen;
+  width from a stylus's pressure or simulated from speed), highlighter, eraser, rectangle, ellipse,
   diamond, wedge (pie / donut slices with handles for
   the edges and the hole), line (drag, or click points
   for a polyline or a closed, fillable shape), arrow, text
@@ -258,8 +258,10 @@ See [skills/README.md](skills/README.md) for usage and install instructions.
 - **Compression**: deflate-raw via `CompressionStream` /
   `DecompressionStream` APIs for URL sharing
 - **Drawing**: hand-written SVG canvas (no libraries);
-  pressure strokes are filled outlines, input is smoothed
-  and simplified (Ramer–Douglas–Peucker) before saving
+  pressure strokes are filled outlines (thinning and taper
+  in the spirit of perfect-freehand), sharpie and brush
+  input is streamlined, the plain pen keeps every move; all
+  simplified (Ramer–Douglas–Peucker) before saving
 - **Zip**: Custom minimal zip builder (no library)
   for multi-note download
 - **Google Drive**: OAuth 2.0 via Google Identity

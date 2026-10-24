@@ -41,7 +41,7 @@ Coordinates are integers in canvas units; y grows downwards.
 | `t`  | text        | `x y` (its anchor, see `ta` `va`) | yes | c s ta va st fo o rot gr |
 | `l`  | line        | two or more points `x,y`        | no    | c s f d o gr          |
 | `a`  | arrow       | `start end`, each `x,y` or a shape id | yes | c s d hs he st fo o bend gr |
-| `p`  | pen stroke  | points, see below               | no    | c s o rot gr          |
+| `p`  | pen stroke  | points, see below               | no    | c s th tp o rot gr    |
 | `h`  | highlighter | points, see below               | no    | c s o rot gr          |
 
 **Arrows** given a shape id start/end at that shape's outline and follow it
@@ -82,6 +82,8 @@ then every point has one. Strokes are stored simplified.
 | `o`    | opacity `1`–`100` of the shape; its label stays at full strength (on text: the text) | `100` |
 | `rx`   | rectangle corner radius, `0` for square corners                        | up to `8` |
 | `ir`   | wedge inner radius, % of its radius `0`–`99`                           | `0`     |
+| `th`   | pen thinning `0`–`100`: how far pressure narrows the stroke (up to a hairline), full pressure swelling it (up to about double at 100) | — (classic pressure) |
+| `tp`   | pen taper: both ends narrow to a point over this length                 | —       |
 | `bend` | arrow curve: how far its middle sits off the straight line; positive curves right of the direction of travel | `0` |
 | `rot`  | rotation in degrees, clockwise around the shape's centre (strokes: the centre of their points, which are stored upright) | `0` |
 | `gr`   | group id: shapes with the same `gr` select and move together           | —       |

@@ -968,3 +968,62 @@ test("touch: taps place points, the first point closes, a double-tap finishes", 
   await tap(200, 200);
   expect((await shapes(page))[1].pts).toEqual([[0, 200], [100, 220], [200, 200]]);
 });
+
+test("pen modes: pen, sharpie (bold, from speed), brush pen (pointed)", async ({ page }) => {
+  await openDrawing(page);
+  await page.keyboard.press("d");
+  // Until one is picked: even with a mouse, as before
+  await expect(page.locator('[data-draw="style:pen:even"]')).toHaveClass(/active/);
+  const stroke = async (mode, y) => {
+    await page.click(`[data-draw="style:pen:${mode}"]`);
+    await page.keyboard.press("d");
+    const a = await at(page, 0, y);
+    await page.mouse.move(...a);
+    await page.mouse.down();
+    // Slow, fast, slow
+    let x = 0;
+    for (const step of [2, 2, 2, 2, 2, 2, 30, 30, 30, 30, 30, 30, 2, 2, 2, 2, 2, 2]) {
+      x += step;
+      await page.mouse.move(...(await at(page, x, y + (x % 7))));
+    }
+    await page.mouse.up();
+    return (await shapes(page)).at(-1).pts;
+  };
+  expect((await stroke("even", 0))[0]).toHaveLength(2);
+  const p = (await stroke("pressure", 100)).map((q) => q[2]);
+  // Thinner through the fast middle than at the slow end, but a marker never runs thin
+  expect(Math.min(...p)).toBeLessThan(p.at(-1));
+  expect(Math.min(...p)).toBeGreaterThanOrEqual(3);
+  await stroke("taper", 200);
+  // Thinning and taper go with the size: M here
+  const [even, pressure, taper] = await shapes(page);
+  expect([even.th, even.tp, pressure.th, pressure.tp, taper.th, taper.tp]).toEqual([undefined, undefined, 65, undefined, 85, 91]);
+  // The stroke ends where the pointer stopped, despite the streamlining
+  expect(taper.pts.at(-1).slice(0, 2)).toEqual([204, 201]);
+  // A tool setting: remembered, and not shown for a selected stroke
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("notepad_draw_style")).pen)).toBe("taper");
+  // A drawn stroke changes mode in the panel, and follows its size
+  await page.keyboard.press("v");
+  await page.mouse.click(...(await at(page, 54, 200)));
+  await expect(page.locator('[data-draw="style:pen:taper"]')).toHaveClass(/active/);
+  await page.click('[data-draw="style:s:xl"]');
+  expect((await shapes(page))[2]).toMatchObject({ s: "xl", th: 98, tp: 208 });
+  await page.click('[data-draw="style:pen:even"]');
+  const flat = (await shapes(page))[2];
+  expect([flat.th, flat.tp, flat.pts[0].length]).toEqual([undefined, undefined, 2]);
+});
+
+test("pen: the plain pen keeps its corners", async ({ page }) => {
+  await openDrawing(page);
+  await page.keyboard.press("d");
+  await page.click('[data-draw="style:pen:even"]');
+  await page.mouse.move(...(await at(page, 0, 100)));
+  await page.mouse.down();
+  for (let i = 1; i <= 20; i++) await page.mouse.move(...(await at(page, i * 5, 100 - i * 5)));
+  for (let i = 1; i <= 20; i++) await page.mouse.move(...(await at(page, 100 + i * 5, i * 5)));
+  await page.mouse.up();
+  const s = (await shapes(page))[0];
+  // The tip of the V is a point of the stroke, and the line runs straight through it
+  expect(s.pts).toContainEqual([100, 0]);
+  expect(await page.locator(`#drawHost [data-id=${s.id}] path`).getAttribute("d")).not.toContain("Q");
+});

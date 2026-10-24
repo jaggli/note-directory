@@ -70,7 +70,7 @@
     t: ["c", "s", "ta", "va", "st", "fo", "o", "rot", "gr"],
     l: ["c", "s", "f", "d", "o", "gr"],
     a: ["c", "s", "d", "hs", "he", "st", "fo", "o", "bend", "gr"],
-    p: ["c", "s", "o", "rot", "gr"],
+    p: ["c", "s", "th", "tp", "o", "rot", "gr"],
     h: ["c", "s", "o", "rot", "gr"],
   };
   // Caps keep a hostile shared link from freezing the page
@@ -78,7 +78,7 @@
   const MAX_POINTS = 200000;
   const MAX_COORD = 1e6;
   // Number attributes that have a range of their own
-  const RANGES = { o: [1, 100], rx: [0, MAX_COORD], ir: [0, 99] };
+  const RANGES = { o: [1, 100], rx: [0, MAX_COORD], ir: [0, 99], th: [0, 100], tp: [0, MAX_COORD] };
   const MAX_LABEL = 5000;
   const ID_RE = /^[A-Za-z0-9_-]{1,16}$/;
   const NUM_RE = /^-?\d{1,9}(\.\d+)?$/;
@@ -571,7 +571,8 @@
 
   function lineWidth(s) {
     if (s.k === "h") return strokeW(s) * 4.5;
-    if (s.k === "p") return strokeW(s) * 1.3;
+    // Thinning strokes swell where the pressure is full, the more the more they thin
+    if (s.k === "p") return strokeW(s) * 1.3 * (1 + 0.9 * ((s.th || 0) / 100) ** 2);
     return strokeW(s);
   }
 
@@ -730,7 +731,15 @@
       let max = 0;
       let idx = -1;
       for (let i = a + 1; i < b; i++) {
-        const d = segDist(pts[i], pts[a], pts[b]);
+        let d = segDist(pts[i], pts[a], pts[b]);
+        if (pts[i].length > 2) {
+          // Pressure counts too: keep the points where the width changes
+          const [ax, ay, ap] = pts[a];
+          const [bx, by, bp] = pts[b];
+          const l2 = (bx - ax) ** 2 + (by - ay) ** 2;
+          const t = l2 ? Math.max(0, Math.min(1, ((pts[i][0] - ax) * (bx - ax) + (pts[i][1] - ay) * (by - ay)) / l2)) : 0;
+          d = Math.max(d, Math.abs(pts[i][2] - (ap + (bp - ap) * t)) * eps * 1.5);
+        }
         if (d > max) {
           max = d;
           idx = i;
@@ -778,10 +787,23 @@
     return d + "L" + P(pts[pts.length - 1]);
   }
 
-  // Pressure stroke: filled outline whose half-width follows the pen pressure
-  function outlineD(pts, w) {
-    const radius = (p) => (w / 2) * (0.25 + (p[2] / 9) * 1.1);
+  // Pressure stroke: filled outline whose half-width follows the pen pressure.
+  // With `th` (thinning, %) pressure narrows it down to almost nothing; with `tp`
+  // the ends taper to a point over that length, like perfect-freehand.
+  function outlineD(pts, w, { th, tp } = {}) {
+    const t = (th ?? -1) / 100;
+    const radius =
+      t < 0
+        ? (p) => (w / 2) * (0.25 + (p[2] / 9) * 1.1)
+        : (p) => (w / 2) * (p[2] === undefined ? 1 : (1 + 0.9 * t * t) * (1 - t * (1 - p[2] / 9)));
     const rs = pts.map(radius);
+    if (tp) {
+      const at = [0];
+      for (let i = 1; i < pts.length; i++) at.push(at[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      const total = at.at(-1);
+      const ease = (x) => (x >= 1 ? 1 : x * (2 - x));
+      for (let i = 0; i < rs.length; i++) rs[i] = Math.max(0.15, rs[i] * ease(at[i] / tp) * ease((total - at[i]) / tp));
+    }
     // Smooth the radii so pressure noise doesn't make the outline wobble
     for (let i = 1; i < rs.length - 1; i++) rs[i] = (rs[i - 1] + rs[i] * 2 + rs[i + 1]) / 4;
     if (pts.length === 1) {
@@ -969,12 +991,14 @@
     } else if (s.k === "h") {
       rotateStroke(g, s);
       el("path", { ...stroke, "stroke-dasharray": null, "stroke-width": lineWidth(s), "stroke-opacity": 0.35, d: smoothD(s.pts) }, body);
-    } else if (s.pts[0].length > 2) {
+    } else if (s.pts[0].length > 2 || s.th !== undefined || s.tp) {
       rotateStroke(g, s);
-      el("path", { fill: color, d: outlineD(s.pts, lineWidth(s)) }, body);
+      el("path", { fill: color, d: outlineD(s.pts, strokeW(s) * 1.3, s) }, body);
     } else {
+      // A plain stroke goes straight through its points, so its corners stay where they were drawn
       rotateStroke(g, s);
-      el("path", { ...stroke, "stroke-dasharray": null, "stroke-width": lineWidth(s), d: smoothD(s.pts) }, body);
+      const d = s.pts.length === 1 ? smoothD(s.pts) : "M" + s.pts.map(P).join("L");
+      el("path", { ...stroke, "stroke-dasharray": null, "stroke-width": lineWidth(s), d }, body);
     }
     return g;
   }
@@ -1146,6 +1170,10 @@
   const TOOL_KEYS = { v: "select", h: "hand", d: "pen", D: "highlight", e: "eraser", r: "rect", o: "ellipse", m: "diamond", w: "wedge", l: "line", a: "arrow", t: "text" };
   const TOOL_KIND = { rect: "r", ellipse: "e", diamond: "m", wedge: "w", line: "l", arrow: "a", text: "t", pen: "p", highlight: "h" };
   const STYLE_KEY = "notepad_draw_style";
+  // How the pen draws: an even line; a marker, bold with width from pressure (a stylus's,
+  // or simulated from speed) that never thins to a hairline; a brush pen, all the way thin
+  // with pointed ends
+  const PEN_MODES = [["even", "Pen"], ["pressure", "Sharpie"], ["taper", "Brush pen"]];
   // Right-click menu: [action, label, shortcut]; null is a separator. The first four are the Arrange menu.
   const MENU = [
     ["front", "Bring to front", "Alt+Shift+↑"],
@@ -1297,6 +1325,7 @@
       if (/^[biu]{0,3}$/.test(saved.st)) style.st = textStyle(saved.st);
       if (Number.isInteger(saved.o) && saved.o >= 1 && saved.o <= 100) style.o = saved.o;
       if (saved.rx === "square") style.rx = "square";
+      if (PEN_MODES.some(([m]) => m === saved.pen)) style.pen = saved.pen;
       if (style.f === "none" && style.d === "none") style.d = "solid";
     } catch {}
     return style;
@@ -1306,6 +1335,21 @@
     try {
       localStorage.setItem(STYLE_KEY, JSON.stringify(E.style));
     } catch {}
+  }
+
+  // Style panel icons (28×14) for the pen modes: the bare pen keeps sharp corners, the
+  // marker is short and bold, the brush swells and ends in points (drawn by the brush itself)
+  function penIcon(mode) {
+    const line = 'fill="none" stroke="currentColor"';
+    if (mode === "even") return `<path d="M4 10L9.5 4L15 10L20.5 4L24 8" ${line} stroke-width="1.3" stroke-linejoin="miter"/>`;
+    if (mode === "pressure") return `<path d="M6.5 9C10 5 14.5 5.5 17 7.5S20.5 7 21.5 5.5" ${line} stroke-width="3.8" stroke-linecap="round"/>`;
+    const pts = [];
+    for (let i = 0; i <= 24; i++) {
+      const t = i / 24;
+      // Slow through the belly of the swoosh, quick out of it
+      pts.push([3.5 + t * 21, 10 - Math.sin(t * Math.PI * 0.9) * 5 + t * 1.5, 9 - Math.round(8 * Math.max(0, t - 0.45) / 0.55)]);
+    }
+    return `<path d="${outlineD(pts, 2.6, { th: 95, tp: 8 })}" fill="currentColor"/>`;
   }
 
   // Style panel icons (28×14): a line style
@@ -1462,6 +1506,7 @@
       ]),
       rx: seg(row("Corners", ["rx"]), "rx", [["round", "Round"], ["square", "Square"]]),
       o: seg(row("Opacity", ["o"]), "o", [20, 40, 60, 80, 100].map((v) => [v, String(v), v + " %"])),
+      pen: seg(row("Pen", ["pen"]), "pen", PEN_MODES.map(([m, label]) => [m, penIcon(m), label])),
       hs: seg(row("Start", ["hs"]), "hs", HEADS.map((k) => [k, headIcon(k, true), HEAD_NAMES[k]])),
       he: seg(row("End", ["he"]), "he", HEADS.map((k) => [k, headIcon(k, false), HEAD_NAMES[k]])),
       ta: seg((textRow = row("Text", ["ta", "va"])), "ta", words(ENUMS.ta, ["Left", "Centre", "Right"])),
@@ -1933,6 +1978,7 @@
   // The change a panel value makes to a shape
   function stylePatch(s, key, v) {
     if (key === "o") return { o: v === 100 ? undefined : v };
+    if (key === "s" && s.k === "p" && s.th !== undefined) return { s: v, ...penLook(penOf(s), v) };
     if (key === "rx") return { rx: v === "square" ? 0 : undefined };
     // Free text keeps its place: the anchor moves to the new side of the same box
     if (key === "ta" && s.k === "t") {
@@ -1961,6 +2007,11 @@
       }
       const vals = new Set(has.map((s) => styleValue(s, key)));
       out[key] = vals.size === 1 ? [...vals][0] : null;
+    }
+    if (!sel.length && E.tool === "pen") out.pen = penMode();
+    else if (sel.length && sel.every((s) => s.k === "p")) {
+      const modes = new Set(sel.map(penOf));
+      out.pen = modes.size === 1 ? [...modes][0] : null;
     }
     // No outline only where everything selected can be filled
     const fillable = items.length > 0 && items.every((s) => panelAttrs(s).includes("f"));
@@ -2074,6 +2125,7 @@
 
   function setStyle(key, v) {
     if (key === "st") return toggleTextStyle(v);
+    if (key === "pen") return setPen(v);
     if (key === "o") v = Number(v);
     E.style[key] = v;
     // A shape always keeps a fill or an outline
@@ -2094,6 +2146,19 @@
       changed = true;
     }
     if (changed) {
+      renderShapes();
+      renderOverlay();
+      commit();
+    }
+    renderUI();
+  }
+
+  function setPen(mode) {
+    E.style.pen = mode;
+    saveStyle();
+    const strokes = selected().filter((s) => s.k === "p" && penOf(s) !== mode);
+    for (const s of strokes) replaceShape({ ...s, ...penPatch(s, mode) });
+    if (strokes.length) {
       renderShapes();
       renderOverlay();
       commit();
@@ -2495,10 +2560,16 @@
       return createText(w);
     }
     if (tool === "pen" || tool === "highlight") {
-      const pressure = e.pointerType === "pen";
-      const p = pressure ? [...w, pressureOf(e)] : w;
+      const real = e.pointerType === "pen";
+      const mode = tool === "pen" ? penMode() : real ? "pressure" : "even";
+      const pressure = mode !== "even";
+      // A brush touches down at half pressure; a marker pools a little ink first
+      const op = { type: "pen", raw: [], pressure, real, mode, highlight: tool === "highlight", sim: mode === "pressure" ? 1 : 0.5, before: E.model.shapes.slice() };
+      const p = pressure ? [...w, inkPressure(op, real ? pressureOf(e) : 1 + op.sim * 8)] : w;
+      op.raw.push(p);
       const s = { k: TOOL_KIND[tool], id: newId(), pts: [p], c: E.style.c, s: E.style.s, o: opacity() };
-      startOp({ type: "pen", id: s.id, raw: [p], pressure, before: E.model.shapes.slice() });
+      if (tool === "pen") Object.assign(s, penLook(mode, E.style.s));
+      startOp({ ...op, id: s.id });
       addShape(s);
       renderShapes();
       return;
@@ -2526,6 +2597,35 @@
   }
 
   const opacity = () => (E.style.o === 100 ? undefined : E.style.o);
+  // Until one is picked: pressure for a stylus, even for mouse and touch
+  const penMode = () => E.style.pen || (E.sawPen ? "pressure" : "even");
+
+  // Without a stylus, faster is thinner: pressure eases towards what the speed
+  // suggests, like perfect-freehand. `d`: screen pixels moved since the last point
+  function simulatePressure(op, d) {
+    // A brush answers sooner than a marker
+    op.sim += (1 - Math.min(1, d / (op.mode === "taper" ? 12 : 14)) - op.sim) * 0.3;
+    return Math.max(1, Math.min(9, Math.round(1 + op.sim * 8)));
+  }
+
+  // A marker never runs dry: its pressure stays in the upper two thirds, so it's bold and never a hairline
+  const inkPressure = (op, p) => Math.round(op.mode === "pressure" ? 3 + ((p - 1) * 3) / 4 : p);
+
+  // How far a pen mode goes grows with the stroke size: subtle at XS, extreme at XL
+  const THIN = { xs: 25, s: 45, m: 65, l: 80, xl: 92 };
+  const BRUSH_THIN = { xs: 50, s: 70, m: 85, l: 93, xl: 98 };
+  const penLook = (mode, size = "m") => ({
+    th: mode === "even" ? undefined : (mode === "taper" ? BRUSH_THIN : THIN)[size],
+    tp: mode === "taper" ? R(STROKE[size] * 26) : undefined,
+  });
+  const penOf = (s) => (s.tp ? "taper" : s.th !== undefined || s.pts[0].length > 2 ? "pressure" : "even");
+
+  // A drawn stroke switched to another mode; even drops its pressure
+  function penPatch(s, mode) {
+    const look = penLook(mode, s.s);
+    return mode === "even" ? { ...look, pts: s.pts.map((p) => p.slice(0, 2)) } : look;
+  }
+
   // Lines and arrows have nothing to fill, so they always keep their stroke
   const lineDash = () => (E.style.d === "none" ? undefined : E.style.d);
 
@@ -2643,11 +2743,15 @@
       const events = e.getCoalescedEvents?.() || [e];
       for (const ev of events.length ? events : [e]) {
         const p = toWorld(...screenPt(ev));
+        op.tail = p;
         const last = op.raw[op.raw.length - 1];
-        // Light streamlining takes the jitter out of the hand
-        const q = [last[0] + (p[0] - last[0]) * 0.7, last[1] + (p[1] - last[1]) * 0.7];
-        if (Math.hypot(q[0] - last[0], q[1] - last[1]) * E.cam.z < 1) continue;
-        op.raw.push(op.pressure ? [...q, pressureOf(ev)] : q);
+        // Ink strokes are streamlined for smoother curves, the highlighter a little;
+        // the plain pen keeps every move, corners included
+        const k = op.mode !== "even" ? 0.4 : op.highlight ? 0.7 : 1;
+        const q = [last[0] + (p[0] - last[0]) * k, last[1] + (p[1] - last[1]) * k];
+        const d = Math.hypot(q[0] - last[0], q[1] - last[1]) * E.cam.z;
+        if (d < 1) continue;
+        op.raw.push(op.pressure ? [...q, inkPressure(op, op.real ? pressureOf(ev) : simulatePressure(op, d))] : q);
       }
       replaceShape({ ...E.model.byId.get(op.id), pts: op.raw.slice() });
       renderShapes();
@@ -3010,6 +3114,10 @@
     else if (op.type === "move") changed = op.moved;
     else if (op.type === "pen") {
       const eps = Math.max(0.3, 0.6 / E.cam.z);
+      // Streamlining trails the pointer: end where it stopped
+      const last = op.raw.at(-1);
+      if (op.tail && Math.hypot(op.tail[0] - last[0], op.tail[1] - last[1]) * E.cam.z >= 1)
+        op.raw.push(last.length > 2 ? [...op.tail, last[2]] : op.tail);
       let pts = simplify(op.raw, eps).map((p) => (p.length > 2 ? [R(p[0]), R(p[1]), p[2]] : [R(p[0]), R(p[1])]));
       pts = pts.filter((p, i) => !i || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]);
       replaceShape({ ...E.model.byId.get(op.id), pts });

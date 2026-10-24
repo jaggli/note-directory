@@ -108,7 +108,7 @@ A line is: kind, id, values, `key=value` attributes, and an optional `"label"`. 
 | `t`  | text        | `x y`: its anchor, top-left unless `ta`/`va` say otherwise | yes | c s ta va st fo o rot gr |
 | `l`  | line        | two or more points `x,y`; with `f` a closed, filled polygon | no | c s f d o gr |
 | `a`  | arrow       | `start end`, each `x,y` or a shape id       | yes   | c s d hs he st fo o bend gr |
-| `p`  | pen stroke  | first point absolute, then deltas `dx,dy`   | no    | c s o rot gr          |
+| `p`  | pen stroke  | first point absolute, then deltas `dx,dy`   | no    | c s th tp o rot gr    |
 | `h`  | highlighter | like `p`                                    | no    | c s o rot gr          |
 
 - **Arrows** given a shape id start/end at that shape's outline and follow it when it moves (`r e m w t` shapes only).
@@ -129,6 +129,8 @@ A line is: kind, id, values, `key=value` attributes, and an optional `"label"`. 
 | `o`    | opacity 1–100 of the shape (fill and outline; multiplies with `semi`); its label stays at full strength. On `t` it fades the text | `100` |
 | `rx`   | rectangle corner radius (`0` square) | up to 8 |
 | `ir`   | wedge inner radius in % of its radius (donut, gauge), 0–99 | `0` |
+| `th`   | pen thinning 0–100: how far pressure narrows a stroke | — |
+| `tp`   | pen taper: the ends narrow to a point over this length | — |
 | `hs`   | arrowhead at the start `none open triangle dot diamond bar` | `none` |
 | `he`   | arrowhead at the end, same values | `open` |
 | `bend` | arrow curve: how far its middle sits off the straight line; positive curves to the right of the direction of travel (a left-to-right arrow sags down) | `0` |

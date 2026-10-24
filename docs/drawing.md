@@ -96,6 +96,7 @@ stays the same and is only moved; resizing it returns to an upright box.
 | Wheel / ctrl+wheel            | Pan / zoom at pointer                    |
 | Two fingers                   | Pan + pinch zoom; quick tap = undo       |
 | Pen (stylus) input            | Pressure strokes; fingers then only pan  |
+| Draw tool's Pen row           | Even / Pressure / Tapered (see below)    |
 | Right-click                   | Menu: stacking, duplicate, group, delete; selects the shape under the pointer first |
 
 Keys only act while the canvas has focus (it takes focus on mount and
@@ -139,6 +140,16 @@ something (`panelAttrs()`):
   tool, for the shapes it closes). **Line → None** only for fillable shapes,
   and never together with no fill, so a shape can't turn invisible.
 - **Corners** (round / square) for rectangles; **Opacity** for everything.
+- **Pen** for the draw tool and selected strokes: *Pen* (even width and
+  bare: every move kept, drawn straight from point to point, so corners stay),
+  *Sharpie* (a marker: width from pressure — a stylus's, or simulated from
+  speed for mouse and touch, faster is thinner — kept in the upper two thirds so
+  it's bold and never a hairline, starting with a little pooled ink), or
+  *Brush pen* (pressure all the way down, ends narrowing to a point). Sharpie
+  sets `th` (thinning), Brush pen also `tp` (taper length), both from the
+  stroke size: subtle at XS, extreme at XL, and they follow a size change.
+  Both are streamlined more than Pen. Strokes without `th` keep the classic
+  pressure look. Until a mode is picked: Sharpie for a stylus, Pen otherwise.
 - **Text, Font, Style** once a shape has a label (always for text). Free text
   aligns left / centre / right only, and keeps its place when realigned.
 - Wedge angles and hole are edited with handles on the shape, path points by
