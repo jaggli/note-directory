@@ -9067,8 +9067,16 @@ function continueList() {
   const m = line.match(LIST_RE);
   if (!m || pos < start + m[0].length || inCodeFence(val, start)) return false;
   const [marker, indent, bullet, num, delim, gap, task] = m;
+  const rest = val.slice(pos, end);
+  const lead = rest.length - rest.trimStart().length;
   if (!line.slice(marker.length).trim()) {
     editor.setRangeText("", start, end, "start");
+  } else if (LIST_RE.test(rest.slice(lead))) {
+    // The text after the cursor already starts with its own marker: split
+    // there instead of adding a second one
+    const before = val.slice(start + marker.length, pos);
+    const trail = before.length - before.trimEnd().length;
+    editor.setRangeText("\n" + indent, pos - trail, pos + lead, "end");
   } else {
     const next = bullet || Number(num) + 1 + delim;
     editor.setRangeText(
