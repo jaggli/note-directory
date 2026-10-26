@@ -39,7 +39,7 @@ async function newEncrypted(page, text = SECRET) {
   if (await page.evaluate(() => !loadVaults().length)) {
     await page.click("#modalConfirm");
     const modal = page.locator("#modalText");
-    await expect(modal).toContainText("recovery key");
+    await expect(modal).toContainText("Your recovery key");
     recovery = (await modal.textContent()).match(/[0-9A-Z]{4}(-[0-9A-Z]{4}){7}/)[0];
     await page.click("#modalConfirm");
   }
