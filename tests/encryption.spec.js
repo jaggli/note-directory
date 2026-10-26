@@ -108,6 +108,8 @@ test("lock by hand, unlock with the passkey; reload stays decryptable", async ({
   await page.evaluate(() => lockNote(state.activeId));
   await expect(page.locator("#lockState")).toBeVisible();
   await expect(page.locator("#editor")).toHaveValue("");
+  await page.evaluate(() => renameNote(realNote(state.activeId), "renamed.md"));
+  await expect(page.locator("#lockName")).toHaveText("renamed.md");
   const before = await page.evaluate(() => passkeyPrompts);
   await page.click('[data-action="unlock-note"]');
   await expect(page.locator("#editor")).toHaveValue(SECRET);

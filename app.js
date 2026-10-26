@@ -2655,6 +2655,7 @@ function renameNote(note, raw) {
   updateHighlight();
   updateTitle();
   updateMdTabBar();
+  updateEmptyState();
   return null;
 }
 
