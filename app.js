@@ -1115,18 +1115,33 @@ function passkeyRequest(vault) {
   return { prf: { eval: { first: unb64u(vault.prfSalt) } } };
 }
 
-async function passkeyPrf(vault, ids) {
+// [credential id, its vault] for every passkey of these vaults
+const vaultCreds = (vaults) =>
+  vaults.flatMap((v) => v.slots.filter((s) => s.cred).map((s) => [s.cred, v]));
+
+// One prompt for any of these passkeys; each evaluates its own vault's salt
+async function passkeyPrf(creds) {
+  const one = creds.every(([, v]) => v === creds[0][1]);
   const a = await navigator.credentials.get({
     publicKey: {
       challenge: rnd(32),
-      allowCredentials: ids.map((id) => ({ type: "public-key", id: unb64u(id) })),
+      allowCredentials: creds.map(([id]) => ({ type: "public-key", id: unb64u(id) })),
       userVerification: "required",
-      extensions: passkeyRequest(vault),
+      extensions: one
+        ? passkeyRequest(creds[0][1])
+        : {
+            prf: {
+              evalByCredential: Object.fromEntries(
+                creds.map(([id, v]) => [id, { first: unb64u(v.prfSalt) }]),
+              ),
+            },
+          },
     },
   });
   const out = a.getClientExtensionResults().prf?.results?.first;
   if (!out) throw new Error("prf");
-  return { cred: b64u(new Uint8Array(a.rawId)), out };
+  const cred = b64u(new Uint8Array(a.rawId));
+  return { cred, out, vault: creds.find(([id]) => id === cred)[1] };
 }
 
 async function addPasskey(vault, raw) {
@@ -1147,7 +1162,7 @@ async function addPasskey(vault, raw) {
   if (!prf?.enabled && !prf?.results) throw new Error("prf");
   const id = b64u(new Uint8Array(cred.rawId));
   // Some authenticators only evaluate the PRF when signing in
-  const out = prf.results?.first ?? (await passkeyPrf(vault, [id])).out;
+  const out = prf.results?.first ?? (await passkeyPrf([[id, vault]])).out;
   vault.slots.push({
     kind: "passkey",
     cred: id,
@@ -1161,19 +1176,79 @@ function passkeyFailed(e, msg) {
   return false;
 }
 
-async function unlockVault(vault) {
+// The vault whose passkey answered, or null
+async function unlockVault(vaults) {
+  const creds = vaultCreds(vaults);
+  if (!creds.length) return null;
   try {
-    const ids = vault.slots.filter((s) => s.cred).map((s) => s.cred);
-    const { cred, out } = await passkeyPrf(vault, ids);
+    const { cred, out, vault } = await passkeyPrf(creds);
     const slot = vault.slots.find((s) => s.cred === cred);
     const raw = await unseal(await wrapKey(out, PASSKEY_INFO), slot.key);
     vaultKeys.set(vault.id, await importVaultKey(raw));
     raw.fill(0);
     lastActivity = Date.now();
-    return true;
+    return vault;
   } catch (e) {
-    return passkeyFailed(e, "Couldn't unlock with this passkey");
+    passkeyFailed(e, "Couldn't unlock with this passkey");
+    return null;
   }
+}
+
+// The vault this recovery key opens, or null; offers a passkey for this browser
+async function recoverVault(vaults) {
+  const code = await showPromptModal("Recovery key for your encrypted files", "", "Unlock");
+  if (!code) return null;
+  let vault, raw;
+  for (const v of vaults) {
+    const slot = v.slots.find((s) => s.kind === "recovery");
+    try {
+      raw = await unseal(await wrapKey(fromB32(code), RECOVERY_INFO), slot.key);
+      vault = v;
+      break;
+    } catch {}
+  }
+  if (!vault) {
+    showToast("That recovery key doesn't fit", { error: true });
+    return null;
+  }
+  vaultKeys.set(vault.id, await importVaultKey(raw));
+  lastActivity = Date.now();
+  if (
+    vaultSupport &&
+    (await showModal(
+      "Add a passkey for this browser? Then it won't need the recovery key again.",
+      "Add passkey",
+      "Not now",
+    ))
+  ) {
+    try {
+      await addPasskey(vault, raw);
+      saveVault(vault);
+    } catch (e) {
+      passkeyFailed(e, "Couldn't add the passkey");
+    }
+  }
+  raw.fill(0);
+  return vault;
+}
+
+// No passkey answered: deleted, or only on another device
+async function lostPasskey(vaults) {
+  if (
+    await showModal(
+      "No passkey opened your encrypted files. If it was deleted or is on another device, your recovery key adds a new one here.",
+      "Use recovery key",
+      "No recovery key",
+    )
+  )
+    return recoverVault(vaults);
+  const fresh = await showModal(
+    "Start over with a new passkey? Encrypted files you have now then open only with their recovery key.",
+    "Start over",
+    "Cancel",
+    true,
+  );
+  return fresh ? createVault() : null;
 }
 
 async function createVault() {
@@ -1243,52 +1318,24 @@ async function unlockNote(id) {
     });
     return false;
   }
-  return (await unlockVault(vault)) && openNote(id);
+  return (await unlockVault([vault])) && openNote(id);
 }
 
 async function recoverNote(id) {
   const n = realNote(id);
   const vault = n && loadVaults().find((v) => v.id === n.enc);
-  const slot = vault?.slots.find((s) => s.kind === "recovery");
-  if (!slot) return false;
-  const code = await showPromptModal("Recovery key for your encrypted files", "", "Unlock");
-  if (!code) return false;
-  let raw;
-  try {
-    raw = await unseal(await wrapKey(fromB32(code), RECOVERY_INFO), slot.key);
-  } catch {
-    showToast("That recovery key doesn't fit", { error: true });
-    return false;
-  }
-  vaultKeys.set(vault.id, await importVaultKey(raw));
-  lastActivity = Date.now();
-  if (
-    vaultSupport &&
-    (await showModal(
-      "Add a passkey for this browser? Then it won't need the recovery key again.",
-      "Add passkey",
-      "Not now",
-    ))
-  ) {
-    try {
-      await addPasskey(vault, raw);
-      saveVault(vault);
-    } catch (e) {
-      passkeyFailed(e, "Couldn't add the passkey");
-    }
-  }
-  raw.fill(0);
-  return openNote(id);
+  if (!vault?.slots.some((s) => s.kind === "recovery")) return false;
+  return (await recoverVault([vault])) && openNote(id);
 }
 
 async function createEncryptedNote() {
   const vaults = loadVaults();
   let vault = vaults.find((v) => vaultKeys.has(v.id));
-  if (!vault) {
-    vault = vaults[0];
-    if (vault ? !(await unlockVault(vault)) : !(vault = await createVault()))
-      return;
-  }
+  if (!vault)
+    vault = vaults.length
+      ? (await unlockVault(vaults)) || (await lostPasskey(vaults))
+      : await createVault();
+  if (!vault) return;
   const o = { salt: b64u(rnd(16)), text: "", seq: 0 };
   o.key = await fileKey(vaultKeys.get(vault.id), o.salt);
   o.sealed = await encryptText(o, "");

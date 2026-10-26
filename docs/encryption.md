@@ -52,3 +52,9 @@ Shown only where `PublicKeyCredential.getClientCapabilities()` reports
 Passkeys are bound to the host, so preview hosts need their own. A device
 without the synced passkey opens files with the recovery key and can then
 add its own passkey.
+
+A passkey deleted from the password manager stays in the vault, so the browser
+offers only phone or security key. When no passkey answers, **New encrypted
+file** offers the recovery key (which adds a new passkey to the same vault) or
+starting over with a new vault. Unlocking asks once for any vault's passkey,
+each with its own PRF salt (`evalByCredential`).

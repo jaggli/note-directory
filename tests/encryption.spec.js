@@ -8,7 +8,7 @@ const SECRET = "the vault code is 4711";
 async function authenticator(page) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable");
-  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
     options: {
       protocol: "ctap2",
       ctap2Version: "ctap2_1",
@@ -20,6 +20,8 @@ async function authenticator(page) {
       hasPrf: true,
     },
   });
+  // Deletes every passkey, as the password manager would
+  return () => cdp.send("WebAuthn.clearCredentials", { authenticatorId });
 }
 
 // Counts passkey prompts (navigator.credentials.get calls)
@@ -216,6 +218,68 @@ test("a second device opens it with the recovery key and adds its passkey", asyn
   expect(await b.evaluate(() => loadVaults()[0].slots.length)).toBe(3);
   await ctxA.close();
   await ctxB.close();
+});
+
+test("a deleted passkey: the recovery key adds a new one to the same vault", async ({
+  page,
+}) => {
+  const deletePasskeys = await authenticator(page);
+  await openApp(page);
+  const recovery = await newEncrypted(page);
+  await deletePasskeys();
+  await page.reload();
+  await page.click("#btnNewMenu");
+  await page.click('#newMenu [data-action="new-encrypted"]');
+  await expect(page.locator("#modalText")).toContainText("No passkey opened");
+  await page.click("#modalConfirm");
+  await page.fill("#modalInput", recovery);
+  await page.click("#modalConfirm");
+  await expect(page.locator("#modalText")).toContainText("Add a passkey");
+  await page.click("#modalConfirm");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("second");
+  await expect.poll(() => sealedText(page)).toBe("second");
+  const vaults = await page.evaluate(() => loadVaults());
+  expect(vaults).toHaveLength(1);
+  expect(vaults[0].slots.filter((s) => s.kind === "passkey")).toHaveLength(2);
+});
+
+test("a deleted passkey without recovery key: start over, the new vault wins", async ({
+  page,
+  context,
+}) => {
+  await countPrompts(context);
+  const deletePasskeys = await authenticator(page);
+  await openApp(page);
+  await newEncrypted(page);
+  const oldId = await page.evaluate(() => state.activeId);
+  await deletePasskeys();
+  await page.reload();
+  await page.click("#btnNewMenu");
+  await page.click('#newMenu [data-action="new-encrypted"]');
+  await expect(page.locator("#modalText")).toContainText("No passkey opened");
+  await page.click("#modalCancel");
+  await expect(page.locator("#modalText")).toContainText("Start over");
+  await page.click("#modalConfirm");
+  await expect(page.locator("#modalText")).toContainText("Encrypted files are locked");
+  await page.click("#modalConfirm");
+  await expect(page.locator("#modalText")).toContainText("Your recovery key");
+  await page.click("#modalConfirm");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("fresh");
+  await expect.poll(() => sealedText(page)).toBe("fresh");
+  expect(await page.evaluate(() => loadVaults().length)).toBe(2);
+
+  // Both vaults in one prompt: the new passkey answers for its own vault
+  await page.reload();
+  const before = await page.evaluate(() => passkeyPrompts);
+  await page.click("#btnNewMenu");
+  await page.click('#newMenu [data-action="new-encrypted"]');
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("third");
+  await expect.poll(() => sealedText(page)).toBe("third");
+  expect(await page.evaluate(() => passkeyPrompts)).toBe(before + 1);
+  expect(await page.evaluate((id) => isLocked(realNote(id)), oldId)).toBe(true);
 });
 
 test("without PRF support nothing about encryption shows", async ({ page, context }) => {
