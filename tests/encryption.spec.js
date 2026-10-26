@@ -45,10 +45,16 @@ async function newEncrypted(page, text = SECRET) {
     recovery = (await modal.textContent()).match(/[0-9A-Z]{4}(-[0-9A-Z]{4}){7}/)[0];
     await page.click("#modalConfirm");
   }
-  await page.keyboard.press("Enter");
+  await keepName(page);
   await page.keyboard.type(text);
   await expect.poll(() => sealedText(page)).toBe(text);
   return recovery;
+}
+
+// The new file's name field has focus once the file exists: keep the name
+async function keepName(page) {
+  await expect(page.locator("#crumbInput")).toBeFocused();
+  await page.keyboard.press("Enter");
 }
 
 // The open file's text, once its stored ciphertext has caught up
@@ -236,7 +242,7 @@ test("a deleted passkey: the recovery key adds a new one to the same vault", asy
   await page.click("#modalConfirm");
   await expect(page.locator("#modalText")).toContainText("Add a passkey");
   await page.click("#modalConfirm");
-  await page.keyboard.press("Enter");
+  await keepName(page);
   await page.keyboard.type("second");
   await expect.poll(() => sealedText(page)).toBe("second");
   const vaults = await page.evaluate(() => loadVaults());
@@ -265,7 +271,7 @@ test("a deleted passkey without recovery key: start over, the new vault wins", a
   await page.click("#modalConfirm");
   await expect(page.locator("#modalText")).toContainText("Your recovery key");
   await page.click("#modalConfirm");
-  await page.keyboard.press("Enter");
+  await keepName(page);
   await page.keyboard.type("fresh");
   await expect.poll(() => sealedText(page)).toBe("fresh");
   expect(await page.evaluate(() => loadVaults().length)).toBe(2);
@@ -275,7 +281,7 @@ test("a deleted passkey without recovery key: start over, the new vault wins", a
   const before = await page.evaluate(() => passkeyPrompts);
   await page.click("#btnNewMenu");
   await page.click('#newMenu [data-action="new-encrypted"]');
-  await page.keyboard.press("Enter");
+  await keepName(page);
   await page.keyboard.type("third");
   await expect.poll(() => sealedText(page)).toBe("third");
   expect(await page.evaluate(() => passkeyPrompts)).toBe(before + 1);
