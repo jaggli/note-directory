@@ -68,6 +68,10 @@ across devices via Google Drive.
   versions, marked *Conflict* with a banner that resolves them
 - Shared links open for reading under a banner and join
   your notes only when you save, edit or tick a task
+- Encrypted files (New ▾ › New encrypted file, in browsers
+  with passkey PRF support): owner only, unlocked with a
+  passkey, encrypted at rest and in Drive, never in a link
+  (see [docs/encryption.md](docs/encryption.md))
 - Settings: theme (or match the system), wrap, vim, format
   on save, sync and backup, storage
 - Vim mode (toggle in status bar, desktop only)

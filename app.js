@@ -289,6 +289,8 @@ const cursorPos = document.getElementById("cursorPos");
 const btnShare = document.getElementById("btnShare");
 const btnWrap = document.getElementById("btnWrap");
 const emptyState = document.getElementById("emptyState");
+const lockState = document.getElementById("lockState");
+const lockName = document.getElementById("lockName");
 const modalOverlay = document.getElementById("modalOverlay");
 const modalText = document.getElementById("modalText");
 const modalInput = document.getElementById("modalInput");
@@ -833,6 +835,7 @@ function swapKey(noteId) {
 }
 
 function saveSwap(noteId, content) {
+  if (realNote(noteId)?.enc) return;
   try {
     localStorage.setItem(
       swapKey(noteId),
@@ -867,9 +870,477 @@ let sharedNote = null;
 
 function getActiveNote() {
   return (
-    sharedNote || state.notes.find((n) => n.id === state.activeId) || null
+    sharedNote ||
+    viewOf(state.notes.find((n) => n.id === state.activeId)) ||
+    null
   );
 }
+
+// ═══════════════════════════════════════════════════
+//  Encrypted files
+// ═══════════════════════════════════════════════════
+// An encrypted note (`enc` = its vault's id) holds ciphertext in `content`
+// at all times, so everything that stores or sends notes — IndexedDB, other
+// tabs, Drive, the ZIP — only ever sees that. While unlocked, the note is
+// seen through a Proxy whose `content` is the plaintext; writing it encrypts.
+// Keys: a random vault key, wrapped by each passkey's PRF output and by a
+// recovery key. A file's key is HKDF(vault key, the file's salt).
+
+const VAULTS_KEY = "notepad_vaults";
+const LOCK_IDLE = 5 * 60 * 1000;
+const PASSKEY_INFO = "note.directory passkey";
+const RECOVERY_INFO = "note.directory recovery";
+const FILE_INFO = "note.directory file";
+const vaultKeys = new Map(); // vault id → HKDF key, until idle or locked
+const opened = new Map(); // note id → { key, salt, text, sealed, seq }
+const handLocked = new Set(); // locked by hand: the passkey again, not auto-open
+const views = new WeakMap();
+const viewSet = new WeakSet();
+let vaultSupport = false;
+let lastActivity = Date.now();
+
+const plainView = {
+  get(n, k) {
+    if (k !== "content") return n[k];
+    const o = opened.get(n.id);
+    if (!o) return "";
+    // Another tab or device changed it
+    if (n.content !== o.sealed && !o.busy) reopen(n, o);
+    return o.text;
+  },
+  set(n, k, v) {
+    if (k === "content") setPlain(n, v);
+    else n[k] = v;
+    return true;
+  },
+};
+
+function viewOf(note) {
+  if (!note?.enc || viewSet.has(note)) return note;
+  if (!views.has(note)) {
+    const view = new Proxy(note, plainView);
+    views.set(note, view);
+    viewSet.add(view);
+  }
+  return views.get(note);
+}
+
+function isLocked(note) {
+  return !!note?.enc && !opened.has(note.id);
+}
+
+// Locked, and the vault isn't open for it either: only a passkey helps
+function needsPasskey(note) {
+  return (
+    isLocked(note) && (!vaultKeys.has(note.enc) || handLocked.has(note.id))
+  );
+}
+
+const realNote = (id) => state.notes.find((n) => n.id === id);
+
+function setPlain(n, text) {
+  const o = opened.get(n.id);
+  if (!o || o.text === text) return;
+  o.text = text;
+  const seq = ++o.seq;
+  encryptText(o, text)
+    .then((content) => {
+      if (seq !== o.seq) return;
+      n.content = o.sealed = content;
+      saveState();
+      scheduleDriveUpload(false);
+    })
+    .catch(() => showToast("Couldn't encrypt " + n.name, { error: true }));
+}
+
+async function reopen(n, o) {
+  o.busy = true;
+  const content = n.content;
+  try {
+    const salt = content.split(".")[0];
+    if (salt !== o.salt) {
+      o.key = await fileKey(vaultKeys.get(n.enc), salt);
+      o.salt = salt;
+    }
+    const text = await decryptText(o.key, content);
+    if (n.content === content && opened.get(n.id) === o) {
+      o.text = text;
+      o.sealed = content;
+    }
+  } catch {
+    opened.delete(n.id);
+  }
+  o.busy = false;
+  if (n.id === state.activeId) render();
+}
+
+// ── Crypto ──
+
+const rnd = (n) => crypto.getRandomValues(new Uint8Array(n));
+
+function b64u(bytes) {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function unb64u(s) {
+  return Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) =>
+    c.charCodeAt(0),
+  );
+}
+
+const importVaultKey = (raw) =>
+  crypto.subtle.importKey("raw", raw, "HKDF", false, ["deriveKey"]);
+
+function deriveAes(base, salt, info) {
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt, info: new TextEncoder().encode(info) },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+const wrapKey = async (secret, info) =>
+  deriveAes(await importVaultKey(secret), new Uint8Array(), info);
+const fileKey = (vaultKey, salt) => deriveAes(vaultKey, unb64u(salt), FILE_INFO);
+
+async function seal(key, bytes) {
+  const iv = rnd(12);
+  const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes);
+  return b64u(iv) + "." + b64u(new Uint8Array(data));
+}
+
+async function unseal(key, sealed) {
+  const [iv, data] = sealed.split(".").map(unb64u);
+  return new Uint8Array(
+    await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data),
+  );
+}
+
+// Note content: "salt.iv.data"
+async function encryptText(o, text) {
+  return o.salt + "." + (await seal(o.key, new TextEncoder().encode(text)));
+}
+
+async function decryptText(key, content) {
+  const sealed = content.slice(content.indexOf(".") + 1);
+  return new TextDecoder().decode(await unseal(key, sealed));
+}
+
+// Recovery keys in Crockford base32, grouped: easy to type from paper
+const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+function toB32(bytes) {
+  let out = "";
+  let v = 0;
+  let bits = 0;
+  for (const b of bytes) {
+    v = (v << 8) | b;
+    bits += 8;
+    while (bits >= 5) out += B32[(v >>> (bits -= 5)) & 31];
+  }
+  if (bits) out += B32[(v << (5 - bits)) & 31];
+  return out.match(/.{1,4}/g).join("-");
+}
+
+function fromB32(s) {
+  const out = [];
+  let v = 0;
+  let bits = 0;
+  for (const c of s.toUpperCase().replace(/[\s-]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1")) {
+    const i = B32.indexOf(c);
+    if (i < 0) return null;
+    v = (v << 5) | i;
+    bits += 5;
+    if (bits >= 8) out.push((v >>> (bits -= 8)) & 255);
+  }
+  return new Uint8Array(out);
+}
+
+// ── Vaults: one per first setup, synced through Drive ──
+
+function loadVaults() {
+  try {
+    return validVaults(JSON.parse(localStorage.getItem(VAULTS_KEY)));
+  } catch {
+    return [];
+  }
+}
+
+function validVaults(v) {
+  if (!Array.isArray(v)) return [];
+  const str = (x) => typeof x === "string";
+  return v
+    .filter((x) => x && str(x.id) && str(x.prfSalt) && Array.isArray(x.slots))
+    .map((x) => ({
+      id: x.id,
+      prfSalt: x.prfSalt,
+      slots: x.slots.filter(
+        (s) => s && str(s.kind) && str(s.key) && (s.cred == null || str(s.cred)),
+      ),
+    }));
+}
+
+// Union: vaults and their keys are only ever added
+function mergeVaults(a, b) {
+  const out = a.map((v) => ({ ...v, slots: [...v.slots] }));
+  for (const v of b) {
+    const mine = out.find((m) => m.id === v.id);
+    if (!mine) out.push(v);
+    else
+      for (const s of v.slots)
+        if (!mine.slots.some((m) => m.kind === s.kind && m.cred === s.cred))
+          mine.slots.push(s);
+  }
+  return out;
+}
+
+const vaultSize = (vaults) =>
+  vaults.reduce((n, v) => n + 1 + v.slots.length, 0);
+
+function saveVault(vault) {
+  localStorage.setItem(
+    VAULTS_KEY,
+    JSON.stringify(mergeVaults(loadVaults(), [vault])),
+  );
+  scheduleDriveUpload(true);
+}
+
+// ── Passkeys (WebAuthn PRF) ──
+
+function passkeyRequest(vault) {
+  return { prf: { eval: { first: unb64u(vault.prfSalt) } } };
+}
+
+async function passkeyPrf(vault, ids) {
+  const a = await navigator.credentials.get({
+    publicKey: {
+      challenge: rnd(32),
+      allowCredentials: ids.map((id) => ({ type: "public-key", id: unb64u(id) })),
+      userVerification: "required",
+      extensions: passkeyRequest(vault),
+    },
+  });
+  const out = a.getClientExtensionResults().prf?.results?.first;
+  if (!out) throw new Error("prf");
+  return { cred: b64u(new Uint8Array(a.rawId)), out };
+}
+
+async function addPasskey(vault, raw) {
+  const cred = await navigator.credentials.create({
+    publicKey: {
+      rp: { name: "note.directory" },
+      user: { id: rnd(16), name: "Encrypted files", displayName: "Encrypted files" },
+      challenge: rnd(32),
+      pubKeyCredParams: [
+        { type: "public-key", alg: -7 },
+        { type: "public-key", alg: -257 },
+      ],
+      authenticatorSelection: { residentKey: "required", userVerification: "required" },
+      extensions: passkeyRequest(vault),
+    },
+  });
+  const prf = cred.getClientExtensionResults().prf;
+  if (!prf?.enabled && !prf?.results) throw new Error("prf");
+  const id = b64u(new Uint8Array(cred.rawId));
+  // Some authenticators only evaluate the PRF when signing in
+  const out = prf.results?.first ?? (await passkeyPrf(vault, [id])).out;
+  vault.slots.push({
+    kind: "passkey",
+    cred: id,
+    key: await seal(await wrapKey(out, PASSKEY_INFO), raw),
+  });
+}
+
+// Cancelling the browser's passkey dialog is not an error worth a toast
+function passkeyFailed(e, msg) {
+  if (e?.name !== "NotAllowedError") showToast(msg, { error: true });
+  return false;
+}
+
+async function unlockVault(vault) {
+  try {
+    const ids = vault.slots.filter((s) => s.cred).map((s) => s.cred);
+    const { cred, out } = await passkeyPrf(vault, ids);
+    const slot = vault.slots.find((s) => s.cred === cred);
+    const raw = await unseal(await wrapKey(out, PASSKEY_INFO), slot.key);
+    vaultKeys.set(vault.id, await importVaultKey(raw));
+    raw.fill(0);
+    lastActivity = Date.now();
+    return true;
+  } catch (e) {
+    return passkeyFailed(e, "Couldn't unlock with this passkey");
+  }
+}
+
+async function createVault() {
+  const go = await showModal(
+    "Encrypted files are locked with a passkey: Touch ID, Windows Hello or your password manager. Only you can open them, so they can't be shared.\n\nNext you get a recovery key. Without it, a lost passkey means lost files.",
+    "Create passkey",
+    "Cancel",
+  );
+  if (!go) return null;
+  const vault = { id: crypto.randomUUID(), prfSalt: b64u(rnd(32)), slots: [] };
+  const raw = rnd(32);
+  try {
+    await addPasskey(vault, raw);
+  } catch (e) {
+    passkeyFailed(e, "This passkey can't encrypt — try another password manager");
+    return null;
+  }
+  const recovery = rnd(20);
+  vault.slots.push({
+    kind: "recovery",
+    key: await seal(await wrapKey(recovery, RECOVERY_INFO), raw),
+  });
+  vaultKeys.set(vault.id, await importVaultKey(raw));
+  raw.fill(0);
+  saveVault(vault);
+  const code = toB32(recovery);
+  await showModal(
+    "Your recovery key:\n\n" +
+      code +
+      "\n\nIt opens your encrypted files if the passkey is lost. Keep it in your password manager or on paper — it is shown only this once.",
+    "Copy and close",
+  );
+  navigator.clipboard
+    .writeText(code)
+    .then(() => showToast("Recovery key copied", { ic: "check" }))
+    .catch(() => {});
+  return vault;
+}
+
+// ── Opening and locking ──
+
+// Decrypts with the open vault — no prompt. False if it can't.
+async function openNote(id) {
+  const n = realNote(id);
+  const vaultKey = n && vaultKeys.get(n.enc);
+  if (!vaultKey) return false;
+  try {
+    const salt = n.content.split(".")[0];
+    const key = await fileKey(vaultKey, salt);
+    const text = await decryptText(key, n.content);
+    opened.set(id, { key, salt, text, sealed: n.content, seq: 0 });
+    handLocked.delete(id);
+    return true;
+  } catch {
+    showToast("Couldn't decrypt " + n.name, { error: true });
+    return false;
+  }
+}
+
+// Always asks for the passkey
+async function unlockNote(id) {
+  const n = realNote(id);
+  const vault = n && loadVaults().find((v) => v.id === n.enc);
+  if (!vault) {
+    showToast("This file's key isn't in this browser yet — sync with Drive first", {
+      error: true,
+    });
+    return false;
+  }
+  return (await unlockVault(vault)) && openNote(id);
+}
+
+async function recoverNote(id) {
+  const n = realNote(id);
+  const vault = n && loadVaults().find((v) => v.id === n.enc);
+  const slot = vault?.slots.find((s) => s.kind === "recovery");
+  if (!slot) return false;
+  const code = await showPromptModal("Recovery key for your encrypted files", "", "Unlock");
+  if (!code) return false;
+  let raw;
+  try {
+    raw = await unseal(await wrapKey(fromB32(code), RECOVERY_INFO), slot.key);
+  } catch {
+    showToast("That recovery key doesn't fit", { error: true });
+    return false;
+  }
+  vaultKeys.set(vault.id, await importVaultKey(raw));
+  lastActivity = Date.now();
+  if (
+    vaultSupport &&
+    (await showModal(
+      "Add a passkey for this browser? Then it won't need the recovery key again.",
+      "Add passkey",
+      "Not now",
+    ))
+  ) {
+    try {
+      await addPasskey(vault, raw);
+      saveVault(vault);
+    } catch (e) {
+      passkeyFailed(e, "Couldn't add the passkey");
+    }
+  }
+  raw.fill(0);
+  return openNote(id);
+}
+
+async function createEncryptedNote() {
+  const vaults = loadVaults();
+  let vault = vaults.find((v) => vaultKeys.has(v.id));
+  if (!vault) {
+    vault = vaults[0];
+    if (vault ? !(await unlockVault(vault)) : !(vault = await createVault()))
+      return;
+  }
+  const o = { salt: b64u(rnd(16)), text: "", seq: 0 };
+  o.key = await fileKey(vaultKeys.get(vault.id), o.salt);
+  o.sealed = await encryptText(o, "");
+  const id = crypto.randomUUID();
+  opened.set(id, o);
+  return createNote(undefined, o.sealed, true, undefined, { id, enc: vault.id });
+}
+
+// Plaintext leaves memory: the text, its undo history, the editor
+function forget(id) {
+  if (id === state.activeId) {
+    if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
+    cancelHistorySnapshot();
+    closeFindReplace(false);
+  }
+  opened.delete(id);
+  delete histories[id];
+}
+
+function lockNote(id) {
+  forget(id);
+  handLocked.add(id);
+  render();
+}
+
+function lockAll() {
+  for (const id of [...opened.keys()]) forget(id);
+  vaultKeys.clear();
+  handLocked.clear();
+  render();
+}
+
+for (const type of ["keydown", "pointerdown", "wheel", "touchstart"])
+  document.addEventListener(type, () => (lastActivity = Date.now()), {
+    capture: true,
+    passive: true,
+  });
+
+// Background tabs run timers late: also check when the tab comes back
+function lockIfIdle() {
+  if (vaultKeys.size && Date.now() - lastActivity > LOCK_IDLE) lockAll();
+}
+setInterval(lockIfIdle, 15000);
+document.addEventListener("visibilitychange", lockIfIdle);
+
+window.PublicKeyCredential?.getClientCapabilities?.()
+  .then((caps) => {
+    vaultSupport = !!caps["extension:prf"];
+    for (const el of document.querySelectorAll(".needs-vault"))
+      el.hidden = !vaultSupport;
+  })
+  .catch(() => {});
 
 function sortNotes() {
   // Pinned first, then unpinned. Preserve relative order within each group.
@@ -890,21 +1361,11 @@ async function compress(text) {
   const stream = new Response(text).body.pipeThrough(
     new CompressionStream("deflate-raw"),
   );
-  const buf = await new Response(stream).arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return b64u(new Uint8Array(await new Response(stream).arrayBuffer()));
 }
 
 async function decompress(b64) {
-  const binary = atob(b64.replace(/-/g, "+").replace(/_/g, "/"));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const stream = new Response(bytes).body.pipeThrough(
+  const stream = new Response(unb64u(b64)).body.pipeThrough(
     new DecompressionStream("deflate-raw"),
   );
   return await new Response(stream).text();
@@ -957,7 +1418,8 @@ async function updateUrl() {
     return;
   }
   try {
-    const compressed = await compress(note.content);
+    // An encrypted note's URL has its name only
+    const compressed = note.enc ? null : await compress(note.content);
     if (seq !== urlSeq) return;
     const queryParams = new URLSearchParams();
     if (viewQuery()) queryParams.set("view", viewQuery());
@@ -969,7 +1431,7 @@ async function updateUrl() {
       plainTextParam(location.hash)?.params ?? parseHashParams(location.hash);
     hashMap.set("name", note.name);
     hashMap.set("note", compressed);
-    hashMap.set("ts", String(note.updatedAt));
+    hashMap.set("ts", compressed && String(note.updatedAt));
     const full = location.pathname + query + buildHash(hashMap);
     if (full.length > URL_MAX_LENGTH) {
       // Too long — drop note content from URL (Share explains why)
@@ -1951,6 +2413,13 @@ function updateEmptyState() {
   emptyState.classList.toggle("visible", !note);
   editor.style.display = note ? "" : "none";
   highlightLayer.style.display = note ? "" : "none";
+  const ask = needsPasskey(note);
+  lockState.classList.toggle("visible", ask);
+  if (ask) lockName.innerHTML = nameHtml(note.name);
+  else if (isLocked(note)) {
+    // The vault is open: no prompt, just decrypt
+    openNote(note.id).then((ok) => ok && note.id === state.activeId && render());
+  }
 }
 
 function renderEditor() {
@@ -1960,7 +2429,7 @@ function renderEditor() {
   const note = getActiveNote();
   if (note) {
     editor.value = note.content;
-    editor.disabled = false;
+    editor.disabled = isLocked(note);
     btnShare.disabled = false;
     // Recover from swap file — unless the note was saved/synced after it
     const swap = loadSwap(note.id);
@@ -2086,6 +2555,7 @@ function noteRow(note, ni) {
     (isConflictCopy(note.name)
       ? '<span class="badge" data-tip="Edited on two devices" data-sub="This copy holds the other version">Conflict</span>'
       : "") +
+    (note.enc ? icon("lock", "sm row-lock") : "") +
     (note.pinned ? icon("pin-on", "sm row-pin") : "") +
     `<span class="note-item-time">${shortTime(note.updatedAt)}</span>` +
     `<span class="note-item-acts">` +
@@ -2287,6 +2757,8 @@ function updateTitle() {
 let lastRenderedId = null;
 
 function render() {
+  // A note just locked must not stay on screen as preview or canvas
+  if (mdViewActive && isLocked(getActiveNote())) switchMdTab("edit");
   renderNoteList();
   renderEditor();
   updateLineNumbers();
@@ -2399,9 +2871,11 @@ function hideDraw() {
 // stroke keeps receiving the strokes after it
 function drawCommit(target, content) {
   if (target === sharedNote) saveShared(true);
-  const note = state.notes.includes(target)
-    ? target
-    : state.notes.find((n) => n.id === target.id);
+  const note = viewOf(
+    state.notes.includes(target)
+      ? target
+      : state.notes.find((n) => n.id === target.id),
+  );
   if (!note || note.content === content) return;
   pushHistory(note.id, note.content);
   note.content = content;
@@ -2438,8 +2912,13 @@ function hydrateDrawEmbeds() {
           el.classList.add("missing");
           continue;
         }
+        if (isLocked(note)) {
+          el.textContent = "encrypted: " + ref;
+          el.classList.add("missing");
+          continue;
+        }
         el.replaceChildren(
-          Draw.renderStatic(note ? note.content : el.dataset.draw),
+          Draw.renderStatic(note ? viewOf(note).content : el.dataset.draw),
         );
         if (note) el.title = "open " + note.name;
       }
@@ -3337,6 +3816,7 @@ function switchMdTab(tab, pushHistory) {
       location.href,
     );
   }
+  if (isLocked(getActiveNote())) tab = "edit";
   // Preview renders note.content and edit reloads it — save the vim buffer
   // first or unsaved edits vanish
   if (tab !== "edit" && vimState.enabled && vimState.bufferDirty) {
@@ -3629,7 +4109,7 @@ function exitZenMode() {
     const { name, content } = zenEphemeralNote;
     zenFromUrl = false;
     zenEphemeralNote = null;
-    const existing = state.notes.find((n) => n.name === name);
+    const existing = state.notes.find((n) => n.name === name && !n.enc);
     if (existing && existing.content === content) state.activeId = existing.id;
     else openShared(name, content, Date.now(), existing);
   }
@@ -3703,7 +4183,7 @@ function dismissShared(rerender = true) {
 
 // The copy's text goes into the original (⌘Z there brings it back), the copy goes
 function useConflictCopy(copy, original) {
-  pushHistory(original.id, original.content);
+  if (!original.enc) pushHistory(original.id, original.content);
   original.content = copy.content;
   original.updatedAt = Date.now();
   deleteNote(copy.id);
@@ -3856,6 +4336,10 @@ mdPreview.addEventListener("click", (e) => {
   const anchor = e.target.closest(".heading-anchor");
   if (!anchor) return;
   e.preventDefault();
+  const heading = anchor.closest("h1,h2,h3,h4,h5,h6");
+  // The slug is the heading's text: kept out of the URL of an encrypted file
+  if (getActiveNote()?.enc)
+    return heading?.scrollIntoView({ behavior: "smooth" });
   const slug = anchor.getAttribute("href").slice(1);
   const hashMap = parseHashParams(location.hash);
   hashMap.set("anchor", slug);
@@ -3865,7 +4349,6 @@ mdPreview.addEventListener("click", (e) => {
     "",
     location.pathname + location.search + newHash,
   );
-  const heading = anchor.closest("h1,h2,h3,h4,h5,h6");
   if (heading) heading.scrollIntoView({ behavior: "smooth" });
   const fullUrl =
     location.origin + location.pathname + location.search + newHash;
@@ -4040,7 +4523,7 @@ function uniqueName(name) {
   return `${base}${num}${ext}`;
 }
 
-async function createNote(name, content, focusName, ext) {
+async function createNote(name, content, focusName, ext, fields) {
   sharedNote = null;
   const contentStr = content || "";
   const estimatedBytes = (name || "").length * 2 + contentStr.length * 2 + 200;
@@ -4055,6 +4538,7 @@ async function createNote(name, content, focusName, ext) {
     name: name || nextNoteName(ext),
     content: contentStr,
     updatedAt: Date.now(),
+    ...fields,
   };
   // Notes that arrive with content (help, imports) open at the top —
   // otherwise the caret lands at the end and the preview follows it
@@ -4131,7 +4615,7 @@ function switchNote(id) {
   if (mdViewActive) {
     const fromMd = isMarkdownFile(getActiveNote()?.name);
     if (targetNote && isMarkdownFile(targetNote.name) && fromMd) {
-      setPreviewHtml(renderMarkdown(targetNote.content));
+      setPreviewHtml(renderMarkdown(viewOf(targetNote).content));
     } else if (!isDrawFile(targetNote?.name)) {
       switchMdTab("edit");
     }
@@ -4349,8 +4833,9 @@ function searchNotes(query) {
     const nameMatch = exactName || fuzzyMatch(note.name, query);
     // Enough content hits: keep looking for name matches only
     if (!nameMatch && contentOnly >= MAX_RESULTS * 2) continue;
-    const raw = note.content.split("\n");
-    const lines = isDrawFile(note.name) ? drawSearchLines(note.content) : raw;
+    const text = note.enc ? "" : note.content;
+    const raw = text.split("\n");
+    const lines = isDrawFile(note.name) ? drawSearchLines(text) : raw;
     const lineLimit = Math.min(lines.length, MAX_LINES_PER_NOTE);
     const lineMatches = [];
     for (let i = 0; i < lineLimit; i++) {
@@ -4623,21 +5108,26 @@ function paletteCommands() {
   const draw = note && isDrawFile(note.name);
   const view = note && hasViewTab(note.name);
   const saved = note && !sharedNote;
+  const shareable = note && !note.enc;
+  const readable = note && !isLocked(note);
   return [
     ["note", "New note", "new", () => createNote(undefined, undefined, true)],
     ["file-draw", "New drawing", "", () =>
       createNote(undefined, undefined, true, "draw")],
+    vaultSupport && ["lock", "New encrypted file", "", createEncryptedNote],
     ["import", "Import files…", "", openImport],
     ["archive", "Export all as ZIP", "", downloadAll],
     saved && ["pencil", "Rename note", "F2", renameInTitle],
     saved && [note.pinned ? "pin-on" : "pin", note.pinned ? "Unpin note" : "Pin note", "", () => togglePin(note.id)],
-    note && ["share", "Share…", "", () => openShare()],
-    note && ["link", "Copy link", "", () => copyLink(note)],
+    shareable && ["share", "Share…", "", () => openShare()],
+    shareable && ["link", "Copy link", "", () => copyLink(note)],
     note && ["download", "Download", "", () => downloadNote(note)],
-    md && ["download", "Download as HTML", "", () => downloadHtml(note)],
-    draw && ["download", "Download as SVG", "", () => drawDownloadSvg(note)],
-    draw && ["image", "Copy as PNG", "", () => drawCopyPng(note)],
-    md && ["format", "Format markdown", "⌥⇧F", () => formatNote(note)],
+    md && readable && ["download", "Download as HTML", "", () => downloadHtml(note)],
+    draw && readable && ["download", "Download as SVG", "", () => drawDownloadSvg(note)],
+    draw && readable && ["image", "Copy as PNG", "", () => drawCopyPng(note)],
+    md && readable && ["format", "Format markdown", "⌥⇧F", () => formatNote(note)],
+    note?.enc && readable && ["lock", "Lock this file", "", () => lockNote(note.id)],
+    vaultKeys.size > 0 && ["lock", "Lock all encrypted files", "", lockAll],
     view && [mdViewActive ? "code" : "eye", mdViewActive ? (draw ? "Show source" : "Edit") : draw ? "Show canvas" : "Preview", "⌘E", toggleView],
     view && ["zen", "Zen", "", () => switchMdTab("zen", true)],
     note && ["search", "Find", "⌘F", () => openFindReplace()],
@@ -7447,8 +7937,10 @@ editor.addEventListener("blur", scheduleOccurrenceUpdate);
 function openNoteMenu(note, anchor, at) {
   const md = isMarkdownFile(note.name);
   const draw = isDrawFile(note.name);
-  const active = note === getActiveNote();
+  const active = note.id === getActiveNote()?.id;
   const kind = noteKind(note.name);
+  // A locked file offers what a passkey can open: download
+  const readable = !isLocked(note);
   const item = (ic, label, act, key = "", cls = "") =>
     `<button class="menu-item ${cls}" role="menuitem" data-note-act="${act}">${icon(ic)}<span class="label">${label}</span>${key ? `<span class="kbd">${keyLabel(key)}</span>` : ""}</button>`;
   const sep = '<div class="menu-sep"></div>';
@@ -7459,12 +7951,13 @@ function openNoteMenu(note, anchor, at) {
       : item("pencil", "Rename", "rename", "F2") +
         item(note.pinned ? "pin-on" : "pin", note.pinned ? "Unpin" : "Pin", "pin") +
         sep) +
-    item("link", "Copy link", "copy-link") +
-    (draw ? item("image", "Copy as PNG", "png") : "") +
+    (note.enc ? "" : item("link", "Copy link", "copy-link")) +
+    (draw && readable ? item("image", "Copy as PNG", "png") : "") +
     item("download", "Download", "download") +
-    (md ? item("download", "Download as HTML", "html") : "") +
-    (draw ? item("download", "Download as SVG", "svg") : "") +
-    (md ? sep + item("format", "Format markdown", "format", "⌥⇧F") : "") +
+    (md && readable ? item("download", "Download as HTML", "html") : "") +
+    (draw && readable ? item("download", "Download as SVG", "svg") : "") +
+    (note.enc && readable ? item("lock", "Lock", "lock") : "") +
+    (md && readable ? sep + item("format", "Format markdown", "format", "⌥⇧F") : "") +
     (isMobile() && active && hasViewTab(note.name)
       ? sep + item("zen", "Zen", "zen")
       : "") +
@@ -7500,7 +7993,10 @@ function toggleNoteMenu() {
 
 function runNoteAction(note, act, anchor) {
   const fromRow = anchor && anchor.closest?.(".note-list");
+  note = viewOf(note);
   switch (act) {
+    case "lock":
+      return lockNote(note.id);
     case "rename":
       if (note === getActiveNote() && !fromRow) renameInTitle();
       else startRename(note.id);
@@ -7555,7 +8051,7 @@ function updateTitleBar() {
   const note = getActiveNote();
   const st = note ? noteState(note) : null;
   const key = note ? note.name + "\n" + st.label + "\n" + st.detail : "";
-  btnShare.disabled = !note;
+  btnShare.disabled = !note || !!note.enc;
   btnNoteMenu.disabled = !note;
   if (key === titleBarKey) return;
   titleBarKey = key;
@@ -7751,7 +8247,7 @@ let shareMode = "edit";
 
 async function openShare(anchor = btnShare) {
   const note = getActiveNote();
-  if (!note) return;
+  if (!note || note.enc) return;
   if (sharePop.classList.contains("visible")) return closeAllMenus();
   const url = await shareLink(note, shareMode);
   const kb = (n) => Math.max(1, Math.round(n / 1000)) + " kB";
@@ -8032,6 +8528,7 @@ function formatNote(note = getActiveNote()) {
   if (!note) return;
   if (!isMarkdownFile(note.name))
     return showToast("Format works on markdown notes", { error: true });
+  note = viewOf(note);
   if (note !== getActiveNote()) {
     pushHistory(note.id, note.content);
     note.content = formatMarkdown(note.content);
@@ -8109,9 +8606,12 @@ function triggerDownload(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
-function downloadNote(note = getActiveNote()) {
+async function downloadNote(note = getActiveNote()) {
   if (!note) return;
+  if (isLocked(note) && !(await unlockNote(note.id))) return;
+  note = viewOf(note);
   triggerDownload(new Blob([note.content], { type: "text/plain" }), note.name);
+  if (note.id === state.activeId) render();
 }
 
 // Drawing as an image: the clipboard gets a PNG, the download an SVG
@@ -8157,8 +8657,8 @@ async function noteHtml(note) {
       for (const el of embeds) {
         const ref =
           el.dataset.ref && state.notes.find((n) => n.name === el.dataset.ref);
-        if (el.dataset.ref && !ref) continue;
-        const content = ref ? ref.content : el.dataset.draw;
+        if ((el.dataset.ref && !ref) || isLocked(ref)) continue;
+        const content = ref ? viewOf(ref).content : el.dataset.draw;
         el.replaceChildren(Draw.renderStatic(content));
         for (const f of Draw.usedFonts(content)) fonts.add(f);
       }
@@ -8257,7 +8757,9 @@ async function downloadAll() {
   }));
   // Drawings also go in as images, readable without the app
   const renders = [];
-  const drawings = state.notes.filter((n) => isDrawFile(n.name) && n.content);
+  const drawings = state.notes.filter(
+    (n) => isDrawFile(n.name) && n.content && !n.enc,
+  );
   if (drawings.length) {
     try {
       await loadDraw();
@@ -8276,6 +8778,7 @@ async function downloadAll() {
       id: n.id,
       name: n.name,
       updatedAt: n.updatedAt,
+      ...(n.enc && { enc: n.enc }),
     })),
     renders,
   };
@@ -8307,7 +8810,7 @@ async function shareUrlFor(note) {
 }
 
 async function copyLink(note = getActiveNote()) {
-  if (!note) return;
+  if (!note || note.enc) return;
   const url = await shareUrlFor(note);
   if (!url) return openShare();
   try {
@@ -8363,7 +8866,7 @@ async function loadFromUrl() {
     const content = plain ? plain.text : await decompress(noteData);
 
     const urlTs = Number(hashMap.get("ts")) || 0;
-    const existing = state.notes.find((n) => n.name === name);
+    const existing = state.notes.find((n) => n.name === name && !n.enc);
 
     // Zen mode from URL: don't persist, store ephemerally — unless it is
     // one of your notes (same content, or the URL is an older snapshot)
@@ -8592,6 +9095,7 @@ async function importFiles(files) {
       content: it.content,
       updatedAt: it.meta?.updatedAt ?? Date.now(),
       cursorPos: 0,
+      ...(typeof it.meta?.enc === "string" && { enc: it.meta.enc }),
     };
     state.notes.unshift(last);
     added++;
@@ -8599,8 +9103,11 @@ async function importFiles(files) {
   for (const it of ready) add(it, it.name);
   for (const c of clashes) {
     if (c.choice === "replace") {
-      pushHistory(c.existing.id, c.existing.content);
+      // The file replaces it as it is: encrypted or not
+      if (!c.existing.enc) pushHistory(c.existing.id, c.existing.content);
       c.existing.content = c.content;
+      if (typeof c.meta?.enc === "string") c.existing.enc = c.meta.enc;
+      else delete c.existing.enc;
       c.existing.updatedAt = c.meta?.updatedAt ?? Date.now();
       last = c.existing;
       added++;
@@ -9630,6 +10137,7 @@ function parseDrivePayload(data) {
       : [],
     deletedAt,
     settings: data?.settings || null,
+    vaults: validVaults(data?.vaults),
   };
 }
 
@@ -9645,6 +10153,7 @@ function combineDrivePayloads(payloads) {
     out.deletedIds.push(...p.deletedIds);
     Object.assign(out.deletedAt, p.deletedAt);
     out.settings ||= p.settings;
+    out.vaults = mergeVaults(out.vaults, p.vaults);
   }
   out.notes = [...byId.values()];
   out.deletedIds = [...new Set(out.deletedIds)];
@@ -9654,6 +10163,7 @@ function combineDrivePayloads(payloads) {
 function gatherDrivePayload() {
   return JSON.stringify({
     ...state,
+    vaults: loadVaults(),
     settings: {
       wrap: localStorage.getItem(WRAP_KEY),
       vim: localStorage.getItem(VIM_KEY),
@@ -9886,7 +10396,11 @@ async function runSync() {
       const copiesBefore = new Set(
         state.notes.filter((n) => isConflictCopy(n.name)).map((n) => n.id),
       );
-      const needsUpload = mergeDriveState(remote, base);
+      const vaults = mergeVaults(loadVaults(), remote.vaults);
+      localStorage.setItem(VAULTS_KEY, JSON.stringify(vaults));
+      const needsUpload =
+        mergeDriveState(remote, base) ||
+        vaultSize(vaults) !== vaultSize(remote.vaults);
       announceConflicts(copiesBefore);
       saveState();
       if (activeNoteVersion() !== before) render();
@@ -10050,6 +10564,14 @@ const HELP_DESKTOP = [
   "Pick *Editable* or *Read-only*; anyone with the link can read it",
   "instantly (~60kB limit). A link someone sends you opens for",
   "reading first, and joins your notes only when you save it.",
+  "",
+  "## Encrypted files",
+  "",
+  "**▾ › New encrypted file** locks a file with a passkey (Touch ID,",
+  "Windows Hello or your password manager). It stays encrypted in",
+  "this browser and in Drive and opens only for you — it can't be",
+  "shared. It locks after 5 idle minutes; **⋯ › Lock** locks it now.",
+  "Keep the recovery key: without it, a lost passkey loses the file.",
   "",
   "## Keep it safe",
   "",
@@ -10228,6 +10750,14 @@ const HELP_MOBILE = [
   "the entire note lives in the link (~60kB limit). A link someone",
   "sends you opens for reading first, and joins your notes only",
   "when you save it.",
+  "",
+  "## Encrypted files",
+  "",
+  "**▾ › New encrypted file** locks a file with a passkey (Touch ID,",
+  "Windows Hello or your password manager). It stays encrypted in",
+  "this browser and in Drive and opens only for you — it can't be",
+  "shared. It locks after 5 idle minutes; **⋯ › Lock** locks it now.",
+  "Keep the recovery key: without it, a lost passkey loses the file.",
   "",
   "## Keep it safe",
   "",
@@ -10470,6 +11000,9 @@ const clickActions = {
   "new-note-rename": () => createNote(undefined, undefined, true),
   "new-drawing": () => createNote(undefined, undefined, false, "draw"),
   "new-drawing-rename": () => createNote(undefined, undefined, true, "draw"),
+  "new-encrypted": createEncryptedNote,
+  "unlock-note": () => unlockNote(state.activeId).then((ok) => ok && render()),
+  "recover-note": () => recoverNote(state.activeId).then((ok) => ok && render()),
   "toggle-new-menu": toggleNewMenu,
   "toggle-app-menu": toggleAppMenu,
   "toggle-note-menu": toggleNoteMenu,

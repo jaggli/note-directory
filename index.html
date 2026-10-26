@@ -2141,6 +2141,11 @@
         color: var(--n-pin);
       }
 
+      .row-lock {
+        flex: none;
+        color: var(--n-text-3);
+      }
+
       /* Tooltip: icon buttons, short states, disabled reasons */
       .tip {
         position: fixed;
@@ -3570,6 +3575,17 @@
             <button class="btn ghost" data-action="zen-share" aria-label="Copy share link"><svg class="icon sm"><use href="#i-share" /></svg>Share</button>
             <button class="btn ghost" data-action="zen-download" aria-label="Download as shown"><svg class="icon sm"><use href="#i-download" /></svg>Download</button>
           </div>
+          <div class="empty-state" id="lockState">
+            <div class="empty-inner">
+              <svg class="icon"><use href="#i-lock" /></svg>
+              <h2 id="lockName"></h2>
+              <p>Encrypted — your passkey opens it.</p>
+              <div class="empty-acts">
+                <button class="btn primary needs-vault" data-action="unlock-note" hidden>Unlock</button>
+                <button class="btn" data-action="recover-note">Use recovery key</button>
+              </div>
+            </div>
+          </div>
           <div class="empty-state" id="emptyState">
             <div class="empty-inner">
               <h2>No note open</h2>
@@ -3647,6 +3663,7 @@
     <div class="menu" id="newMenu" role="menu" aria-label="New">
       <button class="menu-item" role="menuitem" data-action="new-note-rename" data-close-menu><svg class="icon"><use href="#i-note" /></svg><span class="label">New note</span><span class="kbd" data-k="new"></span></button>
       <button class="menu-item" role="menuitem" data-action="new-drawing-rename" data-close-menu><svg class="icon"><use href="#i-file-draw" /></svg><span class="label">New drawing</span></button>
+      <button class="menu-item needs-vault" role="menuitem" data-action="new-encrypted" data-close-menu hidden><svg class="icon"><use href="#i-lock" /></svg><span class="label">New encrypted file</span></button>
       <div class="menu-sep"></div>
       <button class="menu-item" role="menuitem" data-action="import" data-close-menu><svg class="icon"><use href="#i-import" /></svg><span class="label">Import files…</span></button>
     </div>
