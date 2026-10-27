@@ -87,3 +87,32 @@ test("opening the notes list closes the keyboard", async ({ page }) => {
   await expect(page.locator(".sidebar")).toHaveClass(/open/);
   expect(await editorFocused(page)).toBe(false);
 });
+
+test("one view button instead of tabs; its icon shows the view", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    const note = { id: "v", name: "v.md", content: "# hi", updatedAt: Date.now() };
+    state.notes.push(note);
+    switchNote(note.id);
+  });
+  const toggle = page.locator("#mdTabToggle");
+  const icon = () => toggle.locator("use").getAttribute("href");
+  await expect(page.locator("#mdTabs")).toBeHidden();
+  await expect(toggle).toBeVisible();
+  await expect.poll(icon).toBe("#i-eye");
+  await page.tap("#mdTabToggle");
+  await expect.poll(icon).toBe("#i-code");
+  await expect(page.locator("#editor")).toBeVisible();
+  await page.tap("#mdTabToggle");
+  await expect.poll(icon).toBe("#i-eye");
+
+  // Same height as the buttons beside it
+  await page.evaluate(() => renameInTitle());
+  const h = (sel) => page.locator(sel).evaluate((el) => el.getBoundingClientRect().height);
+  expect(await h("#crumbInput")).toBe(await h("#btnNoteMenu"));
+});
+
+test("a plain text note has no view button", async ({ page }) => {
+  await editingNote(page);
+  await expect(page.locator("#mdTabToggle")).toBeHidden();
+});

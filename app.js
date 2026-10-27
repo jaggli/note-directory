@@ -311,6 +311,7 @@ const findReplaceCount = document.getElementById("findReplaceCount");
 const mdTabs = document.getElementById("mdTabs");
 const mdTabEdit = document.getElementById("mdTabEdit");
 const mdTabView = document.getElementById("mdTabView");
+const mdTabToggle = document.getElementById("mdTabToggle");
 const mdPreview = document.getElementById("mdPreview");
 const mdTabZen = document.getElementById("mdTabZen");
 const crumb = document.getElementById("crumb");
@@ -3885,7 +3886,19 @@ function updateMdTabBar() {
     switchMdTab("view");
   }
   mdTabsKind = isDraw ? "draw" : "md";
+  updateTabToggle();
   updateTitleBar();
+}
+
+// Phones: one button, showing the view you're in
+function updateTabToggle() {
+  const isDraw = isDrawFile(getActiveNote()?.name);
+  const view = mdViewActive ? (isDraw ? "#i-file-draw" : "#i-eye") : "#i-code";
+  mdTabToggle.querySelector("use").setAttribute("href", view);
+  mdTabToggle.setAttribute(
+    "aria-label",
+    mdViewActive ? (isDraw ? "Show source" : "Edit") : isDraw ? "Show canvas" : "Preview",
+  );
 }
 
 function currentTab() {
@@ -3912,6 +3925,7 @@ function switchMdTab(tab, pushHistory) {
   mdViewActive = tab === "view" || tab === "zen";
   mdTabEdit.setAttribute("aria-selected", tab === "edit");
   mdTabView.setAttribute("aria-selected", tab !== "edit");
+  updateTabToggle();
   closeFindReplace(false);
 
   const appEl = document.querySelector(".app");
@@ -11117,6 +11131,7 @@ const clickActions = {
   "drive-sign-out": () => driveSignOut(),
   "tab-edit": () => switchMdTab("edit", true),
   "tab-view": () => switchMdTab("view", true),
+  "tab-toggle": toggleView,
   "tab-zen": () => switchMdTab("zen", true),
   "exit-zen": exitZenMode,
   "zen-share": zenShare,

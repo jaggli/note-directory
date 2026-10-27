@@ -1827,7 +1827,8 @@
       }
 
       #mdTabs:not(.visible),
-      #mdTabZen:not(.visible) {
+      #mdTabZen:not(.visible),
+      #mdTabToggle {
         display: none;
       }
 
@@ -3184,17 +3185,25 @@
 
         .crumb-input {
           width: 100%;
+          height: 40px;
+          padding: 0 10px;
+          border-radius: var(--n-r-md);
           font-size: 16px;
         }
 
-        .titlebar .seg {
-          position: static;
-          transform: none;
+        /* One button instead of the tabs: its icon shows the current view */
+        #mdTabs.visible {
+          display: none;
         }
 
-        .seg > button {
-          height: 32px;
-          padding: 0 10px;
+        #mdTabs.visible ~ .titlebar-end #mdTabToggle {
+          display: inline-flex;
+        }
+
+        /* No pressed look: a tap leaves :hover behind on touch screens */
+        #mdTabToggle:hover {
+          background: none;
+          color: var(--n-text-2);
         }
 
         #mdTabZen {
@@ -3533,6 +3542,7 @@
           </div>
           <div class="titlebar-end">
             <button class="btn ghost square" id="mdTabZen" data-action="tab-zen" aria-label="Zen" data-tip="Zen" data-sub="Read without the app around it"><svg class="icon"><use href="#i-zen" /></svg></button>
+            <button class="btn ghost square" id="mdTabToggle" data-action="tab-toggle" aria-label="Preview"><svg class="icon"><use href="#i-code" /></svg></button>
             <button class="btn share" id="btnShare" data-action="toggle-share" aria-haspopup="dialog" aria-expanded="false"><svg class="icon sm"><use href="#i-share" /></svg><span>Share</span></button>
             <button class="btn ghost square" id="btnNoteMenu" data-action="toggle-note-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Note actions" data-tip="Note actions"><svg class="icon"><use href="#i-more" /></svg></button>
           </div>

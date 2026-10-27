@@ -57,7 +57,7 @@ test("search in a drawing selects the shape", async ({ page }) => {
   expect(await page.evaluate(() => [...Draw._state.sel])).toEqual(["b"]);
 });
 
-test("view switch is centred on desktop, after the name on phones", async ({ page }) => {
+test("view switch is centred on desktop, a button after the name on phones", async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => createNote("c.md", "# c"));
   await page.keyboard.press("Escape");
@@ -66,8 +66,9 @@ test("view switch is centred on desktop, after the name on phones", async ({ pag
   const tabs = await box("mdTabs");
   expect(Math.abs(tabs.left + tabs.width / 2 - (bar.left + bar.width / 2))).toBeLessThan(2);
   await page.setViewportSize({ width: 400, height: 800 });
+  await expect(page.locator("#mdTabs")).toBeHidden();
   const crumb = await box("crumb");
-  const small = await box("mdTabs");
+  const small = await box("mdTabToggle");
   expect(small.left).toBeGreaterThanOrEqual(crumb.right);
   expect(small.right).toBeLessThanOrEqual(400);
 });
