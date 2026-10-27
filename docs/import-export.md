@@ -19,8 +19,9 @@ The ZIP is a valid archive that can be opened by any zip tool (Finder, Explorer,
 In Chromium browsers a sidebar row dragged out of the window drops a copy as a
 file (`DownloadURL`): the note's text, or a PNG for drawings. The PNG is made
 on hover, since the drag needs the file at once. Locked encrypted notes refuse
-the drop with "Unlock it first". Other browsers, and the installed app (Chrome
-ignores DownloadURL in app windows), keep plain reordering.
+the drop with "Unlock it first". Other browsers keep plain reordering.
+Chrome's installed-app windows accept the drop but save nothing (as of
+2026-10); it stays on there so it works once Chrome supports it.
 
 ### `.note.directory` format
 
