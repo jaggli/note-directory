@@ -1213,23 +1213,55 @@ async function recoverVault(vaults) {
   }
   vaultKeys.set(vault.id, await importVaultKey(raw));
   lastActivity = Date.now();
-  if (
-    vaultSupport &&
-    (await showModal(
-      "Add a passkey for this browser? Then it won't need the recovery key again.",
-      "Add passkey",
-      "Not now",
-    ))
-  ) {
-    try {
-      await addPasskey(vault, raw);
-      saveVault(vault);
-    } catch (e) {
-      passkeyFailed(e, "Couldn't add the passkey");
+  if (vaultSupport && !(await linkPasskey(vault, raw)))
+    if (
+      await showModal(
+        "Add a passkey for this browser? Then it won't need the recovery key again.",
+        "Add passkey",
+        "Not now",
+      )
+    ) {
+      try {
+        await addPasskey(vault, raw);
+        saveVault(vault);
+      } catch (e) {
+        passkeyFailed(e, "Couldn't add the passkey");
+      }
     }
-  }
   raw.fill(0);
   return vault;
+}
+
+// Another vault's passkey opens this one too, so one passkey opens every
+// file. False if there is none, or it didn't answer.
+async function linkPasskey(vault, raw) {
+  const mine = new Set(vaultCreds([vault]).map(([id]) => id));
+  const others = vaultCreds(loadVaults().filter((v) => v.id !== vault.id)).filter(
+    ([id]) => !mine.has(id),
+  );
+  if (!others.length) return false;
+  if (
+    !(await showModal(
+      "Open this file with the passkey of your other encrypted files too? Then that one passkey opens them all.",
+      "Use my passkey",
+      "Not now",
+    ))
+  )
+    return false;
+  try {
+    // That passkey, evaluated with this vault's salt
+    const { cred, out } = await passkeyPrf(others.map(([id]) => [id, vault]));
+    vault.slots.push({
+      kind: "passkey",
+      cred,
+      key: await seal(await wrapKey(out, PASSKEY_INFO), raw),
+    });
+    saveVault(vault);
+    return true;
+  } catch (e) {
+    passkeyFailed(e, "Couldn't use that passkey");
+    return false;
+  }
 }
 
 // No passkey answered: deleted, or only on another device
@@ -1318,7 +1350,13 @@ async function unlockNote(id) {
     });
     return false;
   }
-  return (await unlockVault([vault])) && openNote(id);
+  if (await unlockVault([vault])) return openNote(id);
+  // The browser only offers phone or security key when it has none of them
+  showToast("No passkey of this file answered — deleted, or on another device?", {
+    action: "Use recovery key",
+    onAction: () => recoverNote(id).then((ok) => ok && render()),
+  });
+  return false;
 }
 
 async function recoverNote(id) {

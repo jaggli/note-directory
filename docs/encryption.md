@@ -58,3 +58,8 @@ offers only phone or security key. When no passkey answers, **New encrypted
 file** offers the recovery key (which adds a new passkey to the same vault) or
 starting over with a new vault. Unlocking asks once for any vault's passkey,
 each with its own PRF salt (`evalByCredential`).
+
+Starting over leaves older files in the old vault. Opening one with its
+recovery key offers the passkey of another vault: evaluated with this vault's
+salt, it becomes a slot here too, so one passkey opens every vault. A lock
+screen whose passkeys don't answer points to the recovery key.

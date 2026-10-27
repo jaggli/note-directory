@@ -288,6 +288,51 @@ test("a deleted passkey without recovery key: start over, the new vault wins", a
   expect(await page.evaluate((id) => isLocked(realNote(id)), oldId)).toBe(true);
 });
 
+test("after starting over, the old file's recovery key lets the new passkey open it", async ({
+  page,
+  context,
+}) => {
+  await countPrompts(context);
+  const deletePasskeys = await authenticator(page);
+  await openApp(page);
+  const oldRecovery = await newEncrypted(page);
+  const oldId = await page.evaluate(() => state.activeId);
+  await deletePasskeys();
+  await page.reload();
+
+  // The old file's passkey is gone: the lock screen points to the recovery key
+  await page.evaluate((id) => switchNote(id), oldId);
+  await page.click('[data-action="unlock-note"]');
+  await expect(page.locator("#mdToast")).toContainText("No passkey of this file answered");
+
+  // Start over: a second vault with a new passkey
+  await page.click("#btnNewMenu");
+  await page.click('#newMenu [data-action="new-encrypted"]');
+  await page.click("#modalCancel");
+  await page.click("#modalConfirm");
+  await page.click("#modalConfirm");
+  await expect(page.locator("#modalText")).toContainText("Your recovery key");
+  await page.click("#modalConfirm");
+  await keepName(page);
+
+  await page.reload();
+  await page.evaluate((id) => switchNote(id), oldId);
+  await page.click('[data-action="recover-note"]');
+  await page.fill("#modalInput", oldRecovery);
+  await page.click("#modalConfirm");
+  await expect(page.locator("#modalText")).toContainText("passkey of your other encrypted files");
+  await page.click("#modalConfirm");
+  await expect(page.locator("#editor")).toHaveValue(SECRET);
+
+  // Locked and reloaded, the one passkey opens it
+  await page.reload();
+  await page.evaluate((id) => switchNote(id), oldId);
+  const before = await page.evaluate(() => passkeyPrompts);
+  await page.click('[data-action="unlock-note"]');
+  await expect(page.locator("#editor")).toHaveValue(SECRET);
+  expect(await page.evaluate(() => passkeyPrompts)).toBe(before + 1);
+});
+
 test("without PRF support nothing about encryption shows", async ({ page, context }) => {
   await context.addInitScript(() => {
     PublicKeyCredential.getClientCapabilities = async () => ({});
