@@ -341,3 +341,20 @@ test("without PRF support nothing about encryption shows", async ({ page, contex
   await page.click("#btnNewMenu");
   await expect(page.locator('#newMenu [data-action="new-encrypted"]')).toBeHidden();
 });
+
+test("a locked file can't be dragged out of the window", async ({ page }) => {
+  await authenticator(page);
+  await openApp(page);
+  await newEncrypted(page);
+  const id = await page.evaluate(() => state.activeId);
+  await page.evaluate((id) => lockNote(id), id);
+  const url = await page.evaluate((id) => {
+    const row = document.querySelector(`.note-item[data-id="${id}"]`);
+    const dataTransfer = new DataTransfer();
+    row.dispatchEvent(new DragEvent("dragstart", { dataTransfer, bubbles: true }));
+    row.dispatchEvent(new DragEvent("dragend", { bubbles: true, clientX: -10, clientY: 50 }));
+    return dataTransfer.getData("DownloadURL");
+  }, id);
+  expect(url).toBe("");
+  await expect(page.getByText("Unlock it first to drag it out")).toBeVisible();
+});

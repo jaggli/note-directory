@@ -2560,6 +2560,33 @@ function renderEditor() {
 // Drag reorder state
 let dragSrcIdx = null;
 
+// Dragging a row out of the window saves a copy (Chromium's DownloadURL)
+const canDragOut = !!navigator.userAgentData;
+const dragOutFiles = new Map(); // note id → { key, url, type, name }
+
+// The drag needs the file at once: drawings are made into a PNG ahead, on hover
+function prepareDragOut(note) {
+  if (!canDragOut || isLocked(note)) return;
+  const key = note.updatedAt + "|" + note.name;
+  const old = dragOutFiles.get(note.id);
+  if (old?.key === key) return;
+  if (old?.url) URL.revokeObjectURL(old.url);
+  const content = viewOf(note).content;
+  const draw = isDrawFile(note.name);
+  const file = {
+    key,
+    url: null,
+    type: draw ? "image/png" : "text/plain",
+    name: (draw ? note.name.replace(/\.draw$/i, ".png") : note.name).replace(/:/g, "-"),
+  };
+  dragOutFiles.set(note.id, file);
+  const done = (blob) => dragOutFiles.get(note.id) === file && (file.url = URL.createObjectURL(blob));
+  if (!draw) return done(new Blob([content], { type: file.type }));
+  loadDraw()
+    .then(() => Draw.pngBlob(content))
+    .then(done, () => dragOutFiles.delete(note.id));
+}
+
 function isMobile() {
   return window.innerWidth <= 900;
 }
@@ -2650,13 +2677,25 @@ function noteRow(note, ni) {
     `</span>`;
   div.querySelector(".note-item-time").dataset.tip = noteDetail(note);
 
+  let dragOutMissing = null;
+  div.addEventListener("pointerenter", () => prepareDragOut(note));
   div.addEventListener("dragstart", (e) => {
     dragSrcIdx = ni;
     div.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", ni.toString());
+    if (!canDragOut) return;
+    prepareDragOut(note);
+    const file = dragOutFiles.get(note.id);
+    dragOutMissing = isLocked(note) ? "Unlock it first to drag it out" : file?.url ? null : "Still making the image — drag again";
+    if (dragOutMissing) return;
+    e.dataTransfer.effectAllowed = "copyMove";
+    e.dataTransfer.setData("DownloadURL", `${file.type}:${file.name}:${file.url}`);
   });
-  div.addEventListener("dragend", () => {
+  div.addEventListener("dragend", (e) => {
+    const outside = e.clientX < 0 || e.clientY < 0 || e.clientX > innerWidth || e.clientY > innerHeight;
+    if (dragOutMissing && outside) showToast(dragOutMissing, { error: true });
+    dragOutMissing = null;
     div.classList.remove("dragging");
     dragSrcIdx = null;
     noteList

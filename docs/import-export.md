@@ -14,6 +14,13 @@ Creates a standard ZIP file (DEFLATE-compressed) containing:
 
 The ZIP is a valid archive that can be opened by any zip tool (Finder, Explorer, 7-Zip, etc.). Users can unpack it to get their raw text files.
 
+### Dragging a note out
+
+In Chromium browsers a sidebar row dragged out of the window drops a copy as a
+file (`DownloadURL`): the note's text, or a PNG for drawings. The PNG is made
+on hover, since the drag needs the file at once. Locked encrypted notes refuse
+the drop with "Unlock it first". Other browsers keep plain reordering.
+
 ### `.note.directory` format
 
 ```json

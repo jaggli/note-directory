@@ -296,3 +296,33 @@ test("search: note names rank before content, even the open note's", async ({ pa
   await page.keyboard.type("pear");
   await expect(page.locator(".search-result-item").first()).toContainText("pear.md");
 });
+
+// What a row's drag carries for a drop outside the window
+const dragOut = (page, name) =>
+  page.evaluate((name) => {
+    const row = [...document.querySelectorAll(".note-item")].find((r) => r.textContent.includes(name));
+    const dataTransfer = new DataTransfer();
+    row.dispatchEvent(new DragEvent("dragstart", { dataTransfer, bubbles: true }));
+    row.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+    return dataTransfer.getData("DownloadURL");
+  }, name);
+
+test("dragging a row out of the window saves a copy, drawings as PNG", async ({ page }) => {
+  // The page's CSP blocks fetching blob: URLs, so keep the blobs as they are made
+  await page.addInitScript(() => {
+    const make = URL.createObjectURL;
+    window.blobs = {};
+    URL.createObjectURL = (b) => ((window.blobs[make(b)] = b), Object.keys(window.blobs).at(-1));
+  });
+  await openApp(page);
+  await page.evaluate(() => createNote("out.md", "# hi"));
+  const [, type, name, url] = (await dragOut(page, "out.md")).match(/^([^:]+\/[^:]+):([^:]+):(blob:.+)$/);
+  expect([type, name]).toEqual(["text/plain", "out.md"]);
+  expect(await page.evaluate((u) => blobs[u].text(), url)).toBe("# hi");
+
+  await page.evaluate(() => createNote("pic.draw", 'draw 1\nr a 0 0 40 20 "x"\n'));
+  await page.locator(".note-item", { hasText: "pic.draw" }).hover();
+  await expect.poll(async () => dragOut(page, "pic.draw")).toMatch(/^image\/png:pic\.png:blob:/);
+  const png = (await dragOut(page, "pic.draw")).replace(/^image\/png:pic\.png:/, "");
+  expect(await page.evaluate((u) => blobs[u].type, png)).toBe("image/png");
+});
