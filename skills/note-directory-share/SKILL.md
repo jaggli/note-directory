@@ -90,7 +90,13 @@ t note 0 120 c=grey "deployed on k8s"
 - `c=` `text grey red peach yellow green teal sky blue lavender mauve pink` · `s=` `xs s m l xl` · `fo=` `mono sans serif` · `o=<1-100>` opacity · `f=` `none semi solid` · `d=` `solid dash dot none` (none: fill without outline) · `st=` text style, any of `b i u` (bold, italic, underline; e.g. `st=b`) · `rot=<deg>` · `gr=<group id>`.
 - Colours follow the reader's theme (dark by default, light Latte too): never write "white", "darker" or "lighter" in labels; opacity scales read "fainter = less, stronger = more". Series colours in order `blue peach green pink yellow`; never `teal`/`sky`, `blue`/`lavender`, `lavender`/`mauve`, `green`/`teal` or `blue`/`grey` as two different series; `grey` for axes and "other".
 - Charts: baseline at `y=0`, bars upwards with `rx=0`; place labels by anchor (`ta=center va=bottom` above a bar, `ta=right va=middle` for axis ticks) instead of guessing text width; gridlines `l … s=xs c=grey d=dash`. Recipes: https://note.directory/llms.txt
-- Integer coordinates, y grows downwards. Size `m` mono text is 12 units per character (0.545 × font size), so make boxes wide enough (≈ 12 × characters + 40) or let labels wrap at spaces. Leave ~100 units between shapes for arrows, more for a labelled arrow (≈ 13 × label characters + 80).
+- Integer coordinates, y grows downwards. Size `m` mono text is 12 units per character (0.545 × font size) and 29 units per line. Labels that don't fit wrap at spaces and then spill out of the box, so size every box from its longest `\n` line: `r` width ≥ 12 × characters + 40, height ≥ 29 × lines + 30 (two lines: 90). `e` needs ⅓ more of both, `m` twice as much. Leave ~100 units between shapes for arrows, more for a labelled arrow (≈ 13 × label characters + 80).
+- Box-and-arrow diagrams: work it out on paper before writing coordinates.
+  - Use a grid. Each column is as wide as its widest box; the gap to the next column fits the longest arrow label between them. Rows are 250–300 apart, top to top, for labelled vertical arrows. An arrow's label sits centred on its midpoint: keep that point off other shapes and container edges.
+  - Flow runs left to right: sources, then the system, then consumers. Side sinks (monitoring, logs) get their own column or row, never a spot between two connected shapes. Arrows are straight, so check that none crosses a third shape.
+  - Two arrows leaving one shape the same way: put their targets ≥ 200 apart, or `bend=` one of them.
+  - Container (trust boundary, cluster, namespace): `r … f=none d=dash c=grey` without a label, a `t` 14 units inside its top-left corner for the name, inner shapes ≥ 60 below its top.
+  - Box labels: a name plus one short detail line. Longer explanations go in a legend `t` under the drawing.
 - Labels escape `\"`, `\\` and use `\n` for a line break.
 - Full spec: https://github.com/jaggli/note-directory/blob/main/docs/drawing-format.md
 
@@ -108,6 +114,8 @@ a c a b
 ````
 
 (`![label](name.draw)` also embeds, but only works where that drawing note already exists — prefer the fenced block for links.)
+
+**As an image** (for Confluence, slides, docs): open the link. The note menu (`⋯`, top right) has *Copy as PNG* and *Download as SVG*; use those rather than a screenshot. A new version of a drawing is a new link; the app shows it even when a note with that name exists.
 
 ## Output
 

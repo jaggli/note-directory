@@ -139,7 +139,15 @@ A line is: kind, id, values, `key=value` attributes, and an optional `"label"`. 
 
 Labels: `"…"`; escape `\"` and `\\`, `\n` is a line break. Labels wrap inside their shape at spaces.
 
-Layout tips for generated diagrams: `mono` characters are exactly 0.545 × font size wide (xs 6.5, s 8.7, m 12, l 16.4, xl 24 units), `sans` about 0.45 ×, `serif` about 0.5 ×. Make boxes about 12 × characters + 40 wide; leave about 100 units between shapes for arrows, more if the arrow has a label (about 13 × label characters + 80).
+Layout tips for generated diagrams: `mono` characters are exactly 0.545 × font size wide (xs 6.5, s 8.7, m 12, l 16.4, xl 24 units), `sans` about 0.45 ×, `serif` about 0.5 ×. Size every box from its longest `\n` line: a size `m` rectangle needs 12 × characters + 40 wide and 29 × lines + 30 high (two lines: 90); ellipses need a third more of both, diamonds twice as much. A label that doesn't fit wraps at spaces and then spills out of its box. Leave about 100 units between shapes for arrows, more if the arrow has a label (about 13 × label characters + 80).
+
+### Diagrams
+
+- Use a grid: each column as wide as its widest box, the gap to the next column wide enough for the longest arrow label between them, rows 250–300 apart (top to top) when vertical arrows carry labels. An arrow's label sits centred on its midpoint: keep that point off other shapes and container edges.
+- Flow runs left to right: sources, then the system, then consumers. Side sinks (monitoring, logs) get their own column or row, never a spot between two connected shapes. Arrows are straight: check that none crosses a third shape.
+- Two arrows leaving one shape the same way: targets at least 200 apart, or `bend=` one of them.
+- Containers (trust boundary, cluster): `r … f=none d=dash c=grey` without a label, its name as a `t` 14 units inside the top-left corner, inner shapes at least 60 below its top.
+- Box labels: a name and one short detail line; longer explanations go in a legend `t` under the drawing.
 
 ### Charts
 
