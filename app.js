@@ -2560,8 +2560,9 @@ function renderEditor() {
 // Drag reorder state
 let dragSrcIdx = null;
 
-// Dragging a row out of the window saves a copy (Chromium's DownloadURL)
-const canDragOut = !!navigator.userAgentData;
+// Dragging a row out of the window saves a copy (Chromium's DownloadURL);
+// installed-app windows ignore it
+const canDragOut = !!navigator.userAgentData && !matchMedia("(display-mode: standalone)").matches;
 const dragOutFiles = new Map(); // note id → { key, url, type, name }
 
 // The drag needs the file at once: drawings are made into a PNG ahead, on hover
