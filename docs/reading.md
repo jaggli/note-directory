@@ -263,7 +263,7 @@ Zen mode strips all application chrome:
 | Status bar     | Visible    | Hidden                          |
 | Tab bar        | Visible    | Hidden                          |
 | Find & replace | Visible    | Hidden                          |
-| Content width  | Full width | max-width: 800px, centered      |
+| Content width  | 680px column, centered | 680px column, centered |
 | Bottom padding | None       | 40vh (scroll space via ::after) |
 | Menu           | None       | Floating === button (top-left)  |
 
