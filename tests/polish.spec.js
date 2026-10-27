@@ -223,6 +223,16 @@ test("plain text= zen links stay ephemeral", async ({ page }) => {
   expect(await page.evaluate(() => location.search)).toBe("?view=zen");
 });
 
+test("a zen link opens its drawing, not the last drawing you had open", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => createNote("mine.draw", 'draw 1\nr a 0 0 200 80 "mine"\n'));
+  await page.goto("/?view=zen#name=shared.draw&text=" + encodeURIComponent('draw 1\nr a 0 0 200 80 "shared"\n'));
+  await page.waitForFunction(() => zenModeActive);
+  await expect(page.locator(".draw-host")).toContainText("shared");
+  await expect(page.locator(".draw-host")).not.toContainText("mine");
+  expect(await page.evaluate(() => location.search)).toBe("?view=zen");
+});
+
 test("theme: picked from the submenu, persists, repaints drawings", async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => createNote("pic.draw", "draw 1\nr a 0 0 40 20 c=red\n"));

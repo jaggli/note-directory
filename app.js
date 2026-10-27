@@ -2859,7 +2859,9 @@ function render() {
   const note = getActiveNote();
   if ((note?.id ?? null) !== lastRenderedId) {
     lastRenderedId = note?.id ?? null;
-    if (note && isDrawFile(note.name) && !zenModeActive) switchMdTab("view");
+    // Not under a zen link still loading: that would rewrite ?view=zen
+    if (note && isDrawFile(note.name) && !zenModeActive && !zenEphemeralNote)
+      switchMdTab("view");
     // Another note under an open preview (delete, undo, import): show it
     else if (mdViewActive && !zenModeActive)
       switchMdTab(note && hasViewTab(note.name) ? "view" : "edit");
