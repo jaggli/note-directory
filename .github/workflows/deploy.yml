@@ -17,17 +17,16 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Browsers come preinstalled; the tag must match @playwright/test in package.json
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      options: --user 1001
     steps:
       # Full history: storage tests run the previous release from git
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium firefox webkit
       # Serial: some UI tests are timing-sensitive under parallel load.
       # Storage runs in all three engines — it holds everyone's notes
       - run: npx playwright test --workers=1
