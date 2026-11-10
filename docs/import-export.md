@@ -129,6 +129,20 @@ When opening a shared URL:
 
 ---
 
+### Several files in one link
+
+**Share** on a note that embeds drawings, tables or charts (also through a
+chart's `data`, transitively) offers **With its N embedded files**, on by
+default. A folder's menu has **Share folder…**. Such a link carries
+`#files=`: the compressed JSON `{main, files: [{name, content, header?}]}`,
+names relative to the folder they share (a folder keeps its own name).
+Encrypted files are left out.
+
+Opening it lists the files and asks **Add to my notes?**; nothing is stored
+before that. Adding goes through the import (name clashes get the import
+dialog) and opens the main note. Over the link limit, the popover offers
+**Download ZIP** instead, which imports the same way.
+
 ## Security
 
 ### ZIP reader hardening

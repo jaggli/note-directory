@@ -3368,6 +3368,7 @@ function openFolderMenu(dir, anchor, at) {
       ? item("pencil", "Rename", "rename") +
         item("folder", "Move to…", "move") +
         item("search", "Search in folder", "search") +
+        item("share", "Share folder…", "share") +
         (vaultSupport
           ? isEncDir(dir)
             ? item("lock", "Stop encrypting", "decrypt")
@@ -3404,6 +3405,7 @@ function openFolderMenu(dir, anchor, at) {
     }
     if (act === "import") return openImport(dir);
     if (act === "encrypt") return encryptFolder(dir);
+    if (act === "share") return shareFolder(dir, anchor, at);
     if (act === "decrypt") return decryptFolder(dir);
     if (act === "zip")
       return dir ? downloadAll(notesIn(dir), folderName(dir) + ".zip", parentOf(dir)) : downloadAll();
@@ -3491,17 +3493,32 @@ function mapLinks(text, fn, chart = false) {
       if (fence ? lang === "chart" : chart)
         return line.replace(/^(\s*data\s+)(\S+)(\s*)$/, (all, a, href, z) => {
           if (EXTERNAL_RE.test(href)) return all;
-          const out = fn(href);
+          const out = fn(href, true);
           return out == null ? all : a + out + z;
         });
       if (fence) return line;
       return line.replace(LINK_RE, (all, open, href, close) => {
         if (EXTERNAL_RE.test(href)) return all;
-        const out = fn(href);
+        const out = fn(href, open[0] === "!");
         return out == null ? all : open + out + close;
       });
     })
     .join("\n");
+}
+
+// What `note` shows from other notes: embeds and chart data, and theirs
+function partsOf(note) {
+  const out = new Set();
+  const walk = (n) => {
+    if (!hasLinks(n.name) || isLocked(n)) return;
+    mapLinks(viewOf(n).content, (href, embed) => {
+      const t = embed && findByRef(n.name, href.split("#")[0]);
+      if (t && t !== note && !out.has(t)) out.add(t), walk(t);
+      return null;
+    }, isChartFile(n.name));
+  };
+  walk(note);
+  return [...out];
 }
 
 // Notes whose links follow moves: markdown and charts
@@ -9687,11 +9704,82 @@ function closeSidebar() {
 // ── Share ──────────────────────────────────────────
 
 let shareMode = "edit";
+let shareParts = true;
+
+// A link to several notes (a folder, or a note with what it embeds); too big: a ZIP
+async function openShareBundle({ title, notes, main, root, zipName, anchor, at, toggle = "" }) {
+  const url = await bundleLink(notes, main, root);
+  const kb = (n) => Math.max(1, Math.round(n / 1000)) + " kB";
+  const fits = url.length <= URL_MAX_LENGTH;
+  const pct = Math.min(100, (url.length / URL_MAX_LENGTH) * 100);
+  sharePop.innerHTML =
+    `<h4>Share ${title}</h4>` +
+    toggle +
+    `<p class="hint">${fileCount(notes.length)}: ${escapeHtml(notes.slice(0, 5).map((n) => baseOf(n.name)).join(", "))}${notes.length > 5 ? "…" : ""}. They choose whether to add them.</p>` +
+    (fits
+      ? `<label class="field mono"><input readonly aria-label="Link" /></label>`
+      : `<p>Too large for a link: ${kb(url.length)}, the limit is ${kb(URL_MAX_LENGTH)}. A ZIP keeps the folders and imports the same.</p>`) +
+    `<div class="share-size"><span>Link size</span><span>${kb(url.length)} of ${kb(URL_MAX_LENGTH)}</span></div>` +
+    `<div class="meter${fits ? "" : " critical"}"><i style="width:${pct}%"></i></div>` +
+    (fits
+      ? `<button class="btn primary" data-share="copy-bundle">${icon("link", "sm")}Copy link</button>`
+      : `<button class="btn primary" data-share="zip">${icon("archive", "sm")}Download ZIP</button>`);
+  const input = sharePop.querySelector("input[readonly]");
+  if (input) input.value = url;
+  sharePop.onclick = async (e) => {
+    if (e.target.closest("[data-parts]")) {
+      shareParts = !shareParts;
+      closeAllMenus();
+      return openShare(anchor);
+    }
+    const act = e.target.closest("[data-share]")?.dataset.share;
+    if (!act) return;
+    closeAllMenus();
+    if (act === "zip") return downloadAll(notes, zipName, root);
+    navigator.clipboard.writeText(url).then(
+      () => showToast("Link copied", { ic: "check" }),
+      () => showToast("Couldn't copy the link", { error: true }),
+    );
+  };
+  openMenu(sharePop, anchor, { alignRight: anchor === btnShare, at });
+  sharePop.querySelector("[data-share]")?.focus();
+}
+
+function shareFolder(dir, anchor, at) {
+  const notes = notesIn(dir).filter((n) => !n.enc);
+  if (!notes.length) return showToast("Nothing to share: the files in it are encrypted", { error: true });
+  return openShareBundle({
+    title: escapeHtml(folderName(dir)),
+    notes,
+    main: null,
+    root: parentOf(dir),
+    zipName: folderName(dir) + ".zip",
+    anchor,
+    at,
+  });
+}
 
 async function openShare(anchor = btnShare) {
   const note = getActiveNote();
   if (!note || note.enc) return;
   if (sharePop.classList.contains("visible")) return closeAllMenus();
+  const parts = sharedNote ? [] : partsOf(note).filter((n) => !n.enc);
+  const partsToggle = parts.length
+    ? `<label class="share-parts"><input type="checkbox" data-parts${shareParts ? " checked" : ""} /> With ${parts.length === 1 ? "the embedded file" : `its ${parts.length} embedded files`}</label>`
+    : "";
+  if (parts.length && shareParts) {
+    const notes = [note, ...parts];
+    const root = commonDir(notes.map((n) => n.name));
+    return openShareBundle({
+      title: nameHtml(note.name),
+      notes,
+      main: note,
+      root,
+      zipName: baseOf(note.name).replace(/\.[^.]+$/, "") + ".zip",
+      anchor,
+      toggle: partsToggle,
+    });
+  }
   const url = await shareLink(note, shareMode);
   const kb = (n) => Math.max(1, Math.round(n / 1000)) + " kB";
   const fits = url.length <= URL_MAX_LENGTH;
@@ -9699,6 +9787,7 @@ async function openShare(anchor = btnShare) {
   const draw = isDrawFile(note.name);
   sharePop.innerHTML =
     `<h4>Share ${nameHtml(note.name)}</h4>` +
+    partsToggle +
     (fits
       ? `<div class="seg"><button data-mode="edit" aria-pressed="${shareMode === "edit"}">Editable</button><button data-mode="zen" aria-pressed="${shareMode === "zen"}">${icon("lock", "sm")}Read-only</button></div>` +
         `<p class="hint">${shareMode === "zen" ? "Opens in zen. They can still save a copy." : "They get their own copy to edit."}</p>` +
@@ -9709,9 +9798,14 @@ async function openShare(anchor = btnShare) {
     (fits
       ? `<button class="btn primary" data-share="copy">${icon("link", "sm")}Copy link</button><p class="hint">The note lives in the link. Nothing is uploaded; anyone with it can read it.</p>`
       : `<div class="share-row"><button class="btn" data-share="download">${icon("download", "sm")}Download</button>${draw ? `<button class="btn" data-share="png">${icon("image", "sm")}Copy as PNG</button>` : ""}</div>`);
-  const input = sharePop.querySelector("input");
+  const input = sharePop.querySelector("input[readonly]");
   if (input) input.value = url;
   sharePop.onclick = async (e) => {
+    if (e.target.closest("[data-parts]")) {
+      shareParts = !shareParts;
+      closeAllMenus();
+      return openShare(anchor);
+    }
     const mode = e.target.closest("[data-mode]")?.dataset.mode;
     if (mode && mode !== shareMode) {
       shareMode = mode;
@@ -10252,6 +10346,51 @@ async function shareLink(note, mode = "edit") {
   return location.origin + location.pathname + query + buildHash(hashMap);
 }
 
+// Several files in one link: #files= {main, files: [{name, content, header?}]},
+// names relative to `root`
+async function bundleLink(notes, main, root) {
+  const data = {
+    main: main ? main.name.slice(root.length) : null,
+    files: notes.map((n) => ({
+      name: n.name.slice(root.length),
+      content: viewOf(n).content,
+      ...(n.csvHeader === false && { header: false }),
+    })),
+  };
+  return location.origin + location.pathname + buildHash(new Map([["files", await compress(JSON.stringify(data))]]));
+}
+
+// The folder all of `names` are in
+function commonDir(names) {
+  let dir = dirOf(names[0] || "");
+  while (dir && !names.every((n) => n.startsWith(dir))) dir = parentOf(dir);
+  return dir;
+}
+
+// Opened from a #files= link: shown first, added only when asked
+async function offerBundle(packed) {
+  let data;
+  try {
+    data = JSON.parse(await decompress(packed));
+  } catch {
+    return showToast("This link is damaged", { error: true });
+  }
+  const files = (Array.isArray(data?.files) ? data.files : [])
+    .filter((f) => typeof f?.name === "string" && typeof f.content === "string")
+    .map((f) => ({ name: cleanPath(f.name), content: f.content, header: f.header }))
+    .filter((f) => f.name);
+  if (!files.length) return;
+  const main = files.find((f) => f.name === data.main);
+  if (main) files.push(...files.splice(files.indexOf(main), 1)); // added last: it opens
+  const list = files.slice(0, 8).map((f) => f.name).join(", ") + (files.length > 8 ? ` and ${files.length - 8} more` : "");
+  const ok = await showModal(
+    `This link holds ${fileCount(files.length)}: ${list}.\n\nAdd ${files.length === 1 ? "it" : "them"} to your notes?`,
+    "Add to my notes",
+    "Cancel",
+  );
+  if (ok) await importFiles([], "", files);
+}
+
 async function shareUrlFor(note) {
   const url = await shareLink(note, shareMode);
   return url.length > URL_MAX_LENGTH ? null : url;
@@ -10287,6 +10426,14 @@ async function loadFromUrl() {
   const queryParams = new URLSearchParams(location.search);
   const hashMap = parseHashParams(location.hash);
   const viewParam = queryParams.get("view");
+
+  // Several files: offered once the app is up, never stored unasked
+  if (hashMap.get("files")) {
+    const packed = hashMap.get("files");
+    history.replaceState(history.state, "", location.pathname);
+    setTimeout(() => offerBundle(packed));
+    return false;
+  }
 
   // New format: name/note in hash
   let noteData = hashMap.get("note");
@@ -10479,8 +10626,9 @@ function isZipFile(file) {
 }
 
 // Dropped or picked files: everything in, then one dialog for every clash
-async function importFiles(files, dir = "") {
-  if (!files.length) return;
+// `entries`: files already read, {name, content, header?} (a shared link's)
+async function importFiles(files, dir = "", entries = []) {
+  if (!files.length && !entries.length) return;
   if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
   const wasInView = mdViewActive;
   const incoming = [];
@@ -10499,6 +10647,7 @@ async function importFiles(files, dir = "") {
       incoming.push({ name: file.name, content: await file.text(), meta: null });
     } else skipped.push(`${file.name} — not a text file`);
   }
+  incoming.push(...entries.map((e) => ({ ...e, meta: null })));
   for (const it of incoming) it.name = dir + it.name;
   // Tables from elsewhere are converted to our dialect; app exports already are
   const converted = [];
@@ -10572,6 +10721,7 @@ async function importFiles(files, dir = "") {
       updatedAt: it.meta?.updatedAt ?? Date.now(),
       cursorPos: 0,
       ...(typeof it.meta?.enc === "string" && { enc: it.meta.enc }),
+      ...(it.header === false && { csvHeader: false }),
     };
     state.notes.unshift(last);
     added++;
