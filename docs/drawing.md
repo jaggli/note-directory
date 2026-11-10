@@ -131,6 +131,18 @@ blocks into `<span class="draw-embed">` placeholders (the inline source in
 with `Draw.renderStatic()` SVGs built with DOM APIs — labels are text nodes,
 never HTML. Referenced embeds are clickable and open the drawing.
 
+## Editing inline blocks
+
+In the open note's preview, ```` ```draw ````, ```` ```csv ```` and
+```` ```tsv ```` blocks get an **Edit** button (`renderMarkdown(…, editable)`
+wraps them in `.block-edit` with the fence's source lines). It moves the
+canvas or grid host into a full-window overlay (`#blockOverlay`) and mounts
+the editor on the block's text. Every commit replaces the block's lines in
+the note right away; ⌘Z inside undoes within the block, and the whole session
+is one undo step in the note. Header row off writes `noheader` on the fence.
+Esc or Done closes it. If the note changed elsewhere so the fence isn't where
+it was, the overlay closes with a message.
+
 ## Style Panel
 
 Every attribute of the format has a control, shown only where it does

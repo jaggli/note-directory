@@ -3516,6 +3516,7 @@ function showDraw(note, readonly) {
 }
 
 function hideDraw() {
+  if (blockEdit?.host === drawHost) return;
   drawMountSeq++;
   drawHost.classList.remove("visible");
   if (window.Draw) Draw.unmount();
@@ -3673,6 +3674,7 @@ function showGrid(note, readonly) {
 }
 
 function hideGrid() {
+  if (blockEdit?.host === gridHost) return;
   gridMountSeq++;
   gridHost.classList.remove("visible");
   if (window.Grid) Grid.unmount();
@@ -3707,6 +3709,145 @@ function drawCommit(target, content) {
   scheduleSave();
   scheduleUrlUpdate();
 }
+
+// ── Inline blocks (```draw, ```csv, ```tsv) edited in a full-window overlay ──
+// Edits go straight into the note; the whole session is one undo step there.
+let blockEdit = null;
+const blockOverlay = document.getElementById("blockOverlay");
+const BLOCK_FENCE = /^(`{3,})(\S*)(\s+noheader)?\s*$/;
+
+async function openBlockEditor(wrap) {
+  const note = getActiveNote();
+  if (!note || blockEdit || sharedNote || isLocked(note)) return;
+  if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
+  const [open, close] = wrap.dataset.lines.split(",").map(Number);
+  const lang = wrap.dataset.lang;
+  const lines = viewOf(note).content.split("\n");
+  const fence = lines[open]?.match(BLOCK_FENCE);
+  if (!fence || fence[2] !== lang) return;
+  const draw = lang === "draw";
+  const host = draw ? drawHost : gridHost;
+  const b = (blockEdit = {
+    id: note.id, open, close, lang, host,
+    noHeader: !!fence[3],
+    cur: lines.slice(open + 1, close).join("\n"),
+    past: [], future: [], pushed: false,
+    home: [host.parentNode, host.nextSibling],
+  });
+  blockOverlay.querySelector(".block-title").innerHTML =
+    (draw ? "Drawing" : "Table") + ` <span class="dir">in ${escapeHtml(baseOf(note.name))}</span>`;
+  blockOverlay.insertBefore(host, blockOverlay.querySelector(".block-bar").nextSibling);
+  host.classList.add("visible");
+  blockOverlay.classList.add("visible");
+  const opts = {
+    key: `block:${note.id}:${open}`,
+    content: b.cur,
+    onCommit: (c) => {
+      c = c.replace(/\n$/, "");
+      if (c === b.cur) return;
+      b.past.push(b.cur);
+      b.future = [];
+      b.cur = c;
+      writeBlock();
+    },
+    onUndo: () => blockStep(b.past, b.future),
+    onRedo: () => blockStep(b.future, b.past),
+  };
+  try {
+    if (draw) {
+      await loadDraw();
+      if (blockEdit === b) Draw.mount(host, opts);
+    } else {
+      await loadGrid();
+      if (blockEdit === b)
+        Grid.mount(host, {
+          ...opts,
+          sep: lang === "tsv" ? "\t" : ",",
+          header: !b.noHeader,
+          onHeader: (on) => {
+            b.noHeader = !on;
+            writeBlock();
+          },
+        });
+    }
+  } catch {
+    showToast("Couldn't load the editor", { error: true });
+    closeBlockEditor();
+  }
+}
+
+function blockStep(from, to) {
+  const b = blockEdit;
+  if (!b || !from.length) return;
+  to.push(b.cur);
+  b.cur = from.pop();
+  writeBlock();
+  (b.lang === "draw" ? Draw : Grid).update(b.cur);
+}
+
+// The block's lines replaced in the note; its fence line keeps its backticks
+function writeBlock() {
+  const b = blockEdit;
+  const real = realNote(b.id);
+  if (!real) return closeBlockEditor();
+  const n = viewOf(real);
+  const lines = n.content.split("\n");
+  const fence = lines[b.open]?.match(BLOCK_FENCE);
+  if (!fence || fence[2] !== b.lang) {
+    showToast("The note changed elsewhere — edit closed", { error: true });
+    return closeBlockEditor();
+  }
+  const body = b.cur === "" ? [] : b.cur.split("\n");
+  lines.splice(b.open, b.close - b.open, fence[1] + b.lang + (b.noHeader ? " noheader" : ""), ...body);
+  b.close = b.open + 1 + body.length;
+  const content = lines.join("\n");
+  if (content === n.content) return;
+  if (!b.pushed) pushHistory(n.id, n.content);
+  b.pushed = true;
+  n.content = content;
+  n.updatedAt = Date.now();
+  if (n.id === state.activeId) editor.value = content;
+  scheduleSave();
+  scheduleUrlUpdate();
+}
+
+function closeBlockEditor() {
+  const b = blockEdit;
+  if (!b) return;
+  // Unmounting commits a cell or text being edited
+  const ed = b.lang === "draw" ? window.Draw : window.Grid;
+  if (ed?.isMounted()) ed.unmount();
+  blockEdit = null;
+  b.host.classList.remove("visible");
+  b.home[0].insertBefore(b.host, b.home[1]);
+  blockOverlay.classList.remove("visible");
+  const note = getActiveNote();
+  if (mdViewActive && note?.id === b.id && !zenModeActive) {
+    const y = mdPreview.scrollTop;
+    setPreviewHtml(renderMarkdown(viewOf(note).content, note.name, true));
+    mdPreview.scrollTop = y;
+  }
+}
+
+// While it's open the app's shortcuts stay out; undo is the block's own
+function blockEditKey(e, mod, key) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    return closeBlockEditor();
+  }
+  if (!mod || e.target.closest?.("input, textarea")) return;
+  if (key === "z" || key === "y") {
+    e.preventDefault();
+    if (key === "z" && !e.shiftKey) blockStep(blockEdit.past, blockEdit.future);
+    else blockStep(blockEdit.future, blockEdit.past);
+  } else if (key === "s" || key === "e" || key === "p") e.preventDefault();
+}
+
+blockOverlay.querySelector('[data-block="done"]').addEventListener("click", closeBlockEditor);
+mdPreview.addEventListener("click", (e) => {
+  const btn = e.target.closest(".block-edit-btn");
+  if (btn) openBlockEditor(btn.closest(".block-edit"));
+});
 
 // Search drawings by their text only, not by coordinates
 function drawSearchLines(content) {
@@ -4075,7 +4216,8 @@ function formatMarkdown(text) {
 // then parse markdown syntax on the escaped text,
 // then selectively re-enable <details> and <summary> only.
 // `base`: the note being shown, which relative links and embeds start from
-function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name || "") {
+// `editable`: inline drawings and tables get an Edit button (the open note's preview)
+function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name || "", editable = false) {
   let taskIdx = 0;
   // Step 1: escape everything to prevent XSS
   let text = src
@@ -4107,13 +4249,20 @@ function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name 
     let lang = "";
     let noHeader = false;
     let codeLines = [];
+    let openLine = 0;
 
-    function flushCodeBlock() {
+    // Source lines open..close: the fences, for writing an edit back
+    const editWrap = (html, close) =>
+      editable
+        ? `<div class="block-edit" data-lines="${openLine},${close}" data-lang="${lang}">${html}<button class="block-edit-btn" type="button">${icon("pencil", "sm")}Edit</button></div>`
+        : html;
+
+    function flushCodeBlock(close) {
       const code = codeLines.join("\n");
       const idx = codeBlocks.length;
       // ```draw blocks render as drawings (code is already HTML-escaped)
       if (lang === "draw") {
-        codeBlocks.push(`<span class="draw-embed" data-draw="${code}"></span>`);
+        codeBlocks.push(editWrap(`<span class="draw-embed" data-draw="${code}"></span>`, close));
         result.push("\x00CB" + idx + "\x00");
         return;
       }
@@ -4123,7 +4272,7 @@ function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name 
         .replace(/&lt;/g, "<")
         .replace(/&amp;/g, "&");
       if (lang === "csv" || lang === "tsv") {
-        codeBlocks.push(csvTableHtml(raw, lang === "tsv" ? "\t" : ",", !noHeader));
+        codeBlocks.push(editWrap(csvTableHtml(raw, lang === "tsv" ? "\t" : ",", !noHeader), close));
         result.push("\x00CB" + idx + "\x00");
         return;
       }
@@ -4187,6 +4336,7 @@ function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name 
           lang = m[2];
           noHeader = !!m[3];
           codeLines = [];
+          openLine = i;
         } else {
           result.push(line);
         }
@@ -4198,7 +4348,7 @@ function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name 
           fenceStack.pop();
           if (fenceStack.length === 0) {
             // Outermost block closed — flush
-            flushCodeBlock();
+            flushCodeBlock(i);
             lang = "";
             codeLines = [];
           } else {
@@ -4217,7 +4367,7 @@ function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name 
     }
     // Unclosed fence — flush remaining as a code block
     if (fenceStack.length > 0) {
-      flushCodeBlock();
+      flushCodeBlock(lines.length);
     }
     text = result.join("\n");
   }
@@ -4818,7 +4968,7 @@ function switchMdTab(tab, pushHistory) {
       saveState();
       updateUrl();
       scheduleDriveUpload(false);
-      const rendered = renderMarkdown(note.content);
+      const rendered = renderMarkdown(note.content, undefined, !zenModeActive && !sharedNote);
       setPreviewHtml(
         zenModeActive ? `<div class="zen-wrap">${rendered}</div>` : rendered,
       );
@@ -4879,7 +5029,7 @@ function switchMdTab(tab, pushHistory) {
   } else if (tab === "view") {
     const note = getActiveNote();
     if (note) {
-      setPreviewHtml(renderMarkdown(note.content));
+      setPreviewHtml(renderMarkdown(note.content, undefined, !sharedNote));
     }
     attachCheckboxHandler();
     // Remember cursor line ratio before hiding editor
@@ -5531,7 +5681,7 @@ function switchNote(id) {
   if (mdViewActive) {
     const fromMd = isMarkdownFile(getActiveNote()?.name);
     if (targetNote && isMarkdownFile(targetNote.name) && fromMd) {
-      setPreviewHtml(renderMarkdown(viewOf(targetNote).content, targetNote.name));
+      setPreviewHtml(renderMarkdown(viewOf(targetNote).content, targetNote.name, true));
     } else if (!opensInView(targetNote?.name)) {
       switchMdTab("edit");
     }
@@ -10729,6 +10879,7 @@ document.addEventListener("keydown", (e) => {
     document.getElementById("dialogOverlay").classList.contains("visible")
   )
     return;
+  if (blockEdit) return blockEditKey(e, mod, key);
 
   // In zen mode, block all shortcuts except "e", Escape, and Cmd/Ctrl+A
   if (zenModeActive) {

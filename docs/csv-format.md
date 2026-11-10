@@ -85,6 +85,8 @@ Notes from the app's own zip export are not converted.
 A ```` ```csv ```` or ```` ```tsv ```` code block renders as a table in the
 preview, zen and HTML export: same parser, first row as the header
 (```` ```csv noheader ```` for none), numbers right-aligned, line breaks kept.
+In the open note's preview the block has an **Edit** button: the full grid in
+a full-window overlay (see [drawing.md](drawing.md#editing-inline-blocks)).
 
 `![caption](data.csv)` embeds a table note: its current content, its own
 header setting, and a caption linking to it. Missing or locked notes show

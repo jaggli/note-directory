@@ -414,6 +414,77 @@
         margin-top: 44px;
       }
 
+      /* Inline drawings and tables: edited in a full-window overlay */
+      .block-edit {
+        position: relative;
+        width: fit-content;
+        min-width: 120px;
+        max-width: 100%;
+      }
+
+      .block-edit-btn {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 26px;
+        padding: 0 8px;
+        border: 0;
+        border-radius: var(--n-r-md);
+        background: var(--n-raised);
+        box-shadow: var(--n-shadow-1);
+        color: var(--n-text);
+        font: var(--n-label);
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.12s;
+      }
+
+      .block-edit:hover .block-edit-btn,
+      .block-edit-btn:focus-visible {
+        opacity: 1;
+      }
+
+      @media (hover: none) {
+        .block-edit-btn {
+          opacity: 1;
+        }
+      }
+
+      .block-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 250;
+        flex-direction: column;
+        background: var(--bg);
+      }
+
+      .block-overlay.visible {
+        display: flex;
+      }
+
+      .block-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 44px;
+        flex: none;
+        padding: 0 8px 0 16px;
+        border-bottom: 1px solid var(--n-line);
+      }
+
+      .block-title {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font: var(--n-title);
+      }
+
       /* Table grid (UI styles come with grid.js) */
       .grid-host {
         display: none;
@@ -3833,6 +3904,12 @@
     <input type="file" id="importInput" multiple hidden />
     <div class="toast" id="mdToast" role="status" aria-live="polite"><span class="toast-msg"></span><button class="toast-act" hidden></button></div>
     <div class="tip" id="tip" role="tooltip"></div>
+    <div class="block-overlay" id="blockOverlay" role="dialog" aria-modal="true" aria-label="Edit block">
+      <div class="block-bar">
+        <span class="block-title"></span>
+        <button class="btn primary" type="button" data-block="done">Done</button>
+      </div>
+    </div>
     <script src="app.js"></script>
-  </body>
+</body>
 </html>
