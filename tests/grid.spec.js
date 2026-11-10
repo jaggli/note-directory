@@ -195,6 +195,59 @@ test("⌘⌫ deletes selected rows or columns, ⌫ clears", async ({ page }) => 
   expect(await content(page)).toBe("a,c\n,6\n");
 });
 
+test("drag a column edge to resize it, double-click to fit it", async ({ page }) => {
+  await openTable(page, "a,b\n" + "x".repeat(120) + ",2\n");
+  const handle = page.locator("#gridHost .grid-rz[data-rz='0']");
+  const w0 = await page.evaluate(() => Grid._state.w[0]);
+  expect(w0).toBe(280);
+  const box = await handle.boundingBox();
+  await page.mouse.move(box.x + 3, box.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 97, box.y + 5, { steps: 4 });
+  await page.mouse.up();
+  expect(await page.evaluate(() => Grid._state.w[0])).toBe(180);
+  // Nothing selected or written by resizing
+  expect(await page.evaluate(() => Grid.active())).toEqual({ r: 0, c: 0 });
+  const box2 = await handle.boundingBox();
+  await page.mouse.dblclick(box2.x + 3, box2.y + 5);
+  expect(await page.evaluate(() => Grid._state.w[0])).toBeGreaterThan(280);
+  expect(await content(page)).toBe("a,b\n" + "x".repeat(120) + ",2\n");
+});
+
+test("a selection shows sum, average and count", async ({ page }) => {
+  await openTable(page, "item,price\nTea,\"1,5\"\nCake,2.5\nNote,n/a\n");
+  await page.locator("#gridHost .grid-head .gl[data-c='1']").click();
+  await expect(page.locator("#gridHost .grid-size")).toHaveText(/^Sum 4 · Average 2 · Count 3$/);
+  await cellEl(page, 1, 0).click();
+  await expect(page.locator("#gridHost .grid-size")).toHaveText("3 rows × 2 columns");
+});
+
+test("⌘D fills down, ⌘R fills right", async ({ page }) => {
+  await openTable(page, "a,b,c\n1,2,3\n,,\n,,\n");
+  await cellEl(page, 1, 0).click();
+  await cellEl(page, 3, 1).click({ modifiers: ["Shift"] });
+  await page.keyboard.press("ControlOrMeta+d");
+  expect(await content(page)).toBe("a,b,c\n1,2,3\n1,2,\n1,2,\n");
+  await cellEl(page, 2, 2).click();
+  await page.keyboard.press("ControlOrMeta+r");
+  expect(await content(page)).toBe("a,b,c\n1,2,3\n1,2,2\n1,2,\n");
+});
+
+test("undo and redo select the cells they change", async ({ page }) => {
+  await openTable(page, "a,b\n1,2\n3,4\n");
+  await cellEl(page, 2, 1).click();
+  await page.keyboard.type("9");
+  await page.keyboard.press("Enter");
+  await cellEl(page, 1, 0).click();
+  await page.keyboard.press("ControlOrMeta+z");
+  expect(await content(page)).toBe("a,b\n1,2\n3,4\n");
+  expect(await page.evaluate(() => Grid.active())).toEqual({ r: 2, c: 1 });
+  await cellEl(page, 0, 0).click();
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  expect(await content(page)).toBe("a,b\n1,2\n3,9\n");
+  expect(await page.evaluate(() => Grid.active())).toEqual({ r: 2, c: 1 });
+});
+
 test("⌘F finds in cells, also off screen", async ({ page }) => {
   const rows = ["id,name"];
   for (let i = 0; i < 2000; i++) rows.push(`${i},row ${i}`);

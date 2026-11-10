@@ -179,7 +179,9 @@
 .grid-cell{box-sizing:border-box;padding:0 8px;line-height:${RH - 1}px;white-space:pre;overflow:hidden;text-overflow:ellipsis;border-right:1px solid var(--n-line);border-bottom:1px solid var(--n-line);background:var(--bg);cursor:default;user-select:none;-webkit-user-select:none}
 .grid-cell.num{text-align:right;font-feature-settings:"tnum"}
 .grid-cell.gn,.grid-cell.gl{position:sticky;left:0;z-index:1;text-align:right;color:var(--n-text-3);font:var(--n-caption);line-height:${RH - 1}px;background:var(--n-raised);cursor:default;font-feature-settings:"tnum"}
-.grid-cell.gl{position:static;text-align:center}
+.grid-cell.gl{position:relative;left:auto;z-index:auto;text-align:center}
+.grid-rz{position:absolute;top:0;right:-1px;bottom:0;width:7px;cursor:col-resize;z-index:1}
+.grid-rz:hover::after,.grid-rz.on::after{content:"";position:absolute;top:0;bottom:0;right:2px;width:2px;background:var(--n-accent)}
 .grid-cell.hdr{font:var(--n-body-strong);line-height:${RH - 1}px;background:var(--n-raised)}
 .grid-cell.on{color:var(--n-text);background:color-mix(in srgb,var(--n-accent) 14%,var(--n-raised))}
 .grid-cell.sel{background:color-mix(in srgb,var(--n-accent) 14%,var(--bg))}
@@ -211,6 +213,9 @@
     editing: null,
     pending: null,
     find: null,
+    cw: [], // widths set by dragging, by column; forgotten with the note
+    sels: new Map(), // content → selection, so undo and redo land where the edit was
+    prev: null,
   };
 
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -324,7 +329,10 @@
       E.pending = content;
       return;
     }
-    if (content !== E.text) setContent(content, false);
+    if (content === E.text) return;
+    setContent(content, false);
+    const sel = E.sels.get(content);
+    if (sel) select(sel.act, sel.anc);
   }
 
   function setContent(text, reset) {
@@ -333,6 +341,8 @@
     E.rows = rows.length ? rows : [[""]];
     E.cols = Math.max(1, width(E.rows));
     if (reset) {
+      E.cw = [];
+      E.sels.clear();
       E.act = { r: 0, c: 0 };
       E.anc = { r: 0, c: 0 };
       E.scroll.scrollTop = 0;
@@ -365,8 +375,13 @@
         if (x > w[c]) w[c] = x;
       }
     }
-    E.w = w.map((x) => Math.ceil(Math.min(MAX_W, x)));
+    E.auto = w.map((x) => Math.ceil(Math.min(MAX_W, x)));
     E.gut = Math.max(36, Math.ceil(tw(String(E.rows.length)) + 18));
+    applyWidths();
+  }
+
+  function applyWidths() {
+    E.w = E.auto.map((a, c) => E.cw[c] ?? a);
     E.x = [];
     let x = E.gut;
     for (const cw of E.w) {
@@ -374,12 +389,25 @@
       x += cw;
     }
     E.totalW = x;
+    E.inner.style.setProperty("--gt", `${E.gut}px ${E.w.map((w) => w + "px").join(" ")}`);
+    E.inner.style.width = E.totalW + "px";
+  }
+
+  // Double-clicking a column's edge fits it to its longest value, uncapped
+  function autoFit(c) {
+    const tw = (v) => measureCtx.measureText(v.length > 200 ? v.slice(0, 200) : v).width;
+    let w = MIN_W;
+    const n = Math.min(E.rows.length, 20000);
+    for (let r = 0; r < n; r++) {
+      const v = E.rows[r][c];
+      if (v) w = Math.max(w, tw(v.split("\n")[0]) + 20);
+    }
+    E.cw[c] = Math.ceil(Math.min(w, 1200));
+    applyWidths();
   }
 
   function layout() {
     measure();
-    E.inner.style.setProperty("--gt", `${E.gut}px ${E.w.map((w) => w + "px").join(" ")}`);
-    E.inner.style.width = E.totalW + "px";
     E.inner.style.height = headH() + (E.rows.length - d0()) * RH + "px";
     E.bar.querySelector("[data-g=header]").setAttribute("aria-pressed", E.header);
     paint();
@@ -389,7 +417,43 @@
     paintHead();
     paintBody();
     const n = E.rows.length - d0();
-    E.size.textContent = `${n.toLocaleString()} ${n === 1 ? "row" : "rows"} × ${E.cols} ${E.cols === 1 ? "column" : "columns"}`;
+    E.size.textContent =
+      stats() || `${n.toLocaleString()} ${n === 1 ? "row" : "rows"} × ${E.cols} ${E.cols === 1 ? "column" : "columns"}`;
+  }
+
+  // "1'234.5", "1.234,5", "1,234", "12%" → numbers; anything else → NaN
+  function toNumber(v) {
+    let t = v.trim().replace(/[\s']/g, "").replace(/%$/, "");
+    if (!/^[-+]?[\d.,]*\d$/.test(t)) return NaN;
+    const dot = t.lastIndexOf(".");
+    const comma = t.lastIndexOf(",");
+    if (dot >= 0 && comma >= 0) t = dot > comma ? t.replace(/,/g, "") : t.replace(/\./g, "").replace(",", ".");
+    else if (comma >= 0) t = /^[-+]?\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, "") : t.replace(",", ".");
+    else if ((t.match(/\./g) || []).length > 1) t = t.replace(/\./g, "");
+    return Number(t);
+  }
+
+  // Sum, average and count of a multi-cell selection; the header row doesn't count
+  function stats() {
+    const { r1, r2, c1, c2 } = range();
+    if (r1 === r2 && c1 === c2) return "";
+    let count = 0;
+    let nums = 0;
+    let sum = 0;
+    for (let r = Math.max(r1, d0()); r <= r2; r++)
+      for (let c = c1; c <= c2; c++) {
+        const v = cell(r, c);
+        if (!v) continue;
+        count++;
+        const x = toNumber(v);
+        if (!Number.isNaN(x)) {
+          nums++;
+          sum += x;
+        }
+      }
+    if (!count) return "";
+    const fmt = (x) => x.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    return (nums ? `Sum ${fmt(sum)} · Average ${fmt(sum / nums)} · ` : "") + `Count ${count.toLocaleString()}`;
   }
 
   function cellHtml(v, r, c, cls) {
@@ -429,7 +493,7 @@
     const { c1, c2 } = range();
     let html = `<div class="grid-row" data-r="-1"><div class="grid-cell gn"></div>`;
     for (let c = 0; c < E.cols; c++)
-      html += `<div class="grid-cell gl${c >= c1 && c <= c2 ? " on" : ""}" data-c="${c}">${letters(c)}</div>`;
+      html += `<div class="grid-cell gl${c >= c1 && c <= c2 ? " on" : ""}" data-c="${c}">${letters(c)}<i class="grid-rz" data-rz="${c}"></i></div>`;
     html += "</div>";
     if (d0()) html += rowHtml(0, " hdr");
     E.head.innerHTML = html;
@@ -490,13 +554,25 @@
 
   function commit(rows) {
     const text = rows.length ? serialize(rows, E.sep) : "";
+    remember(E.text, E.prev || { act: E.act, anc: E.anc });
+    E.prev = null;
     E.text = text;
     E.rows = rows.length ? rows : [[""]];
     E.cols = Math.max(1, width(E.rows));
     clampSel();
     layout();
+    remember(text, { act: E.act, anc: E.anc });
     E.opts.onCommit?.(text);
   }
+
+  function remember(text, sel) {
+    E.sels.delete(text);
+    E.sels.set(text, sel);
+    if (E.sels.size > 200) E.sels.delete(E.sels.keys().next().value);
+  }
+
+  // Operations that move the selection before committing note where it was
+  const before = () => (E.prev = { act: E.act, anc: E.anc });
 
   // A copy padded to the full width, safe to change
   const grid = () => E.rows.map((r) => {
@@ -518,6 +594,7 @@
   // The new rows or columns end up selected
   function insertRows(at, n = 1) {
     if (E.readonly) return;
+    before();
     const rows = grid();
     rows.splice(at, 0, ...Array.from({ length: n }, () => new Array(E.cols).fill("")));
     E.anc = { r: at, c: E.act.c };
@@ -528,8 +605,10 @@
 
   function insertCol(at, n = 1) {
     if (E.readonly) return;
+    before();
     const rows = grid();
     for (const r of rows) r.splice(at, 0, ...new Array(n).fill(""));
+    if (E.cw.length > at) E.cw.splice(at, 0, ...new Array(n));
     E.anc = { r: E.act.r, c: at };
     E.act = { r: E.act.r, c: at + n - 1 };
     commit(rows);
@@ -538,6 +617,7 @@
 
   function deleteRows() {
     if (E.readonly) return;
+    before();
     const { r1, r2 } = range();
     const rows = grid();
     rows.splice(r1, r2 - r1 + 1);
@@ -547,9 +627,11 @@
 
   function deleteCols() {
     if (E.readonly) return;
+    before();
     const { c1, c2 } = range();
     let rows = grid();
     for (const r of rows) r.splice(c1, c2 - c1 + 1);
+    E.cw.splice(c1, c2 - c1 + 1);
     if (!rows[0]?.length) rows = [];
     E.act = E.anc = { r: E.act.r, c: c1 };
     commit(rows);
@@ -560,6 +642,23 @@
     const { r1, r2, c1, c2 } = range();
     const ch = [];
     for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) if (cell(r, c)) ch.push([r, c, ""]);
+    if (ch.length) setCells(ch);
+  }
+
+  // ⌘D copies the top row of the selection down (one row: the row above);
+  // ⌘R the left column to the right
+  function fill(down) {
+    if (E.readonly) return;
+    let { r1, r2, c1, c2 } = range();
+    if (down && r1 === r2) r1--;
+    if (!down && c1 === c2) c1--;
+    if (r1 < 0 || c1 < 0) return;
+    const ch = [];
+    for (let r = r1; r <= r2; r++)
+      for (let c = c1; c <= c2; c++) {
+        const v = down ? cell(r1, c) : cell(r, c1);
+        if ((down ? r > r1 : c > c1) && cell(r, c) !== v) ch.push([r, c, v]);
+      }
     if (ch.length) setCells(ch);
   }
 
@@ -584,6 +683,7 @@
     if (clip.length === 1 && clip[0].length === 1) {
       for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) ch.push([r, c, clip[0][0]]);
     } else {
+      before();
       clip.forEach((row, i) => row.forEach((v, j) => ch.push([r1 + i, c1 + j, v])));
       E.anc = { r: r1, c: c1 };
       E.act = { r: r1 + clip.length - 1, c: c1 + width(clip) - 1 };
@@ -690,8 +790,36 @@
     select({ r: hit.r, c: hit.c }, extend ? E.anc : { r: hit.r, c: hit.c });
   }
 
+  function onResize(e, c) {
+    e.preventDefault();
+    e.stopPropagation();
+    const now = performance.now();
+    if (E.lastRz && E.lastRz.c === c && now - E.lastRz.t < 400) {
+      E.lastRz = null;
+      return autoFit(c);
+    }
+    E.lastRz = { c, t: now };
+    const x0 = e.clientX;
+    const w0 = E.w[c];
+    e.target.classList.add("on");
+    const onMove = (m) => {
+      E.cw[c] = Math.round(clamp(w0 + m.clientX - x0, 24, 1200));
+      applyWidths();
+    };
+    const onUp = () => {
+      e.target.classList.remove("on");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      placeEditor();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
   function onDown(e) {
     if (e.target === E.ta || e.button > 0) return;
+    const rz = e.target.closest?.(".grid-rz");
+    if (rz) return onResize(e, +rz.dataset.rz);
     const hit = cellAt(e.target);
     if (!hit) return;
     if (E.editing) finishEdit(true, false);
@@ -757,6 +885,7 @@
     if (E.readonly) return;
     if (mod && !e.altKey && lk === "z") return done(), e.shiftKey ? E.opts.onRedo?.() : E.opts.onUndo?.();
     if (mod && !e.altKey && lk === "y") return done(), E.opts.onRedo?.();
+    if (mod && !e.altKey && !e.shiftKey && (lk === "d" || lk === "r")) return done(), fill(lk === "d");
     if (k === "Enter" || k === "F2") return done(), startEdit();
     if (k === "Delete" || k === "Backspace") {
       done();

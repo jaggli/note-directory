@@ -48,6 +48,14 @@ Notes from the app's own zip export are not converted.
   select. Click a column letter or row number to select it, the corner for all.
 - Enter, F2, a double click or typing edits a cell. Enter / Tab commit and move,
   Shift+Enter or ⌥Enter adds a line break, Esc cancels.
+- Drag a column letter's right edge to resize it, double-click it to fit the
+  longest value. Widths are forgotten when the note closes.
+- A selection of several cells shows Sum, Average and Count in the toolbar
+  (`1'234.5`, `1.234,5`, `1,234` and `12%` count as numbers; the header row
+  doesn't count).
+- ⌘D fills the selection down from its top row (one row: from the row above),
+  ⌘R right from its left column.
+- Undo and redo select the cells they change.
 - Delete clears the selection; ⌘⌫ removes it when whole rows or columns are
   selected. ⌘C / ⌘X copy TSV, ⌘V pastes TSV (what
   spreadsheets put on the clipboard); one value pasted over a range fills it.
