@@ -3055,6 +3055,12 @@ function folderRow(dir, depth) {
   return div;
 }
 
+noteList.addEventListener("contextmenu", (e) => {
+  if (e.target.closest(".note-item, input")) return;
+  e.preventDefault();
+  openFolderMenu("", null, { x: e.clientX, y: e.clientY });
+});
+
 // Dropped on the list itself (not on a row): to the top level
 noteList.addEventListener("dragover", (e) => {
   if (dragSrcIdx === null && !dragFolder) return;
@@ -3195,22 +3201,31 @@ function deleteFolder(dir) {
   });
 }
 
+// A folder's menu; dir "" is the list's own (right-click on empty space)
 function openFolderMenu(dir, anchor, at) {
   const item = (ic, label, act, cls = "") =>
     `<button class="menu-item ${cls}" role="menuitem" data-folder-act="${act}">${icon(ic)}<span class="label">${label}</span></button>`;
   const sep = '<div class="menu-sep"></div>';
+  const subs = [...allFolders()].some((f) => f.startsWith(dir) && f !== dir);
   noteMenu.innerHTML =
-    `<div class="menu-title">${icon("folder", "kind folder")}<span>${escapeHtml(dir.slice(0, -1))}</span></div>` +
+    (dir ? `<div class="menu-title">${icon("folder", "kind folder")}<span>${escapeHtml(dir.slice(0, -1))}</span></div>` : "") +
     item("note", "New note", "new-md") +
     item("file-draw", "New drawing", "new-draw") +
     item("table", "New table", "new-csv") +
     item("folder", "New folder", "new-folder") +
     sep +
-    item("pencil", "Rename", "rename") +
-    item("search", "Search in folder", "search") +
-    item("archive", "Export as ZIP", "zip") +
+    (dir
+      ? item("pencil", "Rename", "rename") +
+        item("folder", "Move to…", "move") +
+        item("search", "Search in folder", "search")
+      : "") +
+    (subs || !dir
+      ? item("chevron-down", "Expand all", "expand") + item("chevron-right", "Collapse all", "collapse")
+      : "") +
     sep +
-    item("trash", "Delete", "delete", "danger");
+    item("import", dir ? "Import files here…" : "Import files…", "import") +
+    item("archive", dir ? "Export as ZIP" : "Export all as ZIP", "zip") +
+    (dir ? sep + item("trash", "Delete", "delete", "danger") : "");
   noteMenu.onclick = (e) => {
     const b = e.target.closest("[data-folder-act]");
     if (!b) return;
@@ -3224,11 +3239,78 @@ function openFolderMenu(dir, anchor, at) {
     }
     if (act === "new-folder") return newFolder(dir);
     if (act === "rename") return startFolderRename(dir);
+    if (act === "move") return openMoveMenu({ dir }, anchor, at);
     if (act === "search") return openSearch("folder:" + dir);
-    if (act === "zip") return downloadAll(notesIn(dir), folderName(dir) + ".zip", parentOf(dir));
+    if (act === "expand" || act === "collapse") {
+      for (const f of allFolders())
+        if (f.startsWith(dir)) closedFolders[act === "expand" ? "delete" : "add"](f);
+      saveFolders();
+      return renderNoteList();
+    }
+    if (act === "import") return openImport(dir);
+    if (act === "zip")
+      return dir ? downloadAll(notesIn(dir), folderName(dir) + ".zip", parentOf(dir)) : downloadAll();
     if (act === "delete") return deleteFolder(dir);
   };
   openMenu(noteMenu, anchor, { at, focus: event?.detail === 0 });
+}
+
+// Pick a folder for notes ({ notes }) or a folder ({ dir })
+function openMoveMenu({ notes, dir }, anchor, at) {
+  const from = dir ? parentOf(dir) : dirOf(notes[0].name);
+  const targets = ["", ...[...allFolders()].sort(folderOrder)].filter(
+    (f) => !dir || !f.startsWith(dir),
+  );
+  const what = dir ? folderName(dir) : baseOf(notes[0].name);
+  noteMenu.innerHTML =
+    `<div class="menu-label">Move ${escapeHtml(what)} to</div>` +
+    targets
+      .map((f) => {
+        const depth = f ? f.split("/").length - 2 : 0;
+        return `<button class="menu-item" role="menuitem" data-to="${escapeHtml(f)}" style="padding-left:${10 + depth * 14}px"${f === from ? " disabled" : ""}>${icon("folder")}<span class="label">${f ? escapeHtml(folderName(f)) : "Top level"}</span></button>`;
+      })
+      .join("");
+  noteMenu.onclick = (e) => {
+    const b = e.target.closest("[data-to]");
+    if (!b) return;
+    closeAllMenus();
+    const to = b.dataset.to;
+    if (dir) moveFolder(dir, to);
+    else moveNotesTo(notes, to);
+  };
+  openMenu(noteMenu, anchor, { at, focus: true });
+}
+
+// "plan.md" → "plan copy.md", then "plan copy 2.md"
+function copyName(name) {
+  const dot = name.lastIndexOf(".");
+  const has = dot > dirOf(name).length;
+  const stem = has ? name.slice(0, dot) : name;
+  const ext = has ? name.slice(dot) : "";
+  let c = `${stem} copy${ext}`;
+  for (let i = 2; state.notes.some((n) => n.name === c); i++) c = `${stem} copy ${i}${ext}`;
+  return c;
+}
+
+// Encrypted files are copied sealed: the same vault opens the copy
+function duplicateNote(note) {
+  const { enc, csvHeader } = note;
+  return createNote(copyName(note.name), note.content, false, undefined, {
+    ...(enc && { enc }),
+    ...(csvHeader !== undefined && { csvHeader }),
+  });
+}
+
+// A link from the open note: an embed for drawings and tables
+function copyMdLink(note) {
+  const from = getActiveNote();
+  const href = relRef(from && from !== note ? dirOf(from.name) : dirOf(note.name), note.name);
+  const embed = isDrawFile(note.name) || isCsvFile(note.name);
+  const text = `${embed ? "!" : ""}[${baseOf(note.name).replace(/[[\]]/g, "")}](${href})`;
+  navigator.clipboard.writeText(text).then(
+    () => showToast("Copied " + text),
+    () => showToast("Couldn't copy", { error: true }),
+  );
 }
 
 // ── Links between notes: rewritten when notes move, listed as backlinks ──
@@ -8825,6 +8907,11 @@ function openNoteMenu(note, anchor, at) {
       ? ""
       : item("pencil", "Rename", "rename", "F2") +
         item(note.pinned ? "pin-on" : "pin", note.pinned ? "Unpin" : "Pin", "pin") +
+        (anchor === btnNoteMenu
+          ? ""
+          : item("copy", "Duplicate", "duplicate") +
+            item("folder", "Move to…", "move") +
+            item("link", "Copy markdown link", "md-link")) +
         sep) +
     (note.enc ? "" : item("link", "Copy link", "copy-link")) +
     (draw && readable ? item("image", "Copy as PNG", "png") : "") +
@@ -8855,6 +8942,7 @@ function openNoteMenu(note, anchor, at) {
     if (!b) return;
     closeAllMenus();
     if (b.dataset.noteAct.startsWith("open:")) return switchNote(b.dataset.noteAct.slice(5));
+    if (b.dataset.noteAct === "move") return openMoveMenu({ notes: [note] }, anchor, at);
     runNoteAction(note, b.dataset.noteAct, anchor);
   };
   openMenu(noteMenu, anchor, {
@@ -8898,6 +8986,10 @@ function runNoteAction(note, act, anchor) {
       break;
     case "pin":
       return togglePin(note.id);
+    case "duplicate":
+      return duplicateNote(realNote(note.id));
+    case "md-link":
+      return copyMdLink(note);
     case "copy-link":
       return copyLink(note);
     case "png":
@@ -9931,7 +10023,7 @@ function isZipFile(file) {
 }
 
 // Dropped or picked files: everything in, then one dialog for every clash
-async function importFiles(files) {
+async function importFiles(files, dir = "") {
   if (!files.length) return;
   if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
   const wasInView = mdViewActive;
@@ -9951,6 +10043,7 @@ async function importFiles(files) {
       incoming.push({ name: file.name, content: await file.text(), meta: null });
     } else skipped.push(`${file.name} — not a text file`);
   }
+  for (const it of incoming) it.name = dir + it.name;
   // Tables from elsewhere are converted to our dialect; app exports already are
   const converted = [];
   for (const it of incoming) {
@@ -10163,11 +10256,12 @@ function openDialog(html, onClick, onClose = () => {}, cls = "") {
 }
 
 const importInput = document.getElementById("importInput");
-function openImport() {
+function openImport(dir = "") {
+  importInput.dataset.dir = typeof dir === "string" ? dir : "";
   importInput.click();
 }
 importInput.addEventListener("change", () => {
-  importFiles([...importInput.files]);
+  importFiles([...importInput.files], importInput.dataset.dir || "");
   importInput.value = "";
 });
 

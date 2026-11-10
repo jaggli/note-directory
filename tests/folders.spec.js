@@ -161,3 +161,48 @@ test("share links and downloads use the file name, not its folder", async ({ pag
   const [dl] = await Promise.all([page.waitForEvent("download"), page.evaluate(() => downloadNote())]);
   expect(dl.suggestedFilename()).toBe("n.md");
 });
+
+test("tree menus: duplicate, move to, markdown link, empty-space menu", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await setup(page, [["work/plan.md", "p"], ["other/x.md", "x"], ["top.md", "t"]]);
+  const noteRow = (name) => page.locator("#noteList .note-item:not(.folder-item)").filter({ hasText: name });
+
+  await noteRow("plan.md").click({ button: "right" });
+  await page.click('#noteMenu [data-note-act="duplicate"]');
+  await expect.poll(() => names(page)).toContain("work/plan copy.md");
+
+  await noteRow("plan copy.md").click({ button: "right" });
+  await page.click('#noteMenu [data-note-act="move"]');
+  await expect(page.locator('#noteMenu [data-to="work/"]')).toBeDisabled();
+  await page.click('#noteMenu [data-to="other/"]');
+  await expect.poll(() => names(page)).toContain("other/plan copy.md");
+
+  // Folder into folder; a folder can't be offered itself
+  await row(page, "other/").click({ button: "right" });
+  await page.click('#noteMenu [data-folder-act="move"]');
+  await expect(page.locator('#noteMenu [data-to="other/"]')).toHaveCount(0);
+  await page.click('#noteMenu [data-to="work/"]');
+  await expect.poll(() => names(page)).toContain("work/other/x.md");
+
+  // From top.md, plan.md is a relative link
+  await noteRow("top.md").click();
+  await noteRow("plan.md").first().click({ button: "right" });
+  await page.click('#noteMenu [data-note-act="md-link"]');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("[plan.md](work/plan.md)");
+
+  // Empty space: the list's own menu
+  const box = await page.locator("#noteList").boundingBox();
+  await page.mouse.click(box.x + 20, box.y + box.height - 10, { button: "right" });
+  await expect(page.locator('#noteMenu [data-folder-act="zip"] .label')).toHaveText("Export all as ZIP");
+  await page.click('#noteMenu [data-folder-act="collapse"]');
+  await expect(row(page, "work/other/")).toHaveCount(0);
+  await page.mouse.click(box.x + 20, box.y + box.height - 10, { button: "right" });
+  await page.click('#noteMenu [data-folder-act="new-folder"]');
+  await expect(page.locator("#noteList .note-item-input")).toBeFocused();
+});
+
+test("import files into a folder", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => importFiles([new File(["hi"], "a.md", { type: "text/markdown" })], "in/"));
+  await expect.poll(() => names(page)).toContain("in/a.md");
+});

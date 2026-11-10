@@ -34,7 +34,13 @@ or close it; double-click or **Rename** to rename it.
 - Renaming a note edits its file name; typing `sub/x.md` moves it relative to
   its folder, `/x.md` to the top level.
 - Folder menu (⋯, right-click, long press): New note / drawing / table / folder
-  in it, Rename, Search in folder, Export as ZIP, Delete.
+  in it, Rename, Move to…, Search in folder, Expand / Collapse all (with
+  subfolders), Import files here…, Export as ZIP, Delete.
+- Note menu, from the list: also Duplicate (`plan copy.md`, encrypted files
+  stay sealed), Move to…, and Copy markdown link (relative to the open note;
+  `![]()` for drawings and tables).
+- Right-click empty space in the list: New note / drawing / table / folder at
+  the top level, Expand / Collapse all, Import files…, Export all as ZIP.
 - **Delete** removes the folder and everything in it, with one Undo.
 
 ## Links
