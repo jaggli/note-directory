@@ -5,66 +5,8 @@
 
   // ── Format: RFC 4180 with LF, quoting only fields that need it ──
 
-  function parse(text, sep) {
-    const rows = [];
-    if (!text) return rows;
-    const n = text.length;
-    let row = [];
-    let i = 0;
-    const end = (from) => {
-      let e = from;
-      while (e < n) {
-        const ch = text[e];
-        if (ch === sep || ch === "\n" || ch === "\r") break;
-        e++;
-      }
-      return e;
-    };
-    for (;;) {
-      let f = "";
-      if (text[i] === '"') {
-        let j = i + 1;
-        for (;;) {
-          const k = text.indexOf('"', j);
-          if (k < 0) {
-            f += text.slice(j);
-            i = n;
-            break;
-          }
-          f += text.slice(j, k);
-          if (text[k + 1] === '"') {
-            f += '"';
-            j = k + 2;
-          } else {
-            i = k + 1;
-            break;
-          }
-        }
-        // Stray text after the closing quote stays part of the field
-        const e = end(i);
-        f += text.slice(i, e);
-        i = e;
-      } else {
-        const e = end(i);
-        f = text.slice(i, e);
-        i = e;
-      }
-      row.push(f);
-      if (i >= n) {
-        rows.push(row);
-        break;
-      }
-      if (text[i] === sep) {
-        i++;
-        continue;
-      }
-      i += text[i] === "\r" && text[i + 1] === "\n" ? 2 : 1;
-      rows.push(row);
-      row = [];
-      if (i >= n) break;
-    }
-    return rows;
-  }
+  // The parser lives in app.js: markdown previews render ```csv blocks with it
+  const parse = window.csvParse;
 
   function width(rows) {
     let w = 0;
@@ -166,6 +108,19 @@
 .grid-host.visible{display:flex}
 .grid-bar{display:flex;align-items:center;gap:4px;padding:6px 10px;border-bottom:1px solid var(--n-line);flex:none;overflow-x:auto;scrollbar-width:none}
 .grid-host.readonly .grid-bar{display:none}
+.grid-filter{display:flex;align-items:center;gap:6px;height:26px;margin-left:6px;padding:0 8px;border-radius:var(--n-r-md);background:var(--n-field);box-shadow:inset 0 0 0 1px var(--n-line);color:var(--n-text-3);flex:0 1 200px;min-width:110px}
+.grid-filter:focus-within{box-shadow:inset 0 0 0 1px var(--n-accent),0 0 0 3px var(--n-accent-soft)}
+.grid-filter input{flex:1;min-width:0;border:0;outline:none;background:none;color:var(--n-text);font:var(--n-body);padding:0}
+.grid-filter input::-webkit-search-cancel-button{display:none}
+.grid-bar .grid-save{margin-left:6px;color:var(--n-on-accent);background:var(--n-accent)}
+.grid-bar .grid-save:hover{color:var(--n-on-accent);background:color-mix(in srgb,var(--n-accent) 85%,var(--n-text))}
+.grid-bar button[hidden]{display:none}
+.grid-sort{position:absolute;top:0;right:7px;bottom:0;margin:auto 0;height:18px;width:15px;padding:0;border:0;border-radius:var(--n-r-sm);background:none;color:var(--n-text-3);font:var(--n-caption);cursor:pointer;opacity:0}
+.grid-cell.gl:hover .grid-sort,.grid-sort.on{opacity:1}
+.grid-sort:hover{background:var(--n-hover);color:var(--n-text)}
+.grid-sort.on{color:var(--n-accent)}
+@media (pointer:coarse){.grid-sort{opacity:.6}}
+@media (max-width:600px){.grid-bar{flex-wrap:wrap;overflow:visible}.grid-filter{order:9;flex:1 1 100%;margin:2px 0 0}.grid-bar .grid-save{margin-left:0}}
 .grid-bar button,.grid-pop button{font:var(--n-body-strong);color:var(--n-text-2);background:none;border:0;margin:0;padding:0 8px;height:26px;border-radius:var(--n-r-md);display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;flex:none;-webkit-tap-highlight-color:transparent}
 .grid-bar button:hover{color:var(--n-text);background:var(--n-hover)}
 .grid-bar button[aria-pressed=true]{color:var(--n-text);background:var(--n-pressed)}
@@ -213,6 +168,9 @@
     editing: null,
     pending: null,
     find: null,
+    order: null,
+    sort: null, // { c, dir: 1 | -1 }
+    filter: "",
     cw: [], // widths set by dragging, by column; forgotten with the note
     sels: new Map(), // content → selection, so undo and redo land where the edit was
     prev: null,
@@ -230,7 +188,11 @@
     return s;
   }
 
-  const cell = (r, c) => E.rows[r]?.[c] ?? "";
+  // Sorting and filtering only change what's shown: position p on screen is
+  // row real(p) of the file. Selections, edits and find use positions.
+  const real = (p) => (E.order ? E.order[p] : p);
+  const count = () => (E.order ? E.order.length : E.rows.length);
+  const cell = (p, c) => E.rows[real(p)]?.[c] ?? "";
   const d0 = () => (E.header && E.rows.length > 0 ? 1 : 0);
   const headH = () => RH * (1 + d0());
 
@@ -253,9 +215,11 @@
     E.host = host;
     host.innerHTML = `
 <div class="grid-bar">
-  <button data-g="header" aria-pressed="true">Header row</button>
-  <button data-g="insert" aria-haspopup="menu">Insert<svg class="icon sm"><use href="#i-chev-down"/></svg></button>
-  <button data-g="delete" aria-haspopup="menu">Delete<svg class="icon sm"><use href="#i-chev-down"/></svg></button>
+  <button class="ed" data-g="header" aria-pressed="true">Header row</button>
+  <button class="ed" data-g="insert" aria-haspopup="menu">Insert<svg class="icon sm"><use href="#i-chev-down"/></svg></button>
+  <button class="ed" data-g="delete" aria-haspopup="menu">Delete<svg class="icon sm"><use href="#i-chev-down"/></svg></button>
+  <label class="grid-filter"><svg class="icon sm"><use href="#i-search"/></svg><input type="search" placeholder="Filter rows" aria-label="Filter rows" spellcheck="false" autocomplete="off" /></label>
+  <button class="ed grid-save" data-g="save-sort" hidden>Save sort</button>
   <span class="grid-size"></span>
 </div>
 <div class="grid-scroll" tabindex="0" role="grid" aria-label="Table">
@@ -271,6 +235,23 @@
     E.ta = host.querySelector(".grid-edit");
     E.pop = host.querySelector(".grid-pop");
     E.size = host.querySelector(".grid-size");
+    E.filterInput = host.querySelector(".grid-filter input");
+    E.filterInput.addEventListener("input", () => {
+      E.filter = E.filterInput.value.trim();
+      refreshView();
+    });
+    E.filterInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && E.filterInput.value) {
+        e.preventDefault();
+        e.stopPropagation();
+        E.filterInput.value = "";
+        E.filter = "";
+        refreshView();
+      } else if (e.key === "Enter" || e.key === "ArrowDown") {
+        e.preventDefault();
+        E.scroll.focus({ preventScroll: true });
+      }
+    });
 
     let raf = 0;
     E.scroll.addEventListener("scroll", () => {
@@ -340,9 +321,14 @@
     const rows = parse(text, E.sep);
     E.rows = rows.length ? rows : [[""]];
     E.cols = Math.max(1, width(E.rows));
+    if (E.sort && E.sort.c >= E.cols) E.sort = null;
+    computeView();
     if (reset) {
       E.cw = [];
       E.sels.clear();
+      E.sort = null;
+      E.filter = "";
+      E.filterInput.value = "";
       E.act = { r: 0, c: 0 };
       E.anc = { r: 0, c: 0 };
       E.scroll.scrollTop = 0;
@@ -352,7 +338,7 @@
   }
 
   function clampSel() {
-    const R = E.rows.length - 1;
+    const R = Math.max(0, count() - 1);
     const C = E.cols - 1;
     E.act = { r: clamp(E.act.r, 0, R), c: clamp(E.act.c, 0, C) };
     E.anc = { r: clamp(E.anc.r, 0, R), c: clamp(E.anc.c, 0, C) };
@@ -408,17 +394,94 @@
 
   function layout() {
     measure();
-    E.inner.style.height = headH() + (E.rows.length - d0()) * RH + "px";
+    E.inner.style.height = headH() + Math.max(0, count() - d0()) * RH + "px";
     E.bar.querySelector("[data-g=header]").setAttribute("aria-pressed", E.header);
+    E.bar.querySelector("[data-g=save-sort]").hidden = !E.sort || E.readonly;
     paint();
   }
 
   function paint() {
     paintHead();
     paintBody();
-    const n = E.rows.length - d0();
+    const all = E.rows.length - d0();
+    const n = count() - d0();
+    const rows = n === all ? n.toLocaleString() : `${n.toLocaleString()} of ${all.toLocaleString()}`;
     E.size.textContent =
-      stats() || `${n.toLocaleString()} ${n === 1 ? "row" : "rows"} × ${E.cols} ${E.cols === 1 ? "column" : "columns"}`;
+      stats() || `${rows} ${all === 1 ? "row" : "rows"} × ${E.cols} ${E.cols === 1 ? "column" : "columns"}`;
+  }
+
+  // Numbers first, by value; then text, naturally ("a2" before "a10"); empty last
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+  function sortRows(idx, { c, dir }) {
+    const key = new Map();
+    for (const r of idx) {
+      const v = E.rows[r][c] ?? "";
+      key.set(r, [v, toNumber(v)]);
+    }
+    return idx.slice().sort((a, b) => {
+      const [va, na] = key.get(a);
+      const [vb, nb] = key.get(b);
+      if (!va || !vb) return !va - !vb;
+      const ia = Number.isNaN(na);
+      const ib = Number.isNaN(nb);
+      if (ia !== ib) return (ia - ib) * dir;
+      return (ia ? collator.compare(va, vb) : na - nb) * dir;
+    });
+  }
+
+  function computeView() {
+    if (!E.sort && !E.filter) {
+      E.order = null;
+      return;
+    }
+    const h = d0();
+    let idx = [];
+    for (let r = h; r < E.rows.length; r++) idx.push(r);
+    if (E.filter) {
+      const q = E.filter.toLowerCase();
+      idx = idx.filter((r) => E.rows[r].some((v) => v.toLowerCase().includes(q)));
+    }
+    if (E.sort) idx = sortRows(idx, E.sort);
+    E.order = h ? [0, ...idx] : idx;
+  }
+
+  // View changes keep the selected cell's row when it's still shown
+  function refreshView() {
+    const keep = real(E.act.r);
+    computeView();
+    const p = E.order ? E.order.indexOf(keep) : keep;
+    E.act = E.anc = { r: p < 0 ? 0 : p, c: E.act.c };
+    E.scroll.scrollTop = 0;
+    layout();
+    if (p >= 0) reveal(p, E.act.c);
+  }
+
+  // A column letter's arrow: ascending, descending, off
+  function cycleSort(c) {
+    const s = E.sort;
+    E.sort = s?.c !== c ? { c, dir: 1 } : s.dir === 1 ? { c, dir: -1 } : null;
+    refreshView();
+  }
+
+  function setSort(c, dir) {
+    E.sort = dir ? { c, dir } : null;
+    refreshView();
+  }
+
+  // Writes the sort into the file, for every row, filtered out or not
+  function saveSort() {
+    if (!E.sort || E.readonly) return;
+    const h = d0();
+    const all = [];
+    for (let r = h; r < E.rows.length; r++) all.push(r);
+    const rows = grid();
+    const out = (h ? [0] : []).concat(sortRows(all, E.sort)).map((r) => rows[r]);
+    before();
+    E.sort = null;
+    E.order = null;
+    E.act = E.anc = { r: 0, c: E.act.c };
+    commit(out);
+    refreshView();
   }
 
   // "1'234.5", "1.234,5", "1,234", "12%" → numbers; anything else → NaN
@@ -482,18 +545,25 @@
   function rowHtml(r, cls) {
     const { r1, r2 } = range();
     const on = r >= r1 && r <= r2 ? " on" : "";
-    const label = cls ? "" : String(r - d0() + 1);
+    // Row numbers are the file's, so a sorted view shows where rows live
+    const label = cls ? "" : String(real(r) - d0() + 1);
     let html = `<div class="grid-row" data-r="${r}"><div class="grid-cell gn${on}">${label}</div>`;
-    const row = E.rows[r];
+    const row = E.rows[real(r)] || [];
     for (let c = 0; c < E.cols; c++) html += cellHtml(row[c] ?? "", r, c, cls);
     return html + "</div>";
+  }
+
+  function sortBtn(c) {
+    const dir = E.sort?.c === c ? E.sort.dir : 0;
+    const label = dir === 1 ? "Sorted ascending" : dir === -1 ? "Sorted descending" : "Sort";
+    return `<button class="grid-sort${dir ? " on" : ""}" data-sort="${c}" tabindex="-1" aria-label="${label}" title="${label}">${dir === -1 ? "↓" : dir === 1 ? "↑" : "↕"}</button>`;
   }
 
   function paintHead() {
     const { c1, c2 } = range();
     let html = `<div class="grid-row" data-r="-1"><div class="grid-cell gn"></div>`;
     for (let c = 0; c < E.cols; c++)
-      html += `<div class="grid-cell gl${c >= c1 && c <= c2 ? " on" : ""}" data-c="${c}">${letters(c)}<i class="grid-rz" data-rz="${c}"></i></div>`;
+      html += `<div class="grid-cell gl${c >= c1 && c <= c2 ? " on" : ""}" data-c="${c}">${letters(c)}${sortBtn(c)}<i class="grid-rz" data-rz="${c}"></i></div>`;
     html += "</div>";
     if (d0()) html += rowHtml(0, " hdr");
     E.head.innerHTML = html;
@@ -503,7 +573,7 @@
     if (!E.mounted) return;
     const top = E.scroll.scrollTop;
     const h = E.scroll.clientHeight || 600;
-    const n = E.rows.length - d0();
+    const n = count() - d0();
     const first = Math.max(0, Math.floor(top / RH) - 6);
     const last = Math.min(n, Math.ceil((top + h) / RH) + 6);
     E.body.style.top = headH() + first * RH + "px";
@@ -541,7 +611,7 @@
   function move(dr, dc, extend, jump) {
     let { r, c } = E.act;
     if (jump) {
-      if (dr) r = dr < 0 ? 0 : E.rows.length - 1;
+      if (dr) r = dr < 0 ? 0 : count() - 1;
       if (dc) c = dc < 0 ? 0 : E.cols - 1;
     } else {
       r += dr;
@@ -583,7 +653,12 @@
 
   function setCells(changes) {
     const rows = grid();
-    for (const [r, c, v] of changes) {
+    const shown = count();
+    const extra = Math.max(0, ...changes.map(([p]) => p + 1 - shown));
+    const base = rows.length;
+    if (E.order) for (let k = 0; k < extra; k++) E.order.push(base + k);
+    for (const [p, c, v] of changes) {
+      const r = p < shown ? real(p) : base + p - shown;
       while (rows.length <= r) rows.push([]);
       while (rows[r].length <= c) rows[r].push("");
       rows[r][c] = v;
@@ -596,7 +671,13 @@
     if (E.readonly) return;
     before();
     const rows = grid();
-    rows.splice(at, 0, ...Array.from({ length: n }, () => new Array(E.cols).fill("")));
+    // Below the last shown row: after it in the file, else before the row at `at`
+    const ri = at < count() ? real(at) : at > 0 ? real(at - 1) + 1 : rows.length;
+    rows.splice(ri, 0, ...Array.from({ length: n }, () => new Array(E.cols).fill("")));
+    if (E.order) {
+      E.order = E.order.map((x) => (x >= ri ? x + n : x));
+      E.order.splice(at, 0, ...Array.from({ length: n }, (_, k) => ri + k));
+    }
     E.anc = { r: at, c: E.act.c };
     E.act = { r: at + n - 1, c: E.act.c };
     commit(rows);
@@ -609,6 +690,7 @@
     const rows = grid();
     for (const r of rows) r.splice(at, 0, ...new Array(n).fill(""));
     if (E.cw.length > at) E.cw.splice(at, 0, ...new Array(n));
+    if (E.sort && E.sort.c >= at) E.sort = { ...E.sort, c: E.sort.c + n };
     E.anc = { r: E.act.r, c: at };
     E.act = { r: E.act.r, c: at + n - 1 };
     commit(rows);
@@ -619,8 +701,18 @@
     if (E.readonly) return;
     before();
     const { r1, r2 } = range();
-    const rows = grid();
-    rows.splice(r1, r2 - r1 + 1);
+    const del = new Set();
+    for (let p = r1; p <= r2; p++) if (p < count()) del.add(real(p));
+    const rows = grid().filter((_, i) => !del.has(i));
+    if (E.order) {
+      // Each remaining row moves up by the deleted rows before it
+      const shift = [];
+      for (let i = 0, k = 0; i < E.rows.length; i++) {
+        shift.push(k);
+        if (del.has(i)) k++;
+      }
+      E.order = E.order.filter((x) => !del.has(x)).map((x) => x - shift[x]);
+    }
     E.act = E.anc = { r: r1, c: E.act.c };
     commit(rows);
   }
@@ -632,6 +724,7 @@
     let rows = grid();
     for (const r of rows) r.splice(c1, c2 - c1 + 1);
     E.cw.splice(c1, c2 - c1 + 1);
+    if (E.sort) E.sort = E.sort.c > c2 ? { ...E.sort, c: E.sort.c - (c2 - c1 + 1) } : E.sort.c >= c1 ? null : E.sort;
     if (!rows[0]?.length) rows = [];
     E.act = E.anc = { r: E.act.r, c: c1 };
     commit(rows);
@@ -782,7 +875,7 @@
   }
 
   function selectHit(hit, extend) {
-    const last = { r: E.rows.length - 1, c: E.cols - 1 };
+    const last = { r: Math.max(0, count() - 1), c: E.cols - 1 };
     // Whole rows and columns: the active cell is their first one, and nothing scrolls
     if (hit.kind === "all") return select({ r: 0, c: 0 }, last, false);
     if (hit.kind === "col") return select({ r: 0, c: hit.c }, { r: last.r, c: extend ? E.anc.c : hit.c }, false);
@@ -820,6 +913,12 @@
     if (e.target === E.ta || e.button > 0) return;
     const rz = e.target.closest?.(".grid-rz");
     if (rz) return onResize(e, +rz.dataset.rz);
+    const sb = e.target.closest?.(".grid-sort");
+    if (sb) {
+      e.preventDefault();
+      E.scroll.focus({ preventScroll: true });
+      return cycleSort(+sb.dataset.sort);
+    }
     const hit = cellAt(e.target);
     if (!hit) return;
     if (E.editing) finishEdit(true, false);
@@ -892,7 +991,7 @@
       // ⌘⌫ removes whole selected rows or columns; anything else is cleared
       const { r1, r2, c1, c2 } = range();
       if (mod && c1 === 0 && c2 === E.cols - 1) return deleteRows();
-      if (mod && r1 === 0 && r2 === E.rows.length - 1) return deleteCols();
+      if (mod && r1 === 0 && r2 === count() - 1) return deleteCols();
       return clearRange();
     }
     if (k.length === 1 && !mod && !e.altKey) return done(), startEdit(k);
@@ -920,6 +1019,8 @@
       ]
         .map((it) => (it ? b(it[0], pre ? pre + it[1] : it[1][0].toUpperCase() + it[1].slice(1)) : "<hr>"))
         .join(""),
+      sort:
+        b("sort-asc", "Sort ascending") + b("sort-desc", "Sort descending") + (E.sort ? b("sort-off", "Clear sort") : ""),
       delete:
         b("del-rows", nr === 1 ? "Delete row" : `Delete ${nr} rows`, "danger") +
         b("del-cols", nc === 1 ? "Delete column" : `Delete ${nc} columns`, "danger") +
@@ -944,14 +1045,15 @@
 
   function onBar(e) {
     const b = e.target.closest("button");
-    if (!b || E.readonly) return;
+    if (!b || E.readonly || !b.dataset.g) return;
     const g = b.dataset.g;
     if (g === "header") {
       E.header = !E.header;
       E.opts.onHeader?.(E.header);
-      layout();
+      refreshView();
       return;
     }
+    if (g === "save-sort") return saveSort();
     if (E.pop.classList.contains("visible") && E.pop.dataset.from === g) return closePop();
     const r = b.getBoundingClientRect();
     E.pop.dataset.from = g;
@@ -960,14 +1062,14 @@
 
   function onContextMenu(e) {
     const hit = cellAt(e.target);
-    if (!hit || E.readonly) return;
+    if (!hit) return;
     e.preventDefault();
     const { r1, r2, c1, c2 } = range();
     const inside = hit.kind === "cell" ? hit.r >= r1 && hit.r <= r2 && hit.c >= c1 && hit.c <= c2 : false;
     if (!inside) selectHit(hit, false);
     const items = popItems("Insert ");
     E.pop.dataset.from = "";
-    openPop(items.insert + "<hr>" + items.delete, e.clientX, e.clientY);
+    openPop(E.readonly ? items.sort : items.sort + "<hr>" + items.insert + "<hr>" + items.delete, e.clientX, e.clientY);
   }
 
   function onPop(e) {
@@ -984,6 +1086,9 @@
       "row-below-10": () => insertRows(r2 + 1, 10),
       "col-left-10": () => insertCol(c1, 10),
       "col-right-10": () => insertCol(c2 + 1, 10),
+      "sort-asc": () => setSort(E.act.c, 1),
+      "sort-desc": () => setSort(E.act.c, -1),
+      "sort-off": () => setSort(0, 0),
       "del-rows": deleteRows,
       "del-cols": deleteCols,
       clear: clearRange,
@@ -997,12 +1102,11 @@
   function find(query) {
     const re = findRe(query);
     const out = [];
-    E.rows.forEach((row, r) =>
-      row.forEach((v, c) => {
+    for (let r = 0, n = count(); r < n; r++)
+      (E.rows[real(r)] || []).forEach((v, c) => {
         let i = 0;
         if (v) for (const _ of v.matchAll(re)) out.push({ r, c, i: i++ });
-      }),
-    );
+      });
     return out;
   }
 
@@ -1018,7 +1122,9 @@
   function revealOffset(offset) {
     const pre = E.text.slice(0, offset);
     const n = parse(pre, E.sep).length;
-    select({ r: !pre || pre.endsWith("\n") ? n : n - 1, c: 0 });
+    const r = !pre || pre.endsWith("\n") ? n : n - 1;
+    const p = E.order ? E.order.indexOf(r) : r;
+    if (p >= 0) select({ r: p, c: 0 });
   }
 
   window.Grid = {

@@ -56,6 +56,18 @@ Notes from the app's own zip export are not converted.
 - ⌘D fills the selection down from its top row (one row: from the row above),
   ⌘R right from its left column.
 - Undo and redo select the cells they change.
+- **Sort** (the arrow on a column letter: ascending, descending, off; or
+  right-click) and **Filter rows** (toolbar: rows containing the text, in any
+  column) only change the view. The header row stays on top; without it every
+  row sorts. Numbers sort by value, then text naturally (`a2` before `a10`),
+  empty cells last. Row numbers stay the file's.
+- Edits in a sorted or filtered view go to the rows shown and don't re-sort
+  them; inserted rows stay where they were put. Outside changes (undo, Source)
+  apply the sort and filter again.
+- **Save sort** (toolbar, while sorted) writes the order into the file for every
+  row, filtered out or not. One undo step.
+- Sort and filter are forgotten when the note closes. Zen shows no toolbar;
+  its column arrows still sort.
 - Delete clears the selection; ⌘⌫ removes it when whole rows or columns are
   selected. ⌘C / ⌘X copy TSV, ⌘V pastes TSV (what
   spreadsheets put on the clipboard); one value pasted over a range fills it.
@@ -67,6 +79,17 @@ Notes from the app's own zip export are not converted.
 - ⌘F finds in cells, including rows off screen; replace goes to Source.
   Palette line hits select their row.
 - Zen shows the grid read-only.
+
+## In markdown
+
+A ```` ```csv ```` or ```` ```tsv ```` code block renders as a table in the
+preview, zen and HTML export: same parser, first row as the header
+(```` ```csv noheader ```` for none), numbers right-aligned, line breaks kept.
+
+`![caption](data.csv)` embeds a table note: its current content, its own
+header setting, and a caption linking to it. Missing or locked notes show
+"table not found" / "encrypted". At most 1000 rows are shown, then "N more
+rows". The parser (`csvParse`) lives in `app.js` for this; `grid.js` uses it.
 
 ## Download
 

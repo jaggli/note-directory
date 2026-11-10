@@ -452,7 +452,10 @@
         cursor: pointer;
       }
 
-      .draw-embed.missing {
+      .draw-embed.missing,
+      .csv-missing {
+        display: block;
+        margin: 1em 0;
         color: var(--yellow);
         font-size: 13px;
         cursor: default;
@@ -699,11 +702,13 @@
         margin: 1.5em 0;
       }
 
-      /* Wide tables scroll inside the column */
+      /* Wide and long tables scroll inside themselves, under a sticky header
+         (a scrolling table is what sticky cells stick to) */
       .md-preview table {
         display: block;
         width: max-content;
         max-width: 100%;
+        max-height: 75vh;
         overflow: auto;
         border-collapse: collapse;
         margin: 0 0 1em;
@@ -721,12 +726,44 @@
         background: var(--overlay);
       }
 
+      /* Collapsed borders scroll away under a sticky cell: draw its own */
+      .md-preview thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        box-shadow: inset 0 -1px var(--border);
+      }
+
       .md-preview .align-right {
         text-align: right;
       }
 
       .md-preview .align-center {
         text-align: center;
+      }
+
+      .md-preview .csv-embed {
+        margin: 0 0 1em;
+      }
+
+      .md-preview .csv-embed table,
+      .md-preview .csv-embed .csv-more {
+        margin-bottom: 4px;
+      }
+
+      .md-preview .csv-embed figcaption {
+        font: var(--n-caption);
+        color: var(--n-text-3);
+      }
+
+      .md-preview .csv-embed figcaption a {
+        color: inherit;
+      }
+
+      .md-preview .csv-more {
+        margin: -0.5em 0 1em;
+        color: var(--n-text-3);
+        font: var(--n-caption);
       }
 
       .md-preview details {

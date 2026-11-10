@@ -3009,6 +3009,92 @@ function hideDraw() {
 //  Tables (.csv, .tsv — grid lives in grid.js, loaded on demand)
 // ═══════════════════════════════════════════════════
 
+// RFC 4180 rows; `sep` is "," or "\t". Shared with grid.js
+function csvParse(text, sep) {
+  const rows = [];
+  if (!text) return rows;
+  const n = text.length;
+  let row = [];
+  let i = 0;
+  const end = (from) => {
+    let e = from;
+    while (e < n) {
+      const ch = text[e];
+      if (ch === sep || ch === "\n" || ch === "\r") break;
+      e++;
+    }
+    return e;
+  };
+  for (;;) {
+    let f = "";
+    if (text[i] === '"') {
+      let j = i + 1;
+      for (;;) {
+        const k = text.indexOf('"', j);
+        if (k < 0) {
+          f += text.slice(j);
+          i = n;
+          break;
+        }
+        f += text.slice(j, k);
+        if (text[k + 1] === '"') {
+          f += '"';
+          j = k + 2;
+        } else {
+          i = k + 1;
+          break;
+        }
+      }
+      // Stray text after the closing quote stays part of the field
+      const e = end(i);
+      f += text.slice(i, e);
+      i = e;
+    } else {
+      const e = end(i);
+      f = text.slice(i, e);
+      i = e;
+    }
+    row.push(f);
+    if (i >= n) {
+      rows.push(row);
+      break;
+    }
+    if (text[i] === sep) {
+      i++;
+      continue;
+    }
+    i += text[i] === "\r" && text[i + 1] === "\n" ? 2 : 1;
+    rows.push(row);
+    row = [];
+    if (i >= n) break;
+  }
+  return rows;
+}
+
+// ```csv and ```tsv blocks in markdown: a table, first row as its header
+const CSV_PREVIEW_ROWS = 1000;
+function csvTableHtml(text, sep, header = true) {
+  const rows = csvParse(text.replace(/\n+$/, ""), sep);
+  if (!rows.length) return "";
+  const w = Math.max(...rows.map((r) => r.length));
+  const num = /^[-+]?[\d.,' ]*\d%?$/;
+  const cells = (r, tag) => {
+    let html = "";
+    for (let c = 0; c < w; c++) {
+      const v = r[c] ?? "";
+      html += `<${tag}${tag === "td" && num.test(v) ? ' class="align-right"' : ""}>${escapeHtml(v).replace(/\n/g, "<br>")}</${tag}>`;
+    }
+    return "<tr>" + html + "</tr>";
+  };
+  const h = header ? 1 : 0;
+  const body = rows.slice(h, CSV_PREVIEW_ROWS + h).map((r) => cells(r, "td")).join("");
+  const more = rows.length - h - CSV_PREVIEW_ROWS;
+  return (
+    `<table class="csv-table">${h ? `<thead>${cells(rows[0], "th")}</thead>` : ""}<tbody>${body}</tbody></table>` +
+    (more > 0 ? `<p class="csv-more">${more.toLocaleString()} more rows</p>` : "")
+  );
+}
+
 const gridHost = document.getElementById("gridHost");
 
 function isCsvFile(name) {
@@ -3476,6 +3562,7 @@ function renderMarkdown(src) {
     const result = [];
     const fenceStack = []; // stack of backtick strings for nesting
     let lang = "";
+    let noHeader = false;
     let codeLines = [];
 
     function flushCodeBlock() {
@@ -3492,6 +3579,11 @@ function renderMarkdown(src) {
         .replace(/&gt;/g, ">")
         .replace(/&lt;/g, "<")
         .replace(/&amp;/g, "&");
+      if (lang === "csv" || lang === "tsv") {
+        codeBlocks.push(csvTableHtml(raw, lang === "tsv" ? "\t" : ",", !noHeader));
+        result.push("\x00CB" + idx + "\x00");
+        return;
+      }
       const ext = langAliases[lang] || lang;
       let highlighted;
       if (ext && (langRules[ext] || htmlExts.has(ext))) {
@@ -3545,10 +3637,12 @@ function renderMarkdown(src) {
       const line = lines[i];
       if (fenceStack.length === 0) {
         // Outside any code block
-        const m = line.match(/^(`{3,})(\S*)\s*$/);
+        // ```csv noheader: the table has no header row
+        const m = line.match(/^(`{3,})(\S*)(\s+noheader)?\s*$/);
         if (m) {
           fenceStack.push(m[1]);
           lang = m[2];
+          noHeader = !!m[3];
           codeLines = [];
         } else {
           result.push(line);
@@ -3793,6 +3887,23 @@ function renderMarkdown(src) {
       );
     },
   );
+
+  // Embedded tables — ![alt](name.csv), with the note's own header setting
+  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+\.(?:csv|tsv))\)/gi, (_, alt, name) => {
+    const ref = name.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const note =
+      state.notes.find((n) => n.name === ref) ||
+      state.notes.find((n) => n.name.toLowerCase() === ref.toLowerCase());
+    codeBlocks.push(
+      !note
+        ? `<span class="csv-missing missing">table not found: ${name}</span>`
+        : isLocked(note)
+          ? `<span class="csv-missing missing">encrypted: ${name}</span>`
+          : `<figure class="csv-embed">${csvTableHtml(viewOf(note).content, csvSep(note.name), note.csvHeader !== false)}` +
+            `<figcaption><a href="${name}">${alt || name}</a></figcaption></figure>`,
+    );
+    return "\x00CB" + (codeBlocks.length - 1) + "\x00";
+  });
 
   // Embedded drawings — ![alt](name.draw); held aside so emphasis
   // rules can't reach into the file name

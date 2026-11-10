@@ -248,6 +248,76 @@ test("undo and redo select the cells they change", async ({ page }) => {
   expect(await page.evaluate(() => Grid.active())).toEqual({ r: 2, c: 1 });
 });
 
+const shown = (page, c) =>
+  page.evaluate((c) => [...document.querySelectorAll(`#gridHost .grid-body .grid-row [data-c="${c}"]`)].map((e) => e.textContent), c);
+
+test("sorting is a view: numbers by value, text naturally, empty last", async ({ page }) => {
+  const csv = "name,n\nb10,10\na2,9\n,\nA1,100\nb2,x\n";
+  await openTable(page, csv);
+  const sortBtn = page.locator("#gridHost .grid-sort[data-sort='1']");
+  await sortBtn.click();
+  expect(await shown(page, 1)).toEqual(["9", "10", "100", "x", ""]);
+  await sortBtn.click();
+  expect(await shown(page, 1)).toEqual(["x", "100", "10", "9", ""]);
+  await page.locator("#gridHost .grid-sort[data-sort='0']").click();
+  expect(await shown(page, 0)).toEqual(["A1", "a2", "b2", "b10", ""]);
+  // Row numbers stay the file's
+  expect(await page.locator("#gridHost .grid-body .gn").allTextContents()).toEqual(["4", "2", "5", "1", "3"]);
+  expect(await content(page)).toBe(csv);
+  await page.locator("#gridHost .grid-sort[data-sort='0']").click();
+  await page.locator("#gridHost .grid-sort[data-sort='0']").click();
+  expect(await shown(page, 0)).toEqual(["b10", "a2", "", "A1", "b2"]);
+});
+
+test("edits in a sorted view go to the right rows and keep the order", async ({ page }) => {
+  await openTable(page, "n\n3\n1\n2\n");
+  await page.locator("#gridHost .grid-sort[data-sort='0']").click();
+  expect(await shown(page, 0)).toEqual(["1", "2", "3"]);
+  await cellEl(page, 1, 0).click();
+  await page.keyboard.type("9");
+  await page.keyboard.press("Enter");
+  expect(await content(page)).toBe("n\n3\n9\n2\n");
+  expect(await shown(page, 0)).toEqual(["9", "2", "3"]);
+  // Delete the shown "2" (file row 3)
+  await page.locator("#gridHost .grid-body .grid-row[data-r='2'] .gn").click();
+  await page.keyboard.press("ControlOrMeta+Backspace");
+  expect(await content(page)).toBe("n\n3\n9\n");
+  await page.locator("#gridHost [data-g=insert]").click();
+  await page.locator("#gridHost .grid-pop [data-g=row-below]").click();
+  // The selection moved to "3" (file row 1): the new row goes after it, in view and file
+  expect(await shown(page, 0)).toEqual(["9", "3", ""]);
+  expect(await content(page)).toBe("n\n3\n\n9\n");
+});
+
+test("Save sort writes the order, for every row", async ({ page }) => {
+  await openTable(page, "n,t\n3,c\n1,a\n2,b\n");
+  await expect(page.locator("#gridHost [data-g=save-sort]")).toBeHidden();
+  await page.locator("#gridHost .grid-filter input").fill("a");
+  await page.locator("#gridHost .grid-sort[data-sort='0']").click();
+  await page.locator("#gridHost [data-g=save-sort]").click();
+  expect(await content(page)).toBe("n,t\n1,a\n2,b\n3,c\n");
+  await expect(page.locator("#gridHost [data-g=save-sort]")).toBeHidden();
+  await page.keyboard.press("ControlOrMeta+z");
+  expect(await content(page)).toBe("n,t\n3,c\n1,a\n2,b\n");
+});
+
+test("filter shows matching rows, keeps the header, Esc clears", async ({ page }) => {
+  const rows = ["city,country"];
+  for (let i = 0; i < 3000; i++) rows.push(`c${i},${i % 3 ? "CH" : "DE"}`);
+  await openTable(page, rows.join("\n") + "\n");
+  const input = page.locator("#gridHost .grid-filter input");
+  await input.fill("de");
+  await expect(page.locator("#gridHost .grid-size")).toHaveText("1,000 of 3,000 rows × 2 columns");
+  await expect(page.locator("#gridHost .grid-head .hdr").first()).toHaveText("city");
+  await input.press("Escape");
+  await expect(page.locator("#gridHost .grid-size")).toHaveText("3,000 rows × 2 columns");
+  await input.fill("c2999");
+  await page.locator("#gridHost .grid-scroll").focus();
+  await page.keyboard.press("ControlOrMeta+f");
+  await page.keyboard.type("CH");
+  await expect(page.locator("#findReplaceCount")).toHaveText("1 of 1");
+});
+
 test("⌘F finds in cells, also off screen", async ({ page }) => {
   const rows = ["id,name"];
   for (let i = 0; i < 2000; i++) rows.push(`${i},row ${i}`);
@@ -276,4 +346,65 @@ test("download for Excel: BOM, CRLF", async ({ page }) => {
   const text = require("fs").readFileSync(await dl.path(), "utf8");
   expect(text.startsWith("﻿")).toBe(true);
   expect(text).toMatch(/^﻿a[,;]b\r\nä[,;]2\r\n$/);
+});
+
+test("```csv and ```tsv blocks render as tables in the preview", async ({ page }) => {
+  await openApp(page);
+  const md = '# t\n\n```csv\nname,qty\n"a, <b>",3\n"two\nlines",\n```\n\n```tsv\nx\ty\n1\t2\n```\n';
+  await page.evaluate((c) => createNote("t.md", c), md);
+  await page.evaluate(() => switchMdTab("view"));
+  const tables = page.locator("#mdPreview table.csv-table");
+  await expect(tables).toHaveCount(2);
+  await expect(tables.first().locator("th")).toHaveText(["name", "qty"]);
+  await expect(tables.first().locator("tbody td").first()).toHaveText("a, <b>");
+  await expect(tables.first().locator("tbody td.align-right")).toHaveText("3");
+  expect(await tables.first().locator("tbody tr").nth(1).locator("td").first().innerHTML()).toBe("two<br>lines");
+  await expect(tables.nth(1).locator("td")).toHaveText(["1", "2"]);
+});
+
+test("big csv blocks show the first 1000 rows", async ({ page }) => {
+  await openApp(page);
+  const rows = ["n"];
+  for (let i = 0; i < 1500; i++) rows.push(String(i));
+  await page.evaluate((c) => createNote("t.md", c), "```csv\n" + rows.join("\n") + "\n```\n");
+  await page.evaluate(() => switchMdTab("view"));
+  await expect(page.locator("#mdPreview tbody tr")).toHaveCount(1000);
+  await expect(page.locator("#mdPreview .csv-more")).toHaveText("500 more rows");
+});
+
+test("```csv noheader renders every row as data", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate((c) => createNote("t.md", c), "```csv noheader\na,1\nb,2\n```\n");
+  await page.evaluate(() => switchMdTab("view"));
+  await expect(page.locator("#mdPreview table.csv-table th")).toHaveCount(0);
+  await expect(page.locator("#mdPreview table.csv-table td")).toHaveText(["a", "1", "b", "2"]);
+});
+
+test("![](data.csv) embeds the table, follows its header setting, links to it", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(async () => {
+    await createNote("data.csv", "x,y\n1,2\n");
+    getActiveNote().csvHeader = false;
+    await createNote("t.md", "![Data](data.csv)\n\n![](gone.csv)\n");
+    switchMdTab("view");
+  });
+  const fig = page.locator("#mdPreview figure.csv-embed");
+  await expect(fig.locator("th")).toHaveCount(0);
+  await expect(fig.locator("td")).toHaveText(["x", "y", "1", "2"]);
+  await expect(page.locator("#mdPreview .missing")).toHaveText("table not found: gone.csv");
+  await fig.locator("figcaption a").click();
+  await expect(page.locator("#mdTabView")).toContainText("Table");
+  expect(await page.evaluate(() => getActiveNote().name)).toBe("data.csv");
+});
+
+test("long preview tables keep their header in view", async ({ page }) => {
+  await openApp(page);
+  const rows = ["name,n"];
+  for (let i = 0; i < 200; i++) rows.push(`r${i},${i}`);
+  await page.evaluate((c) => createNote("t.md", c), "```csv\n" + rows.join("\n") + "\n```\n");
+  await page.evaluate(() => switchMdTab("view"));
+  const table = page.locator("#mdPreview table");
+  await table.evaluate((t) => (t.scrollTop = 2000));
+  const [tb, hb] = await Promise.all([table.boundingBox(), page.locator("#mdPreview th").first().boundingBox()]);
+  expect(Math.abs(hb.y - tb.y)).toBeLessThan(2);
 });
