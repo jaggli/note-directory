@@ -1591,7 +1591,7 @@
         align-items: center;
         gap: 8px;
         height: var(--n-row);
-        padding: 0 4px 0 8px;
+        padding: 0 4px 0 calc(8px + var(--depth, 0) * 14px);
         border-radius: var(--n-r-md);
         color: var(--n-text-2);
         cursor: pointer;
@@ -1693,6 +1693,36 @@
         box-shadow:
           inset 0 0 0 1px var(--n-danger),
           0 0 0 3px var(--n-danger-soft);
+      }
+
+      /* Folders: a chevron in front, the folder icon in their kind's place */
+      .folder-item {
+        padding-left: calc(2px + var(--depth, 0) * 14px);
+        gap: 4px;
+      }
+
+      .folder-item .kind {
+        margin-right: 4px;
+        color: var(--n-text-3);
+      }
+
+      .folder-chev {
+        flex: none;
+        color: var(--n-text-3);
+        transition: transform 0.12s;
+      }
+
+      .folder-item[aria-expanded="true"] .folder-chev {
+        transform: rotate(90deg);
+      }
+
+      .folder-item.drag-into {
+        background: var(--n-accent-soft);
+        box-shadow: inset 0 0 0 1px var(--n-accent);
+      }
+
+      .dir {
+        color: var(--n-text-3);
       }
 
       .note-item.dragging {
@@ -3530,6 +3560,7 @@
       <symbol id="i-note" viewBox="0 0 16 16"><path d="M4 1.5h5.5l3 3v10H4zM9.5 1.5v3h3M6 8h4.5M6 10.5h4.5" /></symbol>
       <symbol id="i-file-code" viewBox="0 0 16 16"><path d="M4 1.5h5.5l3 3v10H4zM9.5 1.5v3h3M7 8.3L5.8 9.8 7 11.3M9.5 8.3l1.2 1.5-1.2 1.5" /></symbol>
       <symbol id="i-file-draw" viewBox="0 0 16 16"><circle cx="5.5" cy="10.5" r="3" /><rect x="8" y="2.5" width="5.5" height="5.5" rx="1" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.5a1 1 0 0 1 1-1h3.2l1.5 1.5H13a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" /></symbol>
       <symbol id="i-table" viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M2 6.5h12M2 10h12M6.5 6.5v7" /></symbol>
       <symbol id="i-undo" viewBox="0 0 16 16"><path d="M5.5 4L2.5 7l3 3M2.5 7h7a3.5 3.5 0 0 1 0 7H7" /></symbol>
       <symbol id="i-redo" viewBox="0 0 16 16"><path d="M10.5 4l3 3-3 3M13.5 7h-7a3.5 3.5 0 0 0 0 7H9" /></symbol>
@@ -3716,6 +3747,7 @@
       <button class="menu-item" role="menuitem" data-action="new-note-rename" data-close-menu><svg class="icon"><use href="#i-note" /></svg><span class="label">New note</span><span class="kbd" data-k="new"></span></button>
       <button class="menu-item" role="menuitem" data-action="new-drawing-rename" data-close-menu><svg class="icon"><use href="#i-file-draw" /></svg><span class="label">New drawing</span></button>
       <button class="menu-item" role="menuitem" data-action="new-table-rename" data-close-menu><svg class="icon"><use href="#i-table" /></svg><span class="label">New table</span></button>
+      <button class="menu-item" role="menuitem" data-action="new-folder" data-close-menu><svg class="icon"><use href="#i-folder" /></svg><span class="label">New folder</span></button>
       <button class="menu-item" role="menuitem" data-action="import" data-close-menu><svg class="icon"><use href="#i-import" /></svg><span class="label">Import files…</span></button>
       <button class="menu-item" role="menuitem" data-action="download-all" data-close-menu><svg class="icon"><use href="#i-archive" /></svg><span class="label">Export all as ZIP</span></button>
       <div class="menu-sep"></div>
@@ -3743,6 +3775,7 @@
       <button class="menu-item" role="menuitem" data-action="new-note-rename" data-close-menu><svg class="icon"><use href="#i-note" /></svg><span class="label">New note</span><span class="kbd" data-k="new"></span></button>
       <button class="menu-item" role="menuitem" data-action="new-drawing-rename" data-close-menu><svg class="icon"><use href="#i-file-draw" /></svg><span class="label">New drawing</span></button>
       <button class="menu-item" role="menuitem" data-action="new-table-rename" data-close-menu><svg class="icon"><use href="#i-table" /></svg><span class="label">New table</span></button>
+      <button class="menu-item" role="menuitem" data-action="new-folder" data-close-menu><svg class="icon"><use href="#i-folder" /></svg><span class="label">New folder</span></button>
       <button class="menu-item needs-vault" role="menuitem" data-action="new-encrypted" data-close-menu hidden><svg class="icon"><use href="#i-lock" /></svg><span class="label">New encrypted file</span></button>
       <div class="menu-sep"></div>
       <button class="menu-item" role="menuitem" data-action="import" data-close-menu><svg class="icon"><use href="#i-import" /></svg><span class="label">Import files…</span></button>

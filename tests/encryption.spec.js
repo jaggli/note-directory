@@ -358,3 +358,17 @@ test("a locked file can't be dragged out of the window", async ({ page }) => {
   expect(url).toBe("");
   await expect(page.getByText("Unlock it first to drag it out")).toBeVisible();
 });
+
+test("moving a linked file rewrites links in unlocked encrypted files, re-encrypted", async ({
+  page,
+}) => {
+  await authenticator(page);
+  await openApp(page);
+  await page.evaluate(() => createNote("plan.md", "p"));
+  await newEncrypted(page, "see [plan](plan.md)");
+  const id = await page.evaluate(() => state.activeId);
+  await page.evaluate(() => moveNotesTo([state.notes.find((n) => n.name === "plan.md")], "work/"));
+  await expect.poll(() => sealedText(page)).toBe("see [plan](work/plan.md)");
+  await expect(page.locator("#editor")).toHaveValue("see [plan](work/plan.md)");
+  expect(await page.evaluate((id) => realNote(id).content.includes("plan"), id)).toBe(false);
+});

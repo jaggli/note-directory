@@ -227,7 +227,8 @@ test("zip round trip keeps unicode names and dotfiles", async ({ page }) => {
     return { utf8Flag: (flag & 0x0800) !== 0, names };
   });
   expect(r.utf8Flag).toBe(true);
-  expect(r.names).toEqual(["Ü.md", ".env", "a..b.md", "evil.md"]);
+  // Folders stay; ".." can't climb out
+  expect(r.names).toEqual(["Ü.md", ".env", "dir/a..b.md", "evil.md"]);
 });
 
 test("deletion records expire after six months", async ({ page }) => {

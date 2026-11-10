@@ -6,7 +6,7 @@
 
 Creates a standard ZIP file (DEFLATE-compressed) containing:
 
-1. **All note files** — one file per note, using the note's filename and content
+1. **All note files** — one file per note, in its folder, using the note's filename and content
 2. **Drawing renders** — for each non-empty `.draw` note an SVG image named
    `<name>.draw.svg`, so drawings can be looked at without the app (skipped
    if a note already has that name)
@@ -68,7 +68,7 @@ supported:
 
 ### ZIP files
 
-Detected by `.zip` extension or `application/zip` MIME type. The ZIP reader handles both DEFLATE (method 8) and STORE (method 0) entries, so re-zipped folders from OS tools work fine.
+Detected by `.zip` extension or `application/zip` MIME type. The ZIP reader handles both DEFLATE (method 8) and STORE (method 0) entries, so re-zipped folders from OS tools work fine. Folders inside the zip become folders (see [folders.md](folders.md)).
 
 **With `.note.directory` (app export):**
 

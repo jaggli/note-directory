@@ -61,6 +61,9 @@ across devices via Google Drive.
 - Find (⌘F) and replace (⌘⌥F / Ctrl+H) in a floating widget
 - Import files from a picker or by dropping them; one
   dialog resolves every name clash (Replace · Keep both · Skip)
+- Folders, nested, in the sidebar: drag notes and folders into them, search
+  or export one as a ZIP; links between notes are relative and follow moves
+  (see [docs/folders.md](docs/folders.md))
 - Drag to reorder notes in sidebar
 - Pin notes to keep them at the top
 - Export all notes as a ZIP (includes metadata for re-import)

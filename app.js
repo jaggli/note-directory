@@ -263,11 +263,11 @@ async function readZip(buf) {
         data = new Uint8Array(await new Response(stream).arrayBuffer());
       }
 
-      // macOS resource forks, not files
-      if (entry.rawName.startsWith("__MACOSX/")) return null;
-      // Only the base name is used (also for Windows "\\" paths)
-      const name = entry.rawName.split(/[\\/]/).pop();
-      if (!name || name === "." || name === "..") return null;
+      // macOS resource forks and folder metadata, not files
+      if (/(^|[\\/])__MACOSX[\\/]/.test(entry.rawName)) return null;
+      // Folders are kept (also Windows "\\" paths); ".." can't climb out
+      const name = cleanPath(entry.rawName);
+      if (!name || /[\\/]$/.test(entry.rawName) || baseOf(name) === ".DS_Store") return null;
 
       return { name, data };
     }),
@@ -1845,8 +1845,64 @@ function redo() {
 // ═══════════════════════════════════════════════════
 
 function getExtension(name) {
-  const dot = name.lastIndexOf(".");
-  return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
+  const base = baseOf(name);
+  const dot = base.lastIndexOf(".");
+  return dot > 0 ? base.slice(dot + 1).toLowerCase() : "";
+}
+
+// ── Folders live in names: "projects/q3/plan.md" ──
+// A folder is written "projects/q3/" (with the slash); "" is the top level.
+
+function dirOf(name) {
+  return name.slice(0, name.lastIndexOf("/") + 1);
+}
+
+function baseOf(name) {
+  return name.slice(name.lastIndexOf("/") + 1);
+}
+
+// "projects/q3/" → "projects/"
+function parentOf(dir) {
+  return dirOf(dir.slice(0, -1));
+}
+
+// "a/./b/../c" → "a/c": backslashes, empty parts and ".." above the top go
+function cleanPath(p) {
+  const out = [];
+  for (const part of p.replace(/\\/g, "/").split("/")) {
+    const s = part.trim();
+    if (!s || s === ".") continue;
+    if (s === "..") out.pop();
+    else out.push(s);
+  }
+  return out.join("/");
+}
+
+// A link in note `from` → the name it points to ("/x.md" is from the top)
+function resolveRef(from, ref) {
+  let r = ref;
+  try {
+    r = decodeURI(ref);
+  } catch {}
+  return cleanPath(r.startsWith("/") ? r : dirOf(from) + r);
+}
+
+// The shortest link from folder `dir` to `name`
+function relRef(dir, name) {
+  const a = dir.split("/").filter(Boolean);
+  const b = name.split("/");
+  let i = 0;
+  while (i < a.length && i < b.length - 1 && a[i] === b[i]) i++;
+  return ("../".repeat(a.length - i) + b.slice(i).join("/")).replace(/ /g, "%20");
+}
+
+function findByRef(from, ref) {
+  const path = resolveRef(from, ref);
+  const lower = path.toLowerCase();
+  return (
+    state.notes.find((n) => n.name === path) ||
+    state.notes.find((n) => n.name.toLowerCase() === lower)
+  );
 }
 
 function tokenize(code, rules) {
@@ -2580,7 +2636,7 @@ function prepareDragOut(note) {
     key,
     url: null,
     type: draw ? "image/png" : "text/plain",
-    name: (draw ? note.name.replace(/\.draw$/i, ".png") : note.name).replace(/:/g, "-"),
+    name: baseOf(draw ? note.name.replace(/\.draw$/i, ".png") : note.name).replace(/:/g, "-"),
   };
   dragOutFiles.set(note.id, file);
   const done = (blob) => dragOutFiles.get(note.id) === file && (file.url = URL.createObjectURL(blob));
@@ -2609,13 +2665,17 @@ function noteKind(name) {
   return { cls: "code", icon: "file-code" };
 }
 
-// "release-notes" with a muted ".md"
+// "release-notes" with a muted ".md", and a muted folder in front
 function nameHtml(name) {
-  const dot = name.lastIndexOf(".");
-  if (dot <= 0) return escapeHtml(name);
+  const dir = dirOf(name);
+  const base = baseOf(name);
+  const pre = dir ? `<span class="dir">${escapeHtml(dir)}</span>` : "";
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0) return pre + escapeHtml(base);
   return (
-    escapeHtml(name.slice(0, dot)) +
-    `<span class="ext">${escapeHtml(name.slice(dot))}</span>`
+    pre +
+    escapeHtml(base.slice(0, dot)) +
+    `<span class="ext">${escapeHtml(base.slice(dot))}</span>`
   );
 }
 
@@ -2641,34 +2701,48 @@ function noteDetail(note) {
   );
 }
 
+// Pinned notes on top (with their folder), then folders and notes as a tree
 function renderNoteList() {
   noteList.innerHTML = "";
   sortNotes();
-  const anyPinned = state.notes.some((n) => n.pinned);
-  state.notes.forEach((note, ni) => {
-    const prev = state.notes[ni - 1];
-    if (anyPinned && (!prev || (prev.pinned && !note.pinned))) {
-      const label = document.createElement("div");
-      label.className = "list-label";
-      label.textContent = note.pinned ? "Pinned" : "Notes";
-      noteList.appendChild(label);
+  const label = (text) => {
+    const el = document.createElement("div");
+    el.className = "list-label";
+    el.textContent = text;
+    noteList.appendChild(el);
+  };
+  const pinned = state.notes.filter((n) => n.pinned);
+  if (pinned.length) {
+    label("Pinned");
+    pinned.forEach((n) => noteList.appendChild(noteRow(n, state.notes.indexOf(n), 0, true)));
+    label("Notes");
+  }
+  const folders = allFolders();
+  const walk = (dir, depth) => {
+    for (const f of [...folders].filter((f) => parentOf(f) === dir).sort(folderOrder)) {
+      noteList.appendChild(folderRow(f, depth));
+      if (!closedFolders.has(f)) walk(f, depth + 1);
     }
-    noteList.appendChild(noteRow(note, ni));
-  });
+    state.notes.forEach((n, i) => {
+      if (!n.pinned && dirOf(n.name) === dir) noteList.appendChild(noteRow(n, i, depth));
+    });
+  };
+  walk("", 0);
 }
 
-function noteRow(note, ni) {
+function noteRow(note, ni, depth = 0, pinnedRow = false) {
   const div = document.createElement("div");
   div.className = "note-item" + (note.id === state.activeId ? " active" : "");
   div.setAttribute("role", "listitem");
   div.draggable = true;
   div.dataset.idx = ni;
   div.dataset.id = note.id;
+  div.style.setProperty("--depth", depth);
   const kind = noteKind(note.name);
   const pin = note.pinned ? "Unpin" : "Pin";
   div.innerHTML =
     icon(kind.icon, "kind " + kind.cls) +
-    `<span class="note-item-name">${nameHtml(note.name)}</span>` +
+    `<span class="note-item-name">${nameHtml(pinnedRow ? note.name : baseOf(note.name))}</span>` +
     (isConflictCopy(note.name)
       ? '<span class="badge" data-tip="Edited on two devices" data-sub="This copy holds the other version">Conflict</span>'
       : "") +
@@ -2684,6 +2758,7 @@ function noteRow(note, ni) {
   let dragOutMissing = null;
   div.addEventListener("pointerenter", () => prepareDragOut(note));
   div.addEventListener("dragstart", (e) => {
+    dragFolder = null;
     dragSrcIdx = ni;
     div.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
@@ -2707,8 +2782,9 @@ function noteRow(note, ni) {
       .forEach((el) => el.classList.remove("drag-over"));
   });
   div.addEventListener("dragover", (e) => {
-    if (dragSrcIdx === null) return;
+    if (dragSrcIdx === null && !dragFolder) return;
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
     noteList
       .querySelectorAll(".drag-over")
@@ -2718,11 +2794,18 @@ function noteRow(note, ni) {
   div.addEventListener("dragleave", () => div.classList.remove("drag-over"));
   div.addEventListener("drop", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     div.classList.remove("drag-over");
+    // Dropped next to a note: into its folder, and placed before it
+    const dir = pinnedRow ? null : dirOf(note.name);
+    if (dragFolder) return dir !== null && moveFolder(dragFolder, dir);
     const fromIdx = dragSrcIdx;
     if (fromIdx === null || fromIdx === ni) return;
-    const [moved] = state.notes.splice(fromIdx, 1);
-    state.notes.splice(ni, 0, moved);
+    const moving = state.notes[fromIdx];
+    if (dir !== null && dirOf(moving.name) !== dir && !moveNotesTo([moving], dir)) return;
+    const to = state.notes.indexOf(note);
+    state.notes.splice(state.notes.indexOf(moving), 1);
+    state.notes.splice(to, 0, moving);
     saveState();
     renderNoteList();
   });
@@ -2772,12 +2855,12 @@ function onLongPress(el, fn) {
 // Rename in place. Enter or Tab commits, Esc cancels, a taken name is refused.
 // Returns an error message, or null once renamed (or unchanged)
 function renameNote(note, raw) {
-  const name = raw.trim();
+  const typed = raw.trim();
+  const name = cleanPath(typed.startsWith("/") ? typed : dirOf(note.name) + typed);
   if (!name || name === note.name) return null;
   if (state.notes.some((n) => n !== note && n.name === name))
     return "A note called " + name + " exists";
-  note.name = name;
-  note.updatedAt = Date.now();
+  applyMoves(new Map([[note, name]]), false);
   saveState();
   scheduleDriveUpload(true);
   scheduleUrlUpdate();
@@ -2789,11 +2872,12 @@ function renameNote(note, raw) {
 }
 
 function editName(input, note, done) {
-  input.value = note.name;
+  const base = baseOf(note.name);
+  input.value = base;
   input.classList.remove("error");
   input.focus();
-  const dot = note.name.lastIndexOf(".");
-  input.setSelectionRange(0, dot > 0 ? dot : note.name.length);
+  const dot = base.lastIndexOf(".");
+  input.setSelectionRange(0, dot > 0 ? dot : base.length);
   let finished = false;
   const finish = (commit) => {
     if (finished) return true;
@@ -2855,6 +2939,356 @@ function renameInTitle() {
     crumbBtn.hidden = false;
     renderNoteList();
     updateTitleBar();
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  Folders (in names, see dirOf). Empty folders and closed ones are
+//  remembered in this browser only: an empty folder has no note to sync.
+// ═══════════════════════════════════════════════════
+
+const FOLDERS_KEY = "notepad_folders";
+let keptFolders = new Set();
+let closedFolders = new Set();
+let dragFolder = null;
+try {
+  const f = JSON.parse(localStorage.getItem(FOLDERS_KEY) || "{}");
+  keptFolders = new Set(f.kept || []);
+  closedFolders = new Set(f.closed || []);
+} catch {}
+
+function saveFolders() {
+  try {
+    localStorage.setItem(FOLDERS_KEY, JSON.stringify({ kept: [...keptFolders], closed: [...closedFolders] }));
+  } catch {}
+}
+
+// Every folder: those notes are in (and their parents), and kept empty ones
+function allFolders() {
+  const out = new Set();
+  const add = (dir) => {
+    for (; dir && !out.has(dir); dir = parentOf(dir)) out.add(dir);
+  };
+  for (const n of state.notes) add(dirOf(n.name));
+  for (const f of keptFolders) add(f);
+  return out;
+}
+
+const folderCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const folderOrder = (a, b) => folderCollator.compare(a, b);
+
+// A folder stays when its last note leaves; only deleting it removes it
+function keepFolder(dir) {
+  for (; dir; dir = parentOf(dir)) keptFolders.add(dir);
+  saveFolders();
+}
+
+const folderName = (dir) => baseOf(dir.slice(0, -1));
+const notesIn = (dir) => state.notes.filter((n) => n.name.startsWith(dir));
+
+function folderRow(dir, depth) {
+  const div = document.createElement("div");
+  const open = !closedFolders.has(dir);
+  div.className = "note-item folder-item";
+  div.setAttribute("role", "listitem");
+  div.setAttribute("aria-expanded", open);
+  div.draggable = true;
+  div.dataset.folder = dir;
+  div.style.setProperty("--depth", depth);
+  const count = notesIn(dir).length;
+  div.innerHTML =
+    icon("chev-right", "sm folder-chev") +
+    icon("folder", "kind folder") +
+    `<span class="note-item-name">${escapeHtml(folderName(dir))}</span>` +
+    `<span class="note-item-time">${count || ""}</span>` +
+    `<span class="note-item-acts"><button class="btn ghost sm square btn-more" data-tip="More actions" aria-label="More actions for ${escapeHtml(folderName(dir))}">${icon("more", "sm")}</button></span>`;
+  div.addEventListener("click", (e) => {
+    if (longPressed) return (longPressed = false);
+    if (e.target.closest(".btn-more")) return openFolderMenu(dir, e.target.closest(".btn-more"));
+    if (e.target.closest(".note-item-input")) return;
+    if (open) closedFolders.add(dir);
+    else closedFolders.delete(dir);
+    saveFolders();
+    renderNoteList();
+  });
+  div.addEventListener("dblclick", (e) => {
+    if (!isMobile() && !e.target.closest("button, input")) startFolderRename(dir);
+  });
+  div.addEventListener("contextmenu", (e) => {
+    if (e.target.closest("input")) return;
+    e.preventDefault();
+    openFolderMenu(dir, null, { x: e.clientX, y: e.clientY });
+  });
+  onLongPress(div, () => openFolderMenu(dir, div));
+  div.addEventListener("dragstart", (e) => {
+    dragSrcIdx = null;
+    dragFolder = dir;
+    div.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", dir);
+  });
+  div.addEventListener("dragend", () => {
+    dragFolder = null;
+    div.classList.remove("dragging");
+    noteList.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+  });
+  div.addEventListener("dragover", (e) => {
+    if (dragSrcIdx === null && !dragFolder) return;
+    e.preventDefault();
+    e.stopPropagation();
+    noteList.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+    div.classList.add("drag-into");
+  });
+  div.addEventListener("dragleave", () => div.classList.remove("drag-into"));
+  div.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    div.classList.remove("drag-into");
+    if (dragFolder) return moveFolder(dragFolder, dir);
+    const note = state.notes[dragSrcIdx];
+    if (note && moveNotesTo([note], dir)) {
+      closedFolders.delete(dir);
+      saveFolders();
+      renderNoteList();
+    }
+  });
+  return div;
+}
+
+// Dropped on the list itself (not on a row): to the top level
+noteList.addEventListener("dragover", (e) => {
+  if (dragSrcIdx === null && !dragFolder) return;
+  e.preventDefault();
+});
+noteList.addEventListener("drop", (e) => {
+  if (e.target.closest(".note-item")) return;
+  e.preventDefault();
+  if (dragFolder) return moveFolder(dragFolder, "");
+  const note = state.notes[dragSrcIdx];
+  if (note) moveNotesTo([note], "");
+});
+
+// Renames notes, and rewrites the links to them and in them
+// (`moves`: note → new name). Returns false, changing nothing, on a clash.
+function applyMoves(moves, render = true) {
+  const taken = new Set(state.notes.filter((n) => !moves.has(n)).map((n) => n.name));
+  for (const name of moves.values())
+    if (taken.has(name)) {
+      showToast(name + " exists already", { error: true });
+      return false;
+    }
+  if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
+  const byOld = new Map([...moves].map(([n, name]) => [n.name, name]));
+  for (const n of moves.keys()) keepFolder(dirOf(n.name));
+  rewriteLinks(byOld);
+  const now = Date.now();
+  for (const [n, name] of moves) {
+    n.name = name;
+    n.updatedAt = now;
+  }
+  if (!render) return true;
+  saveState();
+  scheduleDriveUpload(true);
+  scheduleUrlUpdate();
+  renderNoteList();
+  updateTitle();
+  updateTitleBar();
+  updateMdTabBar();
+  return true;
+}
+
+function moveNotesTo(notes, dir) {
+  const moves = new Map();
+  for (const n of notes) if (dirOf(n.name) !== dir) moves.set(n, dir + baseOf(n.name));
+  return !moves.size || applyMoves(moves);
+}
+
+// "a/b/" into "x/" → "x/b/", with everything in it
+function moveFolder(dir, into) {
+  return renameFolder(dir, into + folderName(dir) + "/");
+}
+
+function renameFolder(dir, to) {
+  if (to === dir) return true;
+  if (to.startsWith(dir)) {
+    showToast("A folder can't go into itself", { error: true });
+    return false;
+  }
+  if (allFolders().has(to)) {
+    showToast("A folder called " + folderName(to) + " is there already", { error: true });
+    return false;
+  }
+  const moves = new Map(notesIn(dir).map((n) => [n, to + n.name.slice(dir.length)]));
+  if (moves.size && !applyMoves(moves)) return false;
+  const swap = (set) => {
+    for (const f of [...set])
+      if (f.startsWith(dir)) {
+        set.delete(f);
+        set.add(to + f.slice(dir.length));
+      }
+  };
+  swap(keptFolders);
+  swap(closedFolders);
+  keptFolders.add(to);
+  saveFolders();
+  renderNoteList();
+  return true;
+}
+
+function newFolder(parent = "") {
+  let n = 1;
+  const folders = allFolders();
+  while (folders.has(`${parent}folder${n}/`)) n++;
+  const dir = `${parent}folder${n}/`;
+  keepFolder(dir);
+  closedFolders.delete(parent);
+  saveFolders();
+  renderNoteList();
+  startFolderRename(dir);
+}
+
+function startFolderRename(dir) {
+  const item = noteList.querySelector(`.folder-item[data-folder="${CSS.escape(dir)}"]`);
+  if (!item) return;
+  const input = document.createElement("input");
+  input.className = "note-item-input";
+  input.spellcheck = false;
+  input.autocomplete = "off";
+  input.setAttribute("aria-label", "Folder name");
+  input.value = folderName(dir);
+  item.querySelector(".note-item-name").replaceWith(input);
+  item.draggable = false;
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = (commit) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim().replace(/\//g, "-");
+    if (commit && name && name !== folderName(dir)) renameFolder(dir, parentOf(dir) + name + "/");
+    renderNoteList();
+  };
+  input.onkeydown = (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") finish(true);
+    else if (e.key === "Escape") finish(false);
+  };
+  input.onblur = () => finish(true);
+}
+
+// One toast, one undo, for a folder and everything in it
+function deleteFolder(dir) {
+  const notes = notesIn(dir);
+  const kept = [...keptFolders].filter((f) => f.startsWith(dir));
+  kept.forEach((f) => keptFolders.delete(f));
+  saveFolders();
+  const used = notes.flatMap((n) => backlinks(n)).filter((n) => !n.name.startsWith(dir));
+  deleteNotes(notes, {
+    label:
+      `Deleted ${folderName(dir)}` +
+      (notes.length ? ` and ${notes.length} ${notes.length === 1 ? "note" : "notes"} in it` : "") +
+      (used.length ? ` — used in ${baseOf(used[0].name)}` : ""),
+    onUndo: () => {
+      kept.forEach((f) => keptFolders.add(f));
+      saveFolders();
+    },
+  });
+}
+
+function openFolderMenu(dir, anchor, at) {
+  const item = (ic, label, act, cls = "") =>
+    `<button class="menu-item ${cls}" role="menuitem" data-folder-act="${act}">${icon(ic)}<span class="label">${label}</span></button>`;
+  const sep = '<div class="menu-sep"></div>';
+  noteMenu.innerHTML =
+    `<div class="menu-title">${icon("folder", "kind folder")}<span>${escapeHtml(dir.slice(0, -1))}</span></div>` +
+    item("note", "New note", "new-md") +
+    item("file-draw", "New drawing", "new-draw") +
+    item("table", "New table", "new-csv") +
+    item("folder", "New folder", "new-folder") +
+    sep +
+    item("pencil", "Rename", "rename") +
+    item("search", "Search in folder", "search") +
+    item("archive", "Export as ZIP", "zip") +
+    sep +
+    item("trash", "Delete", "delete", "danger");
+  noteMenu.onclick = (e) => {
+    const b = e.target.closest("[data-folder-act]");
+    if (!b) return;
+    closeAllMenus();
+    const act = b.dataset.folderAct;
+    if (act.startsWith("new-") && act !== "new-folder") {
+      const ext = act.slice(4);
+      closedFolders.delete(dir);
+      saveFolders();
+      return createNote(nextNoteName(ext, dir), undefined, true, ext);
+    }
+    if (act === "new-folder") return newFolder(dir);
+    if (act === "rename") return startFolderRename(dir);
+    if (act === "search") return openSearch("folder:" + dir);
+    if (act === "zip") return downloadAll(notesIn(dir), folderName(dir) + ".zip", parentOf(dir));
+    if (act === "delete") return deleteFolder(dir);
+  };
+  openMenu(noteMenu, anchor, { at, focus: event?.detail === 0 });
+}
+
+// ── Links between notes: rewritten when notes move, listed as backlinks ──
+
+// Markdown links and embeds outside code fences: fn(href) → new href or null
+const LINK_RE = /(!?\[[^\]\n]*\]\()([^)\s]+)((?:\s+"[^"\n]*")?\))/g;
+function mapLinks(text, fn) {
+  let fence = null;
+  return text
+    .split("\n")
+    .map((line) => {
+      const f = line.match(/^\s*(`{3,}|~{3,})/);
+      if (f && (!fence || f[1][0] === fence[0])) {
+        fence = fence ? null : f[1];
+        return line;
+      }
+      if (fence) return line;
+      return line.replace(LINK_RE, (all, open, href, close) => {
+        if (/^([a-z][a-z0-9+.-]*:|#)/i.test(href)) return all;
+        const out = fn(href);
+        return out == null ? all : open + out + close;
+      });
+    })
+    .join("\n");
+}
+
+function rewriteLinks(byOld) {
+  // Unlocked encrypted notes are rewritten through their view, which re-encrypts
+  for (const n of state.notes.filter((n) => !isLocked(n)).map(viewOf)) {
+    if (!isMarkdownFile(n.name)) continue;
+    const to = byOld.get(n.name) ?? n.name;
+    const text = mapLinks(n.content, (href) => {
+      const [path, hash] = href.split(/(?=#)/);
+      const target = findByRef(n.name, path);
+      if (!target) return null;
+      const newTarget = byOld.get(target.name) ?? target.name;
+      if (newTarget === target.name && to === n.name) return null;
+      return relRef(dirOf(to), newTarget) + (hash || "");
+    });
+    if (text === n.content) continue;
+    pushHistory(n.id, n.content);
+    n.content = text;
+    n.updatedAt = Date.now();
+    if (n.id === state.activeId) {
+      editor.value = text;
+      refreshEditor();
+    }
+  }
+}
+
+// Markdown notes that link to or embed `note`
+function backlinks(note) {
+  return state.notes.filter((n) => {
+    if (n === note || isLocked(n) || !isMarkdownFile(n.name)) return false;
+    let hit = false;
+    mapLinks(viewOf(n).content, (href) => {
+      if (!hit && findByRef(n.name, href.split("#")[0]) === note) hit = true;
+      return null;
+    });
+    return hit;
   });
 }
 
@@ -3209,11 +3643,9 @@ function hydrateDrawEmbeds() {
     .then(() => {
       for (const el of embeds) {
         if (!el.isConnected) continue;
-        const ref = el.dataset.ref;
-        const note = ref
-          ? state.notes.find((n) => n.name === ref) ||
-            state.notes.find((n) => n.name.toLowerCase() === ref.toLowerCase())
-          : null;
+        // Resolved by renderMarkdown: "/" + the name
+        const ref = el.dataset.ref?.slice(1);
+        const note = ref ? findByRef("", "/" + ref) : null;
         if (ref && !note) {
           el.textContent = "drawing not found: " + ref;
           el.classList.add("missing");
@@ -3560,7 +3992,8 @@ function formatMarkdown(text) {
 // Strategy: escape ALL HTML first (so no raw tags survive),
 // then parse markdown syntax on the escaped text,
 // then selectively re-enable <details> and <summary> only.
-function renderMarkdown(src) {
+// `base`: the note being shown, which relative links and embeds start from
+function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name || "") {
   let taskIdx = 0;
   // Step 1: escape everything to prevent XSS
   let text = src
@@ -3919,16 +4352,14 @@ function renderMarkdown(src) {
   // Embedded tables — ![alt](name.csv), with the note's own header setting
   text = text.replace(/!\[([^\]]*)\]\(([^)\s]+\.(?:csv|tsv))\)/gi, (_, alt, name) => {
     const ref = name.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-    const note =
-      state.notes.find((n) => n.name === ref) ||
-      state.notes.find((n) => n.name.toLowerCase() === ref.toLowerCase());
+    const note = findByRef(base, ref);
     codeBlocks.push(
       !note
         ? `<span class="csv-missing missing">table not found: ${name}</span>`
         : isLocked(note)
           ? `<span class="csv-missing missing">encrypted: ${name}</span>`
           : `<figure class="csv-embed">${csvTableHtml(viewOf(note).content, csvSep(note.name), note.csvHeader !== false)}` +
-            `<figcaption><a href="${name}">${alt || name}</a></figcaption></figure>`,
+            `<figcaption><a href="/${escapeHtml(note.name)}">${alt || name}</a></figcaption></figure>`,
     );
     return "\x00CB" + (codeBlocks.length - 1) + "\x00";
   });
@@ -3936,8 +4367,10 @@ function renderMarkdown(src) {
   // Embedded drawings — ![alt](name.draw); held aside so emphasis
   // rules can't reach into the file name
   text = text.replace(/!\[([^\]]*)\]\(([^)\s]+\.draw)\)/gi, (_, alt, name) => {
+    const ref = name.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const path = "/" + resolveRef(base, ref);
     codeBlocks.push(
-      `<span class="draw-embed" data-ref="${name}" role="img" aria-label="${alt || name}"></span>`,
+      `<span class="draw-embed" data-ref="${escapeHtml(path)}" role="img" aria-label="${alt || name}"></span>`,
     );
     return "\x00CB" + (codeBlocks.length - 1) + "\x00";
   });
@@ -4796,10 +5229,8 @@ mdPreview.addEventListener("click", (e) => {
     );
     return;
   }
-  // Try to find a note matching the link
-  const target =
-    state.notes.find((n) => n.name === clean) ||
-    state.notes.find((n) => n.name.toLowerCase() === clean.toLowerCase());
+  // Links are relative to the note they're in
+  const target = findByRef((zenEphemeralNote || getActiveNote())?.name || "", clean.split("#")[0]);
   if (target) {
     e.preventDefault();
     // Push current state before navigating
@@ -4890,8 +5321,8 @@ window.addEventListener("popstate", async (e) => {
 //  Notes CRUD
 // ═══════════════════════════════════════════════════
 
-function nextNoteName(ext = "md") {
-  const base = ext === "draw" ? "drawing" : ext === "csv" ? "table" : "note";
+function nextNoteName(ext = "md", dir = "") {
+  const base = dir + (ext === "draw" ? "drawing" : ext === "csv" ? "table" : "note");
   let num = 1;
   while (state.notes.some((n) => n.name === `${base}${num}.${ext}`)) num++;
   return `${base}${num}.${ext}`;
@@ -4900,8 +5331,9 @@ function nextNoteName(ext = "md") {
 // "name.md" → "name1.md", "name2.md", … (first free)
 function uniqueName(name) {
   const dot = name.lastIndexOf(".");
-  const base = dot > 0 ? name.slice(0, dot) : name;
-  const ext = dot > 0 ? name.slice(dot) : "";
+  const hasExt = dot > dirOf(name).length;
+  const base = hasExt ? name.slice(0, dot) : name;
+  const ext = hasExt ? name.slice(dot) : "";
   let num = 1;
   while (state.notes.some((n) => n.name === `${base}${num}${ext}`)) num++;
   return `${base}${num}${ext}`;
@@ -4943,20 +5375,35 @@ async function createNote(name, content, focusName, ext, fields) {
 
 // Immediate everywhere, undoable from the toast (or ⌘Z while it shows)
 function deleteNote(id) {
-  const idx = state.notes.findIndex((n) => n.id === id);
-  if (idx === -1) return;
-  const note = state.notes[idx];
-  const wasActive = state.activeId === id;
-  if (wasActive && vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
-  const undoStack = histories[id];
-  deleteSwap(id);
-  delete histories[id];
-  state.deletedIds.push(id);
-  state.deletedAt[id] = Date.now();
-  state.notes.splice(idx, 1);
+  const note = state.notes.find((n) => n.id === id);
+  if (!note) return;
+  keepFolder(dirOf(note.name));
+  const used = backlinks(note);
+  deleteNotes([note], {
+    label: "Deleted " + baseOf(note.name) + (used.length ? " — used in " + baseOf(used[0].name) : ""),
+  });
+}
+
+function deleteNotes(notes, { label, onUndo }) {
+  const active = getActiveNote();
+  if (notes.includes(state.notes.find((n) => n.id === active?.id)) && vimState.enabled && vimState.bufferDirty)
+    vimWriteBuffer();
+  const gone = notes
+    .map((note) => ({ note, idx: state.notes.indexOf(note), undo: histories[note.id] }))
+    .filter((g) => g.idx >= 0)
+    .sort((a, b) => a.idx - b.idx);
+  const wasActive = gone.find((g) => g.note.id === state.activeId);
+  const now = Date.now();
+  for (const { note } of gone) {
+    deleteSwap(note.id);
+    delete histories[note.id];
+    state.deletedIds.push(note.id);
+    state.deletedAt[note.id] = now;
+  }
+  state.notes = state.notes.filter((n) => !notes.includes(n));
   if (wasActive) {
     state.activeId = state.notes.length
-      ? state.notes[Math.min(idx, state.notes.length - 1)].id
+      ? state.notes[Math.min(wasActive.idx, state.notes.length - 1)].id
       : null;
     vimState.bufferDirty = false;
   }
@@ -4964,15 +5411,18 @@ function deleteNote(id) {
   scheduleDriveUpload(true);
   render();
   updateUrl();
-  showToast("Deleted " + note.name, {
+  showToast(label, {
     action: "Undo",
     undo: true,
-    // Back under a new id: other tabs and Drive already hold the tombstone
+    // Back under new ids: other tabs and Drive already hold the tombstones
     onAction: () => {
-      const back = { ...note, id: crypto.randomUUID() };
-      if (undoStack) histories[back.id] = undoStack;
-      state.notes.splice(Math.min(idx, state.notes.length), 0, back);
-      if (wasActive) state.activeId = back.id;
+      for (const { note, idx, undo } of gone) {
+        const back = { ...note, id: crypto.randomUUID() };
+        if (undo) histories[back.id] = undo;
+        state.notes.splice(Math.min(idx, state.notes.length), 0, back);
+        if (note === wasActive?.note) state.activeId = back.id;
+      }
+      onUndo?.();
       saveState();
       scheduleDriveUpload(true);
       render();
@@ -4999,7 +5449,7 @@ function switchNote(id) {
   if (mdViewActive) {
     const fromMd = isMarkdownFile(getActiveNote()?.name);
     if (targetNote && isMarkdownFile(targetNote.name) && fromMd) {
-      setPreviewHtml(renderMarkdown(viewOf(targetNote).content));
+      setPreviewHtml(renderMarkdown(viewOf(targetNote).content, targetNote.name));
     } else if (!opensInView(targetNote?.name)) {
       switchMdTab("edit");
     }
@@ -5088,18 +5538,23 @@ let searchScope = "all";
 const searchScopeEl = document.getElementById("searchScope");
 const NOTE_RESULTS_MAX = 200;
 
+// "all", "note", or "folder:projects/q3/"
 function setSearchScope(scope) {
-  searchScope = scope === "note" && getActiveNote() ? "note" : "all";
+  searchScope = scope === "note" && getActiveNote() ? "note" : scope.startsWith("folder:") ? scope : "all";
   const note = searchScope === "note" ? getActiveNote() : null;
-  searchScopeEl.hidden = !note;
+  const folder = searchScope.startsWith("folder:") ? searchScope.slice(7) : null;
+  searchScopeEl.hidden = !note && !folder;
   if (note)
     searchScopeEl.innerHTML =
       icon(noteKind(note.name).icon, "sm") + nameHtml(note.name);
+  if (folder) searchScopeEl.innerHTML = icon("folder", "sm") + escapeHtml(folder);
   searchInput.placeholder = note
     ? "Search this note"
-    : "Search notes, or > for commands";
+    : folder
+      ? "Search in " + folderName(folder)
+      : "Search notes, or > for commands";
   searchInput.setAttribute("aria-label", searchInput.placeholder);
-  document.getElementById("searchHint").textContent = note
+  document.getElementById("searchHint").textContent = note || folder
     ? "Tab: all notes"
     : "Tab: this note";
   searchNotes(searchInput.value);
@@ -5212,7 +5667,9 @@ function searchNotes(query) {
   if (searchScope === "note") return searchActiveNote(query);
   const results = [];
   let contentOnly = 0;
+  const within = searchScope.startsWith("folder:") ? searchScope.slice(7) : "";
   for (const note of state.notes) {
+    if (!note.name.startsWith(within)) continue;
     const exactName = exactMatch(note.name, query);
     const nameMatch = exactName || fuzzyMatch(note.name, query);
     // Enough content hits: keep looking for name matches only
@@ -5504,6 +5961,7 @@ function paletteCommands() {
     ["file-draw", "New drawing", "", () =>
       createNote(undefined, undefined, true, "draw")],
     ["table", "New table", "", () => createNote(undefined, undefined, true, "csv")],
+    ["folder", "New folder", "", () => newFolder(note ? dirOf(note.name) : "")],
     vaultSupport && ["lock", "New encrypted file", "", createEncryptedNote],
     ["import", "Import files…", "", openImport],
     ["archive", "Export all as ZIP", "", downloadAll],
@@ -5600,7 +6058,7 @@ searchInput.addEventListener("keydown", (e) => {
     setSearchScope(searchScope === "all" ? "note" : "all");
     return;
   }
-  if (e.key === "Backspace" && !searchInput.value && searchScope === "note") {
+  if (e.key === "Backspace" && !searchInput.value && searchScope !== "all") {
     e.preventDefault();
     setSearchScope("all");
     return;
@@ -8388,6 +8846,7 @@ function openNoteMenu(note, anchor, at) {
           "wrap",
         )
       : "") +
+    usedInHtml(note) +
     (sharedNote && active
       ? ""
       : sep + item("trash", "Delete", "delete", "⌘⇧D", "danger"));
@@ -8395,6 +8854,7 @@ function openNoteMenu(note, anchor, at) {
     const b = e.target.closest("[data-note-act]");
     if (!b) return;
     closeAllMenus();
+    if (b.dataset.noteAct.startsWith("open:")) return switchNote(b.dataset.noteAct.slice(5));
     runNoteAction(note, b.dataset.noteAct, anchor);
   };
   openMenu(noteMenu, anchor, {
@@ -8402,6 +8862,23 @@ function openNoteMenu(note, anchor, at) {
     alignRight: anchor === btnNoteMenu,
     focus: event?.detail === 0,
   });
+}
+
+// "Used in": the notes linking to or embedding this one
+function usedInHtml(note) {
+  const used = backlinks(note);
+  if (!used.length) return "";
+  return (
+    '<div class="menu-sep"></div><div class="menu-label">Used in</div>' +
+    used
+      .slice(0, 6)
+      .map(
+        (n) =>
+          `<button class="menu-item" role="menuitem" data-note-act="open:${n.id}">${icon(noteKind(n.name).icon, "kind " + noteKind(n.name).cls)}<span class="label">${nameHtml(n.name)}</span></button>`,
+      )
+      .join("") +
+    (used.length > 6 ? `<div class="menu-label">and ${used.length - 6} more</div>` : "")
+  );
 }
 
 function toggleNoteMenu() {
@@ -9019,6 +9496,7 @@ function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
+  filename = baseOf(filename);
   a.download = filename;
   document.body.appendChild(a);
   a.click();
@@ -9065,7 +9543,7 @@ async function drawDownloadSvg(note = getActiveNote()) {
 // CSP inside the file keeps it inert wherever it is opened.
 async function noteHtml(note) {
   const doc = document.createElement("div");
-  doc.innerHTML = renderMarkdown(note.content);
+  doc.innerHTML = renderMarkdown(note.content, note.name);
   const embeds = doc.querySelectorAll(".draw-embed");
   // Fonts go in as data URLs: code is in Victor Mono, drawings use their own
   const fonts = new Set(doc.querySelector("code, pre") ? ["mono"] : []);
@@ -9075,8 +9553,7 @@ async function noteHtml(note) {
       await loadDraw();
       await Draw.fontsReady();
       for (const el of embeds) {
-        const ref =
-          el.dataset.ref && state.notes.find((n) => n.name === el.dataset.ref);
+        const ref = el.dataset.ref && findByRef("", el.dataset.ref);
         if ((el.dataset.ref && !ref) || isLocked(ref)) continue;
         const content = ref ? viewOf(ref).content : el.dataset.draw;
         el.replaceChildren(Draw.renderStatic(content));
@@ -9169,24 +9646,27 @@ async function zenDownload() {
   downloadNote();
 }
 
-async function downloadAll() {
-  if (!state.notes.length) return;
-  const files = state.notes.map((n) => ({
-    name: n.name,
+// Everything, or a folder's notes: `strip` is cut from the names, so a
+// folder's zip holds that folder
+async function downloadAll(notes = state.notes, zipName = "notes.zip", strip = "") {
+  if (!notes.length) return;
+  const rel = (name) => name.slice(strip.length);
+  const files = notes.map((n) => ({
+    name: rel(n.name),
     content: n.content,
   }));
   // Drawings also go in as images, readable without the app
   const renders = [];
-  const drawings = state.notes.filter(
+  const drawings = notes.filter(
     (n) => isDrawFile(n.name) && n.content && !n.enc,
   );
   if (drawings.length) {
     try {
       await loadDraw();
       for (const n of drawings) {
-        // The importer flattens folders, so renders sit next to the notes
-        const name = n.name + ".svg";
-        if (state.notes.some((o) => o.name === name)) continue;
+        // Next to the drawing, in its folder
+        const name = rel(n.name) + ".svg";
+        if (state.notes.some((o) => o.name === strip + name)) continue;
         if (renders.includes(name)) continue;
         renders.push(name);
         files.push({ name, content: await Draw.svgString(n.content) });
@@ -9194,9 +9674,9 @@ async function downloadAll() {
     } catch {}
   }
   const directory = {
-    notes: state.notes.map((n) => ({
+    notes: notes.map((n) => ({
       id: n.id,
-      name: n.name,
+      name: rel(n.name),
       updatedAt: n.updatedAt,
       ...(n.enc && { enc: n.enc }),
     })),
@@ -9207,7 +9687,7 @@ async function downloadAll() {
     content: JSON.stringify(directory, null, 2),
   });
   const zip = await buildZip(files);
-  triggerDownload(new Blob([zip], { type: "application/zip" }), "notes.zip");
+  triggerDownload(new Blob([zip], { type: "application/zip" }), zipName);
 }
 
 // Share link for a note, built from its content (never from location,
@@ -9217,7 +9697,7 @@ async function shareLink(note, mode = "edit") {
   const view = mode === "zen" ? "zen" : viewQuery() === "zen" ? "" : viewQuery();
   const query = view ? "?view=" + view : "";
   const hashMap = new Map([
-    ["name", note.name],
+    ["name", baseOf(note.name)],
     ["note", await compress(note.content)],
     ["ts", String(note.updatedAt || Date.now())],
   ]);
@@ -10678,7 +11158,7 @@ function loadSyncBase() {
 function conflictName(name) {
   const dot = name.lastIndexOf(".");
   const copy =
-    dot > 0
+    dot > dirOf(name).length
       ? name.slice(0, dot) + " (conflict)" + name.slice(dot)
       : name + " (conflict)";
   return state.notes.some((n) => n.name === copy) ? uniqueName(copy) : copy;
@@ -11444,6 +11924,7 @@ const clickActions = {
   "new-drawing": () => createNote(undefined, undefined, false, "draw"),
   "new-drawing-rename": () => createNote(undefined, undefined, true, "draw"),
   "new-table-rename": () => createNote(undefined, undefined, true, "csv"),
+  "new-folder": () => newFolder(),
   "new-encrypted": createEncryptedNote,
   "unlock-note": () => unlockNote(state.activeId).then((ok) => ok && render()),
   "recover-note": () => recoverNote(state.activeId).then((ok) => ok && render()),

@@ -263,7 +263,7 @@ test("drawings embed in markdown, inline and by name", async ({ page }) => {
   });
   await expect(page.locator("#mdPreview .draw-embed svg")).toHaveCount(2);
   await expect(page.locator("#mdPreview .draw-embed.missing")).toHaveText("drawing not found: missing.draw");
-  await page.locator('#mdPreview .draw-embed[data-ref="my_arch.draw"]').click();
+  await page.locator('#mdPreview .draw-embed[data-ref="/my_arch.draw"]').click();
   await page.waitForFunction(() => Draw.isMounted());
   expect(await page.evaluate(() => getActiveNote().name)).toBe("my_arch.draw");
 });
