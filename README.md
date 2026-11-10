@@ -8,7 +8,7 @@ on any server. No signup, no database, no dependencies, no BS.
 Just open the page and start typing.
 
 Built as `index.html` + `app.js` (+ `draw.js` for
-drawings, `grid.js` for tables) with vanilla JS and CSS (~12k lines). Your notes are stored in your
+drawings, `grid.js` for tables, `chart.js` for charts) with vanilla JS and CSS (~12k lines). Your notes are stored in your
 browser (IndexedDB) by default. Optionally, sign in with Google to sync notes
 across devices via Google Drive.
 
@@ -82,6 +82,12 @@ across devices via Google Drive.
 - Current line highlighting
 - Edit | Preview for `.md` files, Canvas | Source for drawings,
   Table | Source for `.csv`/`.tsv` (see [docs/csv-format.md](docs/csv-format.md)), and zen
+- Charts (`.chart`): bar, column, line, area, pie, donut, stacked bar and
+  column from a table note or inline rows; Chart | Source with a settings
+  panel, **Add chart** in a table, `![](x.chart)` and ` ```chart ` blocks in
+  markdown (see [docs/chart-format.md](docs/chart-format.md))
+- Inline ` ```draw `, ` ```csv ` and ` ```chart ` blocks have an **Edit**
+  button in the preview: the full editor in a full-window overlay
 - Inter-note linking (`[label](other.md)`) with browser
   back/forward navigation between notes
 - Heading anchors in preview (hover to reveal `#` link,

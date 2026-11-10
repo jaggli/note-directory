@@ -1806,6 +1806,7 @@ function undo() {
   refreshEditor();
   if (drawActive()) window.Draw?.update(note.content);
   if (gridActive()) window.Grid?.update(note.content);
+  if (chartActive()) window.Chart?.update(note.content);
 }
 
 function redo() {
@@ -1838,6 +1839,7 @@ function redo() {
   refreshEditor();
   if (drawActive()) window.Draw?.update(note.content);
   if (gridActive()) window.Grid?.update(note.content);
+  if (chartActive()) window.Chart?.update(note.content);
 }
 
 // ═══════════════════════════════════════════════════
@@ -2150,10 +2152,18 @@ const drawRules = [
   [/-?\b\d+\b/g, "hl-num"],
 ];
 
+const chartRules = [
+  [/^[ \t]*#[^\n]*/gm, "hl-cmt"],
+  [/"(?:[^"\\\n]|\\.)*"/g, "hl-str"],
+  [/^[ \t]*(?:chart|type|data|x|y|title|colors|stroke|background|border|legend|labels|grid|ymin|ymax|xlabel|ylabel)\b/gm, "hl-kw"],
+  [/-?\b\d+(?:\.\d+)?\b/g, "hl-num"],
+];
+
 // --- Extension → rules mapping ---
 
 const langRules = {
   draw: drawRules,
+  chart: chartRules,
   js: jsRules,
   jsx: jsRules,
   ts: jsRules,
@@ -2658,6 +2668,7 @@ function icon(id, cls = "") {
 function noteKind(name) {
   if (isDrawFile(name)) return { cls: "draw", icon: "file-draw" };
   if (isCsvFile(name)) return { cls: "table", icon: "table" };
+  if (isChartFile(name)) return { cls: "chart", icon: "chart" };
   if (isMarkdownFile(name)) return { cls: "md", icon: "note" };
   const ext = getExtension(name);
   if (!ext || ext === "txt" || ext === "text" || ext === "log")
@@ -3212,6 +3223,7 @@ function openFolderMenu(dir, anchor, at) {
     item("note", "New note", "new-md") +
     item("file-draw", "New drawing", "new-draw") +
     item("table", "New table", "new-csv") +
+    item("chart", "New chart", "new-chart") +
     item("folder", "New folder", "new-folder") +
     sep +
     (dir
@@ -3235,7 +3247,7 @@ function openFolderMenu(dir, anchor, at) {
       const ext = act.slice(4);
       closedFolders.delete(dir);
       saveFolders();
-      return createNote(nextNoteName(ext, dir), undefined, true, ext);
+      return createNote(nextNoteName(ext, dir), ext === "chart" ? NEW_CHART : undefined, true, ext);
     }
     if (act === "new-folder") return newFolder(dir);
     if (act === "rename") return startFolderRename(dir);
@@ -3315,21 +3327,31 @@ function copyMdLink(note) {
 
 // ── Links between notes: rewritten when notes move, listed as backlinks ──
 
-// Markdown links and embeds outside code fences: fn(href) → new href or null
+// Markdown links and embeds outside code fences, and charts' `data` lines
+// (a .chart note, `chart` true, or ```chart blocks): fn(href) → new href or null
 const LINK_RE = /(!?\[[^\]\n]*\]\()([^)\s]+)((?:\s+"[^"\n]*")?\))/g;
-function mapLinks(text, fn) {
+const EXTERNAL_RE = /^([a-z][a-z0-9+.-]*:|#)/i;
+function mapLinks(text, fn, chart = false) {
   let fence = null;
+  let lang = "";
   return text
     .split("\n")
     .map((line) => {
-      const f = line.match(/^\s*(`{3,}|~{3,})/);
-      if (f && (!fence || f[1][0] === fence[0])) {
+      const f = line.match(/^\s*(`{3,}|~{3,})(\S*)/);
+      if (f && !chart && (!fence || f[1][0] === fence[0])) {
         fence = fence ? null : f[1];
+        lang = fence ? f[2] : "";
         return line;
       }
+      if (fence ? lang === "chart" : chart)
+        return line.replace(/^(\s*data\s+)(\S+)(\s*)$/, (all, a, href, z) => {
+          if (EXTERNAL_RE.test(href)) return all;
+          const out = fn(href);
+          return out == null ? all : a + out + z;
+        });
       if (fence) return line;
       return line.replace(LINK_RE, (all, open, href, close) => {
-        if (/^([a-z][a-z0-9+.-]*:|#)/i.test(href)) return all;
+        if (EXTERNAL_RE.test(href)) return all;
         const out = fn(href);
         return out == null ? all : open + out + close;
       });
@@ -3337,10 +3359,13 @@ function mapLinks(text, fn) {
     .join("\n");
 }
 
+// Notes whose links follow moves: markdown and charts
+const hasLinks = (name) => isMarkdownFile(name) || isChartFile(name);
+
 function rewriteLinks(byOld) {
   // Unlocked encrypted notes are rewritten through their view, which re-encrypts
   for (const n of state.notes.filter((n) => !isLocked(n)).map(viewOf)) {
-    if (!isMarkdownFile(n.name)) continue;
+    if (!hasLinks(n.name)) continue;
     const to = byOld.get(n.name) ?? n.name;
     const text = mapLinks(n.content, (href) => {
       const [path, hash] = href.split(/(?=#)/);
@@ -3349,7 +3374,7 @@ function rewriteLinks(byOld) {
       const newTarget = byOld.get(target.name) ?? target.name;
       if (newTarget === target.name && to === n.name) return null;
       return relRef(dirOf(to), newTarget) + (hash || "");
-    });
+    }, isChartFile(n.name));
     if (text === n.content) continue;
     pushHistory(n.id, n.content);
     n.content = text;
@@ -3364,12 +3389,12 @@ function rewriteLinks(byOld) {
 // Markdown notes that link to or embed `note`
 function backlinks(note) {
   return state.notes.filter((n) => {
-    if (n === note || isLocked(n) || !isMarkdownFile(n.name)) return false;
+    if (n === note || isLocked(n) || !hasLinks(n.name)) return false;
     let hit = false;
     mapLinks(viewOf(n).content, (href) => {
       if (!hit && findByRef(n.name, href.split("#")[0]) === note) hit = true;
       return null;
-    });
+    }, isChartFile(n.name));
     return hit;
   });
 }
@@ -3428,6 +3453,8 @@ function render() {
     window.Draw?.update(note.content);
   } else if (gridActive()) {
     window.Grid?.update(note.content);
+  } else if (chartActive()) {
+    window.Chart?.update(note.content);
   }
 }
 
@@ -3458,12 +3485,12 @@ function isDrawFile(name) {
 
 // Notes with a second tab: markdown preview, drawing canvas or table grid
 function hasViewTab(name) {
-  return isMarkdownFile(name) || isDrawFile(name) || isCsvFile(name);
+  return isMarkdownFile(name) || opensInView(name);
 }
 
 // The second tab is an editor (canvas or grid), and notes open on it
 function opensInView(name) {
-  return isDrawFile(name) || isCsvFile(name);
+  return isDrawFile(name) || isCsvFile(name) || isChartFile(name);
 }
 
 // The canvas is showing an editable drawing
@@ -3659,6 +3686,7 @@ function showGrid(note, readonly) {
           drawCommit(note, content);
           if (findReplaceBar.classList.contains("visible")) updateFindMatches(false);
         },
+        onChart: readonly || !note.id ? null : (c1, c2) => addChart(note, c1, c2),
         onHeader: (on) => {
           const n = state.notes.find((x) => x.id === note.id);
           if (!n) return;
@@ -3710,7 +3738,106 @@ function drawCommit(target, content) {
   scheduleUrlUpdate();
 }
 
-// ── Inline blocks (```draw, ```csv, ```tsv) edited in a full-window overlay ──
+// ═══════════════════════════════════════════════════
+//  Charts (.chart — chart.js lays them out as drawings, draw.js renders)
+// ═══════════════════════════════════════════════════
+
+function isChartFile(name) {
+  return !!name && getExtension(name) === "chart";
+}
+
+const chartHost = document.getElementById("chartHost");
+let chartLoading = null;
+function loadChart() {
+  return (chartLoading ??= loadDraw().then(
+    () =>
+      new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "chart.js";
+        s.onload = resolve;
+        s.onerror = () => {
+          chartLoading = null;
+          reject(new Error("chart.js failed to load"));
+        };
+        document.head.appendChild(s);
+      }),
+  ));
+}
+
+function chartActive() {
+  return mdViewActive && !zenModeActive && isChartFile(getActiveNote()?.name);
+}
+
+// A chart's `data` ref, resolved from `from` (the chart's or markdown note's name)
+function chartData(from) {
+  return (ref) => {
+    const n = findByRef(from, ref);
+    if (!n) return { error: "table not found: " + ref };
+    if (isLocked(n)) return { error: "encrypted: " + ref };
+    if (!isCsvFile(n.name)) return { error: ref + " is not a table" };
+    return { text: viewOf(n).content, sep: csvSep(n.name), header: n.csvHeader !== false };
+  };
+}
+
+// Table notes a chart at `from` can use, as relative refs
+function chartTables(from) {
+  return state.notes
+    .filter((n) => isCsvFile(n.name) && !isLocked(n))
+    .map((n) => ({ ref: relRef(dirOf(from), n.name), label: n.name }));
+}
+
+function chartOpts(from, content, readonly) {
+  return { content, readonly, data: chartData(from), tables: () => chartTables(from) };
+}
+
+let chartMountSeq = 0;
+function showChart(note, readonly) {
+  chartHost.classList.add("visible");
+  const seq = ++chartMountSeq;
+  loadChart()
+    .then(() => Draw.fontsReady())
+    .then(() => {
+      if (seq !== chartMountSeq) return;
+      Chart.mount(chartHost, {
+        ...chartOpts(note.name, note.content, readonly),
+        onCommit: (content) => drawCommit(note, content),
+      });
+    })
+    .catch(() => showToast("Couldn't load the chart", { error: true }));
+}
+
+function hideChart() {
+  if (blockEdit?.host === chartHost) return;
+  chartMountSeq++;
+  chartHost.classList.remove("visible");
+  if (window.Chart) Chart.unmount();
+}
+
+// The drawing a chart or drawing note shows (for embeds, PNG, SVG)
+async function drawTextOf(note) {
+  if (!isChartFile(note.name)) return note.content;
+  await loadChart();
+  return Chart.compile(note.content, chartData(note.name)).draw;
+}
+
+// From a table: a chart next to it on the selected columns (one column: all)
+async function addChart(table, c1, c2) {
+  const real = viewOf(realNote(table.id));
+  if (!real) return;
+  await loadChart();
+  const names = Chart.table(real.content, csvSep(real.name), real.csvHeader !== false).cols;
+  let text = `chart 1\ndata ${relRef(dirOf(real.name), real.name)}\n`;
+  // The first column is the categories
+  if (c2 > c1) text += "y " + names.slice(Math.max(c1, 1), c2 + 1).map(quoteChart).join(" ") + "\n";
+  let name = real.name.replace(/\.[^./]+$/, "") + ".chart";
+  if (state.notes.some((n) => n.name === name)) name = uniqueName(name);
+  return createNote(name, text);
+}
+const quoteChart = (v) => (/^[^\s"\\]+$/.test(v) ? v : '"' + v.replace(/[\\"]/g, "\\$&") + '"');
+
+const NEW_CHART = "chart 1\ntype column\ndata\nmonth,visits\nJan,120\nFeb,150\nMar,90\nApr,180\n";
+
+// ── Inline blocks (```draw, ```csv, ```tsv, ```chart) edited in a full-window overlay ──
 // Edits go straight into the note; the whole session is one undo step there.
 let blockEdit = null;
 const blockOverlay = document.getElementById("blockOverlay");
@@ -3726,7 +3853,8 @@ async function openBlockEditor(wrap) {
   const fence = lines[open]?.match(BLOCK_FENCE);
   if (!fence || fence[2] !== lang) return;
   const draw = lang === "draw";
-  const host = draw ? drawHost : gridHost;
+  const chart = lang === "chart";
+  const host = draw ? drawHost : chart ? chartHost : gridHost;
   const b = (blockEdit = {
     id: note.id, open, close, lang, host,
     noHeader: !!fence[3],
@@ -3735,7 +3863,7 @@ async function openBlockEditor(wrap) {
     home: [host.parentNode, host.nextSibling],
   });
   blockOverlay.querySelector(".block-title").innerHTML =
-    (draw ? "Drawing" : "Table") + ` <span class="dir">in ${escapeHtml(baseOf(note.name))}</span>`;
+    (draw ? "Drawing" : chart ? "Chart" : "Table") + ` <span class="dir">in ${escapeHtml(baseOf(note.name))}</span>`;
   blockOverlay.insertBefore(host, blockOverlay.querySelector(".block-bar").nextSibling);
   host.classList.add("visible");
   blockOverlay.classList.add("visible");
@@ -3757,6 +3885,9 @@ async function openBlockEditor(wrap) {
     if (draw) {
       await loadDraw();
       if (blockEdit === b) Draw.mount(host, opts);
+    } else if (chart) {
+      await loadChart();
+      if (blockEdit === b) Chart.mount(host, { ...chartOpts(note.name, b.cur), ...opts });
     } else {
       await loadGrid();
       if (blockEdit === b)
@@ -3776,13 +3907,15 @@ async function openBlockEditor(wrap) {
   }
 }
 
+const blockEditorOf = (b) => (b.lang === "draw" ? window.Draw : b.lang === "chart" ? window.Chart : window.Grid);
+
 function blockStep(from, to) {
   const b = blockEdit;
   if (!b || !from.length) return;
   to.push(b.cur);
   b.cur = from.pop();
   writeBlock();
-  (b.lang === "draw" ? Draw : Grid).update(b.cur);
+  blockEditorOf(b).update(b.cur);
 }
 
 // The block's lines replaced in the note; its fence line keeps its backticks
@@ -3815,7 +3948,7 @@ function closeBlockEditor() {
   const b = blockEdit;
   if (!b) return;
   // Unmounting commits a cell or text being edited
-  const ed = b.lang === "draw" ? window.Draw : window.Grid;
+  const ed = blockEditorOf(b);
   if (ed?.isMounted()) ed.unmount();
   blockEdit = null;
   b.host.classList.remove("visible");
@@ -3861,31 +3994,38 @@ function drawSearchLines(content) {
 function hydrateDrawEmbeds() {
   const embeds = mdPreview.querySelectorAll(".draw-embed");
   if (!embeds.length) return;
-  loadDraw()
+  const base = getActiveNote()?.name || "";
+  const charts = [...embeds].some((el) => el.dataset.chart != null || /\.chart$/i.test(el.dataset.ref || ""));
+  (charts ? loadChart() : loadDraw())
     .then(() => Draw.fontsReady())
     .then(() => {
       for (const el of embeds) {
         if (!el.isConnected) continue;
-        // Resolved by renderMarkdown: "/" + the name
-        const ref = el.dataset.ref?.slice(1);
-        const note = ref ? findByRef("", "/" + ref) : null;
-        if (ref && !note) {
-          el.textContent = "drawing not found: " + ref;
-          el.classList.add("missing");
-          continue;
-        }
-        if (isLocked(note)) {
-          el.textContent = "encrypted: " + ref;
-          el.classList.add("missing");
-          continue;
-        }
-        el.replaceChildren(
-          Draw.renderStatic(note ? viewOf(note).content : el.dataset.draw),
-        );
-        if (note) el.title = "open " + note.name;
+        const content = embedDrawText(el, base);
+        if (content == null) continue;
+        el.replaceChildren(Draw.renderStatic(content));
+        if (el.dataset.ref) el.title = "open " + el.dataset.ref.slice(1);
       }
     })
     .catch(() => {});
+}
+
+// The drawing an embed shows, or null after writing why it can't
+function embedDrawText(el, base) {
+  // Resolved by renderMarkdown: "/" + the name
+  const ref = el.dataset.ref?.slice(1);
+  const note = ref ? findByRef("", "/" + ref) : null;
+  const fail = (msg) => {
+    el.textContent = msg;
+    el.classList.add("missing");
+    return null;
+  };
+  if (ref && !note) return fail((/\.chart$/i.test(ref) ? "chart" : "drawing") + " not found: " + ref);
+  if (isLocked(note)) return fail("encrypted: " + ref);
+  if (note && isChartFile(note.name))
+    return Chart.compile(viewOf(note).content, chartData(note.name)).draw;
+  if (el.dataset.chart != null) return Chart.compile(el.dataset.chart, chartData(base)).draw;
+  return note ? viewOf(note).content : el.dataset.draw;
 }
 
 // Query params whose only job is to follow the click
@@ -3958,8 +4098,19 @@ function viewQuery() {
   if (zenModeActive) return "zen";
   if (!mdViewActive) return "";
   const name = getActiveNote()?.name;
-  return isDrawFile(name) ? "draw" : isCsvFile(name) ? "grid" : "md";
+  return viewKind(name);
 }
+
+// Which second tab a file has: "draw", "grid", "chart" or "md"
+function viewKind(name) {
+  return isDrawFile(name) ? "draw" : isCsvFile(name) ? "grid" : isChartFile(name) ? "chart" : "md";
+}
+const VIEW_TABS = {
+  draw: { label: "Canvas", icon: "#i-file-draw", show: "Show canvas" },
+  grid: { label: "Table", icon: "#i-table", show: "Show table" },
+  chart: { label: "Chart", icon: "#i-chart", show: "Show chart" },
+  md: { label: "Preview", icon: "#i-eye", show: "Preview" },
+};
 
 // Markdown source formatter — normalizes structure without touching code blocks.
 function formatMarkdown(text) {
@@ -4263,6 +4414,11 @@ function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name 
       // ```draw blocks render as drawings (code is already HTML-escaped)
       if (lang === "draw") {
         codeBlocks.push(editWrap(`<span class="draw-embed" data-draw="${code}"></span>`, close));
+        result.push("\x00CB" + idx + "\x00");
+        return;
+      }
+      if (lang === "chart") {
+        codeBlocks.push(editWrap(`<span class="draw-embed" data-chart="${code}"></span>`, close));
         result.push("\x00CB" + idx + "\x00");
         return;
       }
@@ -4596,9 +4752,9 @@ function renderMarkdown(src, base = (zenEphemeralNote || getActiveNote())?.name 
     return "\x00CB" + (codeBlocks.length - 1) + "\x00";
   });
 
-  // Embedded drawings — ![alt](name.draw); held aside so emphasis
+  // Embedded drawings and charts — ![alt](name.draw); held aside so emphasis
   // rules can't reach into the file name
-  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+\.draw)\)/gi, (_, alt, name) => {
+  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+\.(?:draw|chart))\)/gi, (_, alt, name) => {
     const ref = name.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
     const path = "/" + resolveRef(base, ref);
     codeBlocks.push(
@@ -4803,29 +4959,26 @@ let mdTabsKind = "md";
 function updateMdTabBar() {
   const note = getActiveNote();
   const isMd = note && hasViewTab(note.name);
-  const isDraw = isDrawFile(note?.name);
-  const isGrid = isCsvFile(note?.name);
+  const kind = viewKind(note?.name);
   const zenEphemeral = zenModeActive && zenFromUrl && zenEphemeralNote;
   mdTabs.classList.toggle("visible", !!(isMd || zenEphemeral));
   mdTabZen.classList.toggle("visible", !!isMd);
-  // Drawings: Canvas | Source, tables: Table | Source
-  mdTabs.classList.toggle("is-draw", isDraw || isGrid);
-  mdTabEdit.lastChild.textContent = isDraw || isGrid ? "Source" : "Edit";
-  mdTabView.lastChild.textContent = isDraw ? "Canvas" : isGrid ? "Table" : "Preview";
-  mdTabView
-    .querySelector("use")
-    .setAttribute("href", isDraw ? "#i-file-draw" : isGrid ? "#i-table" : "#i-eye");
+  // Drawings: Canvas | Source, tables: Table | Source, charts: Chart | Source
+  mdTabs.classList.toggle("is-draw", kind !== "md");
+  mdTabEdit.lastChild.textContent = kind !== "md" ? "Source" : "Edit";
+  mdTabView.lastChild.textContent = VIEW_TABS[kind].label;
+  mdTabView.querySelector("use").setAttribute("href", VIEW_TABS[kind].icon);
   if (!isMd && !zenEphemeral && mdViewActive) {
     switchMdTab("edit");
   } else if (
     mdViewActive &&
     !zenModeActive &&
-    mdTabsKind !== (isDraw ? "draw" : isGrid ? "grid" : "md")
+    mdTabsKind !== kind
   ) {
     // Renamed between .md, .draw and .csv while in the second tab
     switchMdTab("view");
   }
-  mdTabsKind = isDraw ? "draw" : isGrid ? "grid" : "md";
+  mdTabsKind = kind;
   updateTabToggle();
   updateTitleBar();
 }
@@ -4833,9 +4986,7 @@ function updateMdTabBar() {
 // Phones: one button, showing the view you're in
 function updateTabToggle() {
   const name = getActiveNote()?.name;
-  const isDraw = isDrawFile(name);
-  const isGrid = isCsvFile(name);
-  const view = mdViewActive ? (isDraw ? "#i-file-draw" : isGrid ? "#i-table" : "#i-eye") : "#i-code";
+  const view = mdViewActive ? VIEW_TABS[viewKind(name)].icon : "#i-code";
   mdTabToggle.querySelector("use").setAttribute("href", view);
   mdTabToggle.setAttribute("aria-label", viewToggleLabel(name));
 }
@@ -4843,7 +4994,7 @@ function updateTabToggle() {
 // ⌘E's label: where it goes from here
 function viewToggleLabel(name) {
   if (mdViewActive) return opensInView(name) ? "Show source" : "Edit";
-  return isDrawFile(name) ? "Show canvas" : isCsvFile(name) ? "Show table" : "Preview";
+  return VIEW_TABS[viewKind(name)].show;
 }
 
 function currentTab() {
@@ -4982,6 +5133,8 @@ function switchMdTab(tab, pushHistory) {
       : getActiveNote();
   const showsDrawing = tab !== "edit" && isDrawFile(shownNote?.name);
   const showsGrid = tab !== "edit" && isCsvFile(shownNote?.name);
+  const showsChart = tab !== "edit" && isChartFile(shownNote?.name);
+  if (!showsChart) hideChart();
   if (!showsDrawing) hideDraw();
   if (!showsGrid) hideGrid();
 
@@ -4990,10 +5143,11 @@ function switchMdTab(tab, pushHistory) {
     gutter.style.display = "none";
     editorArea.style.display = "none";
     emptyState.style.display = "none";
-    if (showsDrawing || showsGrid) {
+    if (showsDrawing || showsGrid || showsChart) {
       mdPreview.classList.remove("visible");
       mdPreview.innerHTML = "";
       if (showsDrawing) showDraw(shownNote, true);
+      else if (showsChart) showChart(shownNote, true);
       else showGrid(shownNote, true);
     } else {
       setPreviewHtml(
@@ -5015,7 +5169,7 @@ function switchMdTab(tab, pushHistory) {
       zenFromUrl && zenEphemeralNote
     );
     wakeZenBar();
-  } else if (tab === "view" && (showsDrawing || showsGrid)) {
+  } else if (tab === "view" && (showsDrawing || showsGrid || showsChart)) {
     gutter.style.display = "none";
     editorArea.style.display = "none";
     emptyState.style.display = "none";
@@ -5025,6 +5179,7 @@ function switchMdTab(tab, pushHistory) {
     zenBar.style.display = "none";
     document.getElementById("zenActions").style.display = "none";
     if (showsDrawing) showDraw(shownNote, false);
+    else if (showsChart) showChart(shownNote, false);
     else showGrid(shownNote, false);
   } else if (tab === "view") {
     const note = getActiveNote();
@@ -5344,7 +5499,7 @@ function checkMdViewParam() {
         });
       }
     }
-  } else if (viewParam === "md" || viewParam === "draw" || viewParam === "grid") {
+  } else if (["md", "draw", "grid", "chart"].includes(viewParam)) {
     const note = getActiveNote();
     if (note && hasViewTab(note.name)) {
       switchMdTab("view");
@@ -5554,7 +5709,7 @@ window.addEventListener("popstate", async (e) => {
 // ═══════════════════════════════════════════════════
 
 function nextNoteName(ext = "md", dir = "") {
-  const base = dir + (ext === "draw" ? "drawing" : ext === "csv" ? "table" : "note");
+  const base = dir + ({ draw: "drawing", csv: "table", chart: "chart" }[ext] || "note");
   let num = 1;
   while (state.notes.some((n) => n.name === `${base}${num}.${ext}`)) num++;
   return `${base}${num}.${ext}`;
@@ -6182,7 +6337,7 @@ const THEME_LABELS = {
 function paletteCommands() {
   const note = getActiveNote();
   const md = note && isMarkdownFile(note.name);
-  const draw = note && isDrawFile(note.name);
+  const draw = note && (isDrawFile(note.name) || isChartFile(note.name));
   const csv = note && isCsvFile(note.name);
   const view = note && hasViewTab(note.name);
   const saved = note && !sharedNote;
@@ -6193,6 +6348,7 @@ function paletteCommands() {
     ["file-draw", "New drawing", "", () =>
       createNote(undefined, undefined, true, "draw")],
     ["table", "New table", "", () => createNote(undefined, undefined, true, "csv")],
+    ["chart", "New chart", "", () => createNote(nextNoteName("chart"), NEW_CHART, true)],
     ["folder", "New folder", "", () => newFolder(note ? dirOf(note.name) : "")],
     vaultSupport && ["lock", "New encrypted file", "", createEncryptedNote],
     ["import", "Import files…", "", openImport],
@@ -9043,7 +9199,7 @@ editor.addEventListener("blur", scheduleOccurrenceUpdate);
 // The ⋯ menu: the title bar's, a row's, and right-click on a row
 function openNoteMenu(note, anchor, at) {
   const md = isMarkdownFile(note.name);
-  const draw = isDrawFile(note.name);
+  const draw = isDrawFile(note.name) || isChartFile(note.name);
   const active = note.id === getActiveNote()?.id;
   const kind = noteKind(note.name);
   // A locked file offers what a passkey can open: download
@@ -9209,6 +9365,7 @@ const LANG_NAMES = {
   md: "Markdown",
   markdown: "Markdown",
   draw: "Drawing",
+  chart: "Chart",
   js: "JavaScript",
   mjs: "JavaScript",
   cjs: "JavaScript",
@@ -9756,15 +9913,17 @@ async function downloadNote(note = getActiveNote()) {
 
 // Drawing as an image: the clipboard gets a PNG, the download an SVG
 function drawCopyPng(note = getActiveNote()) {
-  if (!note || !isDrawFile(note.name)) return;
-  const png = loadDraw().then(() => Draw.pngBlob(note.content));
+  if (!note || !(isDrawFile(note.name) || isChartFile(note.name))) return;
+  const png = loadDraw()
+    .then(() => drawTextOf(note))
+    .then((text) => Draw.pngBlob(text));
   // Safari needs the clipboard write to start inside the click
   navigator.clipboard
     .write([new ClipboardItem({ "image/png": png })])
     .then(() => showToast("Copied as PNG", { ic: "check" }))
     .catch(async () => {
       try {
-        triggerDownload(await png, note.name.replace(/\.draw$/i, "") + ".png");
+        triggerDownload(await png, note.name.replace(/\.(draw|chart)$/i, "") + ".png");
         showToast("Couldn't copy as PNG — downloaded instead", { error: true });
       } catch {
         showToast("Couldn't make a PNG of this drawing", { error: true });
@@ -9773,11 +9932,11 @@ function drawCopyPng(note = getActiveNote()) {
 }
 
 async function drawDownloadSvg(note = getActiveNote()) {
-  if (!note || !isDrawFile(note.name)) return;
+  if (!note || !(isDrawFile(note.name) || isChartFile(note.name))) return;
   await loadDraw();
   triggerDownload(
-    new Blob([await Draw.svgString(note.content)], { type: "image/svg+xml" }),
-    note.name.replace(/\.draw$/i, "") + ".svg",
+    new Blob([await Draw.svgString(await drawTextOf(note))], { type: "image/svg+xml" }),
+    note.name.replace(/\.(draw|chart)$/i, "") + ".svg",
   );
 }
 
@@ -9792,12 +9951,11 @@ async function noteHtml(note) {
   let fontCss = "";
   if (embeds.length || fonts.size) {
     try {
-      await loadDraw();
+      await loadChart();
       await Draw.fontsReady();
       for (const el of embeds) {
-        const ref = el.dataset.ref && findByRef("", el.dataset.ref);
-        if ((el.dataset.ref && !ref) || isLocked(ref)) continue;
-        const content = ref ? viewOf(ref).content : el.dataset.draw;
+        const content = embedDrawText(el, note.name);
+        if (content == null) continue;
         el.replaceChildren(Draw.renderStatic(content));
         for (const f of Draw.usedFonts(content)) fonts.add(f);
       }
@@ -9806,6 +9964,7 @@ async function noteHtml(note) {
   }
   for (const el of doc.querySelectorAll(".draw-embed")) {
     el.removeAttribute("data-draw");
+    el.removeAttribute("data-chart");
     el.removeAttribute("data-ref");
   }
   for (const btn of doc.querySelectorAll(".code-copy-btn")) btn.remove();
@@ -10062,7 +10221,7 @@ async function loadFromUrl() {
 // ═══════════════════════════════════════════════════
 
 const TEXT_EXTS = new Set(
-  "txt md markdown draw json jsonl json5 js jsx ts tsx mjs cjs mts cts css scss sass less html htm xml xsl xslt csv tsv yaml yml toml ini cfg conf sh bash zsh fish ps1 bat cmd py pyi pyw rb rake gemspec go rs java scala kt kts groovy gradle c h cpp hpp cc cxx hxx cs fs fsx swift m mm r jl lua pl pm php phtml ex exs erl hrl hs lhs clj cljs cljc edn lisp cl el rkt ml mli v sv vhd vhdl sql graphql gql proto thrift avsc tf hcl nix dhall dart zig nim cr d pas pp asm s wasm wat sol vy move cairo log env properties lock sum mod cmake make mk svg plist strings resx pot po rst adoc asciidoc tex bib sty cls org wiki textile diff patch gitignore gitattributes gitmodules dockerignore npmignore eslintignore prettierignore editorconfig prettierrc eslintrc babelrc browserslistrc stylelintrc huskyrc lintstagedrc nvmrc".split(
+  "txt md markdown draw chart json jsonl json5 js jsx ts tsx mjs cjs mts cts css scss sass less html htm xml xsl xslt csv tsv yaml yml toml ini cfg conf sh bash zsh fish ps1 bat cmd py pyi pyw rb rake gemspec go rs java scala kt kts groovy gradle c h cpp hpp cc cxx hxx cs fs fsx swift m mm r jl lua pl pm php phtml ex exs erl hrl hs lhs clj cljs cljc edn lisp cl el rkt ml mli v sv vhd vhdl sql graphql gql proto thrift avsc tf hcl nix dhall dart zig nim cr d pas pp asm s wasm wat sol vy move cairo log env properties lock sum mod cmake make mk svg plist strings resx pot po rst adoc asciidoc tex bib sty cls org wiki textile diff patch gitignore gitattributes gitmodules dockerignore npmignore eslintignore prettierignore editorconfig prettierrc eslintrc babelrc browserslistrc stylelintrc huskyrc lintstagedrc nvmrc".split(
     " ",
   ),
 );
@@ -12169,6 +12328,7 @@ const clickActions = {
   "new-drawing": () => createNote(undefined, undefined, false, "draw"),
   "new-drawing-rename": () => createNote(undefined, undefined, true, "draw"),
   "new-table-rename": () => createNote(undefined, undefined, true, "csv"),
+  "new-chart-rename": () => createNote(nextNoteName("chart"), NEW_CHART, true),
   "new-folder": () => newFolder(),
   "new-encrypted": createEncryptedNote,
   "unlock-note": () => unlockNote(state.activeId).then((ok) => ok && render()),

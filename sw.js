@@ -7,6 +7,7 @@ const SHELL = [
   "app.js",
   "draw.js",
   "grid.js",
+  "chart.js",
   "manifest.json",
   "fonts/VictorMono.woff2",
   "fonts/SourceSans3.woff2",

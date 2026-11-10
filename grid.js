@@ -218,6 +218,7 @@
   <button class="ed" data-g="header" aria-pressed="true">Header row</button>
   <button class="ed" data-g="insert" aria-haspopup="menu">Insert<svg class="icon sm"><use href="#i-chev-down"/></svg></button>
   <button class="ed" data-g="delete" aria-haspopup="menu">Delete<svg class="icon sm"><use href="#i-chev-down"/></svg></button>
+  <button class="ed" data-g="chart" hidden>Add chart</button>
   <label class="grid-filter"><svg class="icon sm"><use href="#i-search"/></svg><input type="search" placeholder="Filter rows" aria-label="Filter rows" spellcheck="false" autocomplete="off" /></label>
   <button class="ed grid-save" data-g="save-sort" hidden>Save sort</button>
   <span class="grid-size"></span>
@@ -289,6 +290,7 @@
     E.header = opts.header !== false;
     E.mounted = true;
     host.classList.toggle("readonly", E.readonly);
+    E.bar.querySelector('[data-g="chart"]').hidden = !opts.onChart;
     setContent(opts.content, reset);
     if (!E.readonly && !matchMedia("(pointer:coarse)").matches) E.scroll.focus({ preventScroll: true });
   }
@@ -1054,6 +1056,10 @@
       return;
     }
     if (g === "save-sort") return saveSort();
+    if (g === "chart") {
+      const { c1, c2 } = range();
+      return E.opts.onChart(c1, c2);
+    }
     if (E.pop.classList.contains("visible") && E.pop.dataset.from === g) return closePop();
     const r = b.getBoundingClientRect();
     E.pop.dataset.from = g;
