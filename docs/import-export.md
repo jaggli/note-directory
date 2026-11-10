@@ -88,7 +88,7 @@ Detected by `.zip` extension or `application/zip` MIME type. The ZIP reader hand
 
 ### Individual text files
 
-Any file with a text MIME type or a recognized text extension (~80 extensions supported: `.js`, `.py`, `.md`, `.draw`, `.json`, `.yaml`, `.toml`, `.rs`, `.go`, etc.) can be dropped directly. A dropped `.draw` file opens on the drawing canvas.
+Any file with a text MIME type or a recognized text extension (~80 extensions supported: `.js`, `.py`, `.md`, `.draw`, `.json`, `.yaml`, `.toml`, `.rs`, `.go`, etc.) can be dropped directly. A dropped `.draw` file opens on the drawing canvas. `.csv` and `.tsv` files are converted to the app's CSV dialect on the way in (encoding, separator, line endings; see [csv-format.md](csv-format.md)).
 
 | Scenario        | Behavior                      |
 | --------------- | ----------------------------- |

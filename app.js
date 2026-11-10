@@ -1792,8 +1792,8 @@ function undo() {
     diffPos,
     entry.content.length,
   );
-  // The canvas edits note.content directly, so vim's buffer is not involved
-  if (vimState.enabled && !drawActive()) {
+  // The canvas and grid edit note.content directly, so vim's buffer is not involved
+  if (vimState.enabled && !drawActive() && !gridActive()) {
     vimState.bufferDirty = entry.content !== note.content;
     // Otherwise a reload would restore the undone edit from the swap
     if (vimState.bufferDirty) saveSwap(note.id, entry.content);
@@ -1805,6 +1805,7 @@ function undo() {
   }
   refreshEditor();
   if (drawActive()) window.Draw?.update(note.content);
+  if (gridActive()) window.Grid?.update(note.content);
 }
 
 function redo() {
@@ -1823,8 +1824,8 @@ function redo() {
     diffPos,
     entry.content.length,
   );
-  // The canvas edits note.content directly, so vim's buffer is not involved
-  if (vimState.enabled && !drawActive()) {
+  // The canvas and grid edit note.content directly, so vim's buffer is not involved
+  if (vimState.enabled && !drawActive() && !gridActive()) {
     vimState.bufferDirty = entry.content !== note.content;
     // Otherwise a reload would restore the undone edit from the swap
     if (vimState.bufferDirty) saveSwap(note.id, entry.content);
@@ -1836,6 +1837,7 @@ function redo() {
   }
   refreshEditor();
   if (drawActive()) window.Draw?.update(note.content);
+  if (gridActive()) window.Grid?.update(note.content);
 }
 
 // ═══════════════════════════════════════════════════
@@ -2599,6 +2601,7 @@ function icon(id, cls = "") {
 // Markdown, drawing, code or plain text: icon and colour everywhere a note is listed
 function noteKind(name) {
   if (isDrawFile(name)) return { cls: "draw", icon: "file-draw" };
+  if (isCsvFile(name)) return { cls: "table", icon: "table" };
   if (isMarkdownFile(name)) return { cls: "md", icon: "note" };
   const ext = getExtension(name);
   if (!ext || ext === "txt" || ext === "text" || ext === "log")
@@ -2900,13 +2903,15 @@ function render() {
   if ((note?.id ?? null) !== lastRenderedId) {
     lastRenderedId = note?.id ?? null;
     // Not under a zen link still loading: that would rewrite ?view=zen
-    if (note && isDrawFile(note.name) && !zenModeActive && !zenEphemeralNote)
+    if (note && opensInView(note.name) && !zenModeActive && !zenEphemeralNote)
       switchMdTab("view");
     // Another note under an open preview (delete, undo, import): show it
     else if (mdViewActive && !zenModeActive)
       switchMdTab(note && hasViewTab(note.name) ? "view" : "edit");
   } else if (drawActive()) {
     window.Draw?.update(note.content);
+  } else if (gridActive()) {
+    window.Grid?.update(note.content);
   }
 }
 
@@ -2935,9 +2940,14 @@ function isDrawFile(name) {
   return !!name && getExtension(name) === "draw";
 }
 
-// Notes with a second tab: markdown preview or drawing canvas
+// Notes with a second tab: markdown preview, drawing canvas or table grid
 function hasViewTab(name) {
-  return isMarkdownFile(name) || isDrawFile(name);
+  return isMarkdownFile(name) || isDrawFile(name) || isCsvFile(name);
+}
+
+// The second tab is an editor (canvas or grid), and notes open on it
+function opensInView(name) {
+  return isDrawFile(name) || isCsvFile(name);
 }
 
 // The canvas is showing an editable drawing
@@ -2995,7 +3005,89 @@ function hideDraw() {
   if (window.Draw) Draw.unmount();
 }
 
-// A finished canvas gesture: one undo step, then the usual save path
+// ═══════════════════════════════════════════════════
+//  Tables (.csv, .tsv — grid lives in grid.js, loaded on demand)
+// ═══════════════════════════════════════════════════
+
+const gridHost = document.getElementById("gridHost");
+
+function isCsvFile(name) {
+  const ext = name ? getExtension(name) : "";
+  return ext === "csv" || ext === "tsv";
+}
+
+// Our dialect: commas for .csv, tabs for .tsv (see docs/csv-format.md)
+function csvSep(name) {
+  return getExtension(name) === "tsv" ? "\t" : ",";
+}
+
+function gridActive() {
+  return mdViewActive && !zenModeActive && isCsvFile(getActiveNote()?.name);
+}
+
+let gridLoading = null;
+function loadGrid() {
+  return (gridLoading ??= new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "grid.js";
+    s.onload = resolve;
+    s.onerror = () => {
+      gridLoading = null;
+      reject(new Error("grid.js failed to load"));
+    };
+    document.head.appendChild(s);
+  }));
+}
+
+let gridMountSeq = 0;
+function showGrid(note, readonly) {
+  gridHost.classList.add("visible");
+  const seq = ++gridMountSeq;
+  loadGrid()
+    .then(() => {
+      if (seq !== gridMountSeq) return;
+      Grid.mount(gridHost, {
+        key: note.id || "zen:" + note.name,
+        content: note.content,
+        sep: csvSep(note.name),
+        readonly,
+        header: note.csvHeader !== false,
+        onCommit: (content) => {
+          drawCommit(note, content);
+          if (findReplaceBar.classList.contains("visible")) updateFindMatches(false);
+        },
+        onHeader: (on) => {
+          const n = state.notes.find((x) => x.id === note.id);
+          if (!n) return;
+          if (on) delete n.csvHeader;
+          else n.csvHeader = false;
+          saveState();
+        },
+        onUndo: undo,
+        onRedo: redo,
+      });
+    })
+    .catch(() => showToast("Couldn't load the table editor", { error: true }));
+}
+
+function hideGrid() {
+  gridMountSeq++;
+  gridHost.classList.remove("visible");
+  if (window.Grid) Grid.unmount();
+}
+
+async function downloadExcel(note = getActiveNote()) {
+  if (!note || !isCsvFile(note.name)) return;
+  if (isLocked(note) && !(await unlockNote(note.id))) return;
+  note = viewOf(note);
+  await loadGrid();
+  triggerDownload(
+    new Blob([Grid.excel(note.content, csvSep(note.name))], { type: "text/csv" }),
+    note.name,
+  );
+}
+
+// A finished canvas gesture or grid edit: one undo step, then the usual save path
 // `target` is the note object, so a shared drawing saved by its first
 // stroke keeps receiving the strokes after it
 function drawCommit(target, content) {
@@ -3096,7 +3188,8 @@ function setPreviewHtml(html) {
 function viewQuery() {
   if (zenModeActive) return "zen";
   if (!mdViewActive) return "";
-  return isDrawFile(getActiveNote()?.name) ? "draw" : "md";
+  const name = getActiveNote()?.name;
+  return isDrawFile(name) ? "draw" : isCsvFile(name) ? "grid" : "md";
 }
 
 // Markdown source formatter — normalizes structure without touching code blocks.
@@ -3907,40 +4000,46 @@ function updateMdTabBar() {
   const note = getActiveNote();
   const isMd = note && hasViewTab(note.name);
   const isDraw = isDrawFile(note?.name);
+  const isGrid = isCsvFile(note?.name);
   const zenEphemeral = zenModeActive && zenFromUrl && zenEphemeralNote;
   mdTabs.classList.toggle("visible", !!(isMd || zenEphemeral));
   mdTabZen.classList.toggle("visible", !!isMd);
-  // Drawings: Canvas | Source
-  mdTabs.classList.toggle("is-draw", isDraw);
-  mdTabEdit.lastChild.textContent = isDraw ? "Source" : "Edit";
-  mdTabView.lastChild.textContent = isDraw ? "Canvas" : "Preview";
+  // Drawings: Canvas | Source, tables: Table | Source
+  mdTabs.classList.toggle("is-draw", isDraw || isGrid);
+  mdTabEdit.lastChild.textContent = isDraw || isGrid ? "Source" : "Edit";
+  mdTabView.lastChild.textContent = isDraw ? "Canvas" : isGrid ? "Table" : "Preview";
   mdTabView
     .querySelector("use")
-    .setAttribute("href", isDraw ? "#i-file-draw" : "#i-eye");
+    .setAttribute("href", isDraw ? "#i-file-draw" : isGrid ? "#i-table" : "#i-eye");
   if (!isMd && !zenEphemeral && mdViewActive) {
     switchMdTab("edit");
   } else if (
     mdViewActive &&
     !zenModeActive &&
-    mdTabsKind !== (isDraw ? "draw" : "md")
+    mdTabsKind !== (isDraw ? "draw" : isGrid ? "grid" : "md")
   ) {
-    // Renamed between .md and .draw while in the second tab
+    // Renamed between .md, .draw and .csv while in the second tab
     switchMdTab("view");
   }
-  mdTabsKind = isDraw ? "draw" : "md";
+  mdTabsKind = isDraw ? "draw" : isGrid ? "grid" : "md";
   updateTabToggle();
   updateTitleBar();
 }
 
 // Phones: one button, showing the view you're in
 function updateTabToggle() {
-  const isDraw = isDrawFile(getActiveNote()?.name);
-  const view = mdViewActive ? (isDraw ? "#i-file-draw" : "#i-eye") : "#i-code";
+  const name = getActiveNote()?.name;
+  const isDraw = isDrawFile(name);
+  const isGrid = isCsvFile(name);
+  const view = mdViewActive ? (isDraw ? "#i-file-draw" : isGrid ? "#i-table" : "#i-eye") : "#i-code";
   mdTabToggle.querySelector("use").setAttribute("href", view);
-  mdTabToggle.setAttribute(
-    "aria-label",
-    mdViewActive ? (isDraw ? "Show source" : "Edit") : isDraw ? "Show canvas" : "Preview",
-  );
+  mdTabToggle.setAttribute("aria-label", viewToggleLabel(name));
+}
+
+// ⌘E's label: where it goes from here
+function viewToggleLabel(name) {
+  if (mdViewActive) return opensInView(name) ? "Show source" : "Edit";
+  return isDrawFile(name) ? "Show canvas" : isCsvFile(name) ? "Show table" : "Preview";
 }
 
 function currentTab() {
@@ -4078,17 +4177,20 @@ function switchMdTab(tab, pushHistory) {
       ? zenEphemeralNote
       : getActiveNote();
   const showsDrawing = tab !== "edit" && isDrawFile(shownNote?.name);
+  const showsGrid = tab !== "edit" && isCsvFile(shownNote?.name);
   if (!showsDrawing) hideDraw();
+  if (!showsGrid) hideGrid();
 
   if (zenModeActive) {
     // Hide editor elements, show preview or canvas
     gutter.style.display = "none";
     editorArea.style.display = "none";
     emptyState.style.display = "none";
-    if (showsDrawing) {
+    if (showsDrawing || showsGrid) {
       mdPreview.classList.remove("visible");
       mdPreview.innerHTML = "";
-      showDraw(shownNote, true);
+      if (showsDrawing) showDraw(shownNote, true);
+      else showGrid(shownNote, true);
     } else {
       setPreviewHtml(
         `<div class="zen-wrap">${renderMarkdown(shownNote?.content || "")}</div>`,
@@ -4109,7 +4211,7 @@ function switchMdTab(tab, pushHistory) {
       zenFromUrl && zenEphemeralNote
     );
     wakeZenBar();
-  } else if (tab === "view" && showsDrawing) {
+  } else if (tab === "view" && (showsDrawing || showsGrid)) {
     gutter.style.display = "none";
     editorArea.style.display = "none";
     emptyState.style.display = "none";
@@ -4118,7 +4220,8 @@ function switchMdTab(tab, pushHistory) {
     appEl.classList.remove("zen-mode");
     zenBar.style.display = "none";
     document.getElementById("zenActions").style.display = "none";
-    showDraw(shownNote, false);
+    if (showsDrawing) showDraw(shownNote, false);
+    else showGrid(shownNote, false);
   } else if (tab === "view") {
     const note = getActiveNote();
     if (note) {
@@ -4256,7 +4359,7 @@ function exitZenMode() {
     else openShared(name, content, Date.now(), existing);
   }
   const note = getActiveNote();
-  const toView = note && hasViewTab(note.name) && (sharedNote || isDrawFile(note.name));
+  const toView = note && hasViewTab(note.name) && (sharedNote || opensInView(note.name));
   switchMdTab(toView ? "view" : "edit", true);
   render();
   updateUrl();
@@ -4437,7 +4540,7 @@ function checkMdViewParam() {
         });
       }
     }
-  } else if (viewParam === "md" || viewParam === "draw") {
+  } else if (viewParam === "md" || viewParam === "draw" || viewParam === "grid") {
     const note = getActiveNote();
     if (note && hasViewTab(note.name)) {
       switchMdTab("view");
@@ -4460,7 +4563,7 @@ function navigateToNote(id, viewMd, skipUrlUpdate) {
   render();
   if (viewMd) {
     switchMdTab("view");
-  } else if (mdViewActive && !isDrawFile(getActiveNote()?.name)) {
+  } else if (mdViewActive && !opensInView(getActiveNote()?.name)) {
     switchMdTab("edit");
   }
   if (!skipUrlUpdate) updateUrl();
@@ -4649,7 +4752,7 @@ window.addEventListener("popstate", async (e) => {
 // ═══════════════════════════════════════════════════
 
 function nextNoteName(ext = "md") {
-  const base = ext === "draw" ? "drawing" : "note";
+  const base = ext === "draw" ? "drawing" : ext === "csv" ? "table" : "note";
   let num = 1;
   while (state.notes.some((n) => n.name === `${base}${num}.${ext}`)) num++;
   return `${base}${num}.${ext}`;
@@ -4758,7 +4861,7 @@ function switchNote(id) {
     const fromMd = isMarkdownFile(getActiveNote()?.name);
     if (targetNote && isMarkdownFile(targetNote.name) && fromMd) {
       setPreviewHtml(renderMarkdown(viewOf(targetNote).content));
-    } else if (!isDrawFile(targetNote?.name)) {
+    } else if (!opensInView(targetNote?.name)) {
       switchMdTab("edit");
     }
   }
@@ -5156,6 +5259,10 @@ function showNoteResults(note, hits) {
         Draw.reveal(hit.raw.trim().split(/\s+/)[1]);
         return;
       }
+      if (gridActive() && window.Grid?.isMounted()) {
+        Grid.revealOffset(hit.charOffset);
+        return;
+      }
       if (mdViewActive) switchMdTab("edit", true);
       editor.focus();
       editor.setSelectionRange(hit.charOffset, hit.charOffset);
@@ -5248,6 +5355,7 @@ function paletteCommands() {
   const note = getActiveNote();
   const md = note && isMarkdownFile(note.name);
   const draw = note && isDrawFile(note.name);
+  const csv = note && isCsvFile(note.name);
   const view = note && hasViewTab(note.name);
   const saved = note && !sharedNote;
   const shareable = note && !note.enc;
@@ -5256,6 +5364,7 @@ function paletteCommands() {
     ["note", "New note", "new", () => createNote(undefined, undefined, true)],
     ["file-draw", "New drawing", "", () =>
       createNote(undefined, undefined, true, "draw")],
+    ["table", "New table", "", () => createNote(undefined, undefined, true, "csv")],
     vaultSupport && ["lock", "New encrypted file", "", createEncryptedNote],
     ["import", "Import files…", "", openImport],
     ["archive", "Export all as ZIP", "", downloadAll],
@@ -5267,10 +5376,11 @@ function paletteCommands() {
     md && readable && ["download", "Download as HTML", "", () => downloadHtml(note)],
     draw && readable && ["download", "Download as SVG", "", () => drawDownloadSvg(note)],
     draw && readable && ["image", "Copy as PNG", "", () => drawCopyPng(note)],
+    csv && ["download", "Download for Excel", "", () => downloadExcel(note)],
     md && readable && ["format", "Format markdown", "⌥⇧F", () => formatNote(note)],
     note?.enc && readable && ["lock", "Lock this file", "", () => lockNote(note.id)],
     vaultKeys.size > 0 && ["lock", "Lock all encrypted files", "", lockAll],
-    view && [mdViewActive ? "code" : "eye", mdViewActive ? (draw ? "Show source" : "Edit") : draw ? "Show canvas" : "Preview", "⌘E", toggleView],
+    view && [mdViewActive ? "code" : "eye", viewToggleLabel(note.name), "⌘E", toggleView],
     view && ["zen", "Zen", "", () => switchMdTab("zen", true)],
     note && ["search", "Find", "⌘F", () => openFindReplace()],
     note && ["search", "Find and replace", "⌘⌥F", () => openFindReplace(true)],
@@ -5432,13 +5542,19 @@ function isFindMatchSelected() {
 // The preview finds in its rendered text, painted with the CSS Highlight API;
 // replacing (and zen, which has no find bar) goes to the source
 function inPreviewFind() {
-  return mdViewActive && !zenModeActive && !!window.CSS?.highlights && !isDrawFile(getActiveNote()?.name);
+  return mdViewActive && !zenModeActive && !!window.CSS?.highlights && !opensInView(getActiveNote()?.name);
+}
+
+// The grid finds in its cells; replacing goes to the source like the preview
+function inGridFind() {
+  return gridActive() && !!window.Grid?.isMounted();
 }
 
 // ⌘F finds; ⌘⌥F / Ctrl+H (or the chevron) adds the replace row
 function openFindReplace(withReplace = false) {
   if (!getActiveNote()) return;
-  if (mdViewActive && (withReplace === true || !inPreviewFind())) switchMdTab("edit", true);
+  if (mdViewActive && (withReplace === true || !(inPreviewFind() || inGridFind())))
+    switchMdTab("edit", true);
   if (withReplace === true) findReplaceBar.classList.add("replace");
   else if (!findReplaceBar.classList.contains("visible"))
     findReplaceBar.classList.remove("replace");
@@ -5502,11 +5618,24 @@ function updateFindMatches(select = true) {
     return;
   }
   const preview = inPreviewFind();
-  findMatches = preview ? previewFindAll(query) : findAll(editor.value, query);
+  const grid = inGridFind();
+  findMatches = preview
+    ? previewFindAll(query)
+    : grid
+      ? Grid.find(query)
+      : findAll(editor.value, query);
   if (findMatches.length === 0) {
     paintPreviewFind();
     setFindCount("No results", true);
     return;
+  }
+  if (grid) {
+    // Start at the selected cell's row
+    const at = Grid.active();
+    findMatchIdx = Math.max(0, findMatches.findIndex((m) => m.r > at.r || (m.r === at.r && m.c >= at.c)));
+    if (select) return selectFindMatch();
+    paintPreviewFind();
+    return setFindCount(findMatches.length + (findMatches.length === 1 ? " match" : " matches"));
   }
   if (preview) {
     // Start at the first match on screen
@@ -5550,6 +5679,8 @@ function previewFindAll(query) {
 }
 
 function paintPreviewFind() {
+  if (window.Grid?.isMounted())
+    Grid.showFind(inGridFind() && findInput.value, findMatches[findMatchIdx], false);
   const hl = window.CSS?.highlights;
   if (!hl) return;
   const current = findMatches[findMatchIdx];
@@ -5565,6 +5696,11 @@ function paintPreviewFind() {
 function selectFindMatch(focusEditor) {
   if (findMatchIdx < 0 || findMatchIdx >= findMatches.length) return;
   const m = findMatches[findMatchIdx];
+  if (inGridFind()) {
+    Grid.showFind(findInput.value, m, true);
+    setFindCount(findMatchIdx + 1 + " of " + findMatches.length);
+    return;
+  }
   if (inPreviewFind()) {
     paintPreviewFind();
     const r = m.getBoundingClientRect();
@@ -5597,7 +5733,7 @@ function findNext() {
     return;
   }
   // After edits findMatchIdx points at the first match after the cursor
-  if (inPreviewFind() || isFindMatchSelected())
+  if (inPreviewFind() || inGridFind() || isFindMatchSelected())
     findMatchIdx = (findMatchIdx + 1) % findMatches.length;
   selectFindMatch(true);
 }
@@ -8098,6 +8234,7 @@ function openNoteMenu(note, anchor, at) {
     item("download", "Download", "download") +
     (md && readable ? item("download", "Download as HTML", "html") : "") +
     (draw && readable ? item("download", "Download as SVG", "svg") : "") +
+    (isCsvFile(note.name) && readable ? item("download", "Download for Excel", "excel") : "") +
     (note.enc && readable ? item("lock", "Lock", "lock") : "") +
     (md && readable ? sep + item("format", "Format markdown", "format", "⌥⇧F") : "") +
     (isMobile() && active && hasViewTab(note.name)
@@ -8155,6 +8292,8 @@ function runNoteAction(note, act, anchor) {
       return downloadHtml(note);
     case "svg":
       return drawDownloadSvg(note);
+    case "excel":
+      return downloadExcel(note);
     case "format":
       return formatNote(note);
     case "zen":
@@ -8256,7 +8395,7 @@ function updateStatusBar() {
   statusSel.hidden = !editing;
   statusHint.textContent = "";
   if (!note || editing) return updateCursorPos();
-  if (isDrawFile(note.name)) {
+  if (opensInView(note.name)) {
     cursorPos.textContent = "";
     return;
   }
@@ -9184,9 +9323,25 @@ async function importFiles(files) {
       const r = await readZipEntries(file);
       if (r.error) skipped.push(`${file.name} — ${r.error}`);
       else incoming.push(...r.entries);
+    } else if (isCsvFile(file.name)) {
+      // Excel writes UTF-16 and Windows-1252 too
+      await loadGrid();
+      const { text, encoding } = Grid.decode(await file.arrayBuffer());
+      incoming.push({ name: file.name, content: text, meta: null, encoding });
     } else if (file.type.startsWith("text/") || isTextFilename(file.name)) {
       incoming.push({ name: file.name, content: await file.text(), meta: null });
     } else skipped.push(`${file.name} — not a text file`);
+  }
+  // Tables from elsewhere are converted to our dialect; app exports already are
+  const converted = [];
+  for (const it of incoming) {
+    if (it.meta || !isCsvFile(it.name)) continue;
+    await loadGrid();
+    const { text, notes } = Grid.normalize(it.content, csvSep(it.name));
+    if (it.encoding && it.encoding !== "utf-8")
+      notes.unshift(it.encoding === "windows-1252" ? "Windows-1252" : "UTF-16");
+    it.content = text;
+    if (notes.length) converted.push(`${it.name} (${notes.join(", ")})`);
   }
 
   const ready = [];
@@ -9278,9 +9433,15 @@ async function importFiles(files) {
       { error: true },
     );
   else if (total)
-    showToast(total === 1 ? "Imported " + (last?.name ?? "1 note") : `Imported ${total} notes`, {
-      ic: "check",
-    });
+    showToast(
+      (total === 1 ? "Imported " + (last?.name ?? "1 note") : `Imported ${total} notes`) +
+        (converted.length === 1 && total === 1
+          ? " — converted from " + converted[0].replace(/^.* \((.*)\)$/, "$1")
+          : converted.length
+            ? ` — converted ${converted.length} from other CSV formats`
+            : ""),
+      { ic: "check" },
+    );
 }
 
 function importDialog(ready, clashes, skipped) {
@@ -9879,6 +10040,7 @@ document.addEventListener("keydown", (e) => {
     !inInput &&
     mdViewActive &&
     !drawActive() &&
+    !gridActive() &&
     e.key === "e" &&
     !mod &&
     !e.altKey
@@ -11142,6 +11304,7 @@ const clickActions = {
   "new-note-rename": () => createNote(undefined, undefined, true),
   "new-drawing": () => createNote(undefined, undefined, false, "draw"),
   "new-drawing-rename": () => createNote(undefined, undefined, true, "draw"),
+  "new-table-rename": () => createNote(undefined, undefined, true, "csv"),
   "new-encrypted": createEncryptedNote,
   "unlock-note": () => unlockNote(state.activeId).then((ok) => ok && render()),
   "recover-note": () => recoverNote(state.activeId).then((ok) => ok && render()),
