@@ -702,13 +702,11 @@
         margin: 1.5em 0;
       }
 
-      /* Wide and long tables scroll inside themselves, under a sticky header
-         (a scrolling table is what sticky cells stick to) */
+      /* Wide tables scroll inside the column */
       .md-preview table {
         display: block;
         width: max-content;
         max-width: 100%;
-        max-height: 75vh;
         overflow: auto;
         border-collapse: collapse;
         margin: 0 0 1em;
@@ -726,11 +724,31 @@
         background: var(--overlay);
       }
 
-      /* Collapsed borders scroll away under a sticky cell: draw its own */
+      /* A long table's header follows the page down while the table passes the
+         top: sticky can't, the table scrolls sideways so it would stick inside it.
+         Driven by scrolling itself; followTableHeads() sets the sizes */
+      @supports (animation-timeline: view()) {
+        .md-preview table {
+          view-timeline: --table block;
+        }
+
+        .md-preview thead {
+          animation: table-head linear both;
+          animation-timeline: --table;
+          /* Starts 2px late: the header sits 2px above the top, so subpixel
+             rounding never shows a sliver of the row behind it */
+          animation-range: exit-crossing 2px exit-crossing calc(100% - var(--head-h, 0px) + 2px);
+        }
+
+        @keyframes table-head {
+          to {
+            transform: translateY(calc(var(--table-h, 0px) - var(--head-h, 0px)));
+          }
+        }
+      }
+
+      /* Collapsed borders don't move with it */
       .md-preview thead th {
-        position: sticky;
-        top: 0;
-        z-index: 1;
         box-shadow: inset 0 -1px var(--border);
       }
 

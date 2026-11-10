@@ -397,14 +397,24 @@ test("![](data.csv) embeds the table, follows its header setting, links to it", 
   expect(await page.evaluate(() => getActiveNote().name)).toBe("data.csv");
 });
 
-test("long preview tables keep their header in view", async ({ page }) => {
+test("long preview tables keep their header in view while the page scrolls", async ({ page }) => {
   await openApp(page);
   const rows = ["name,n"];
   for (let i = 0; i < 200; i++) rows.push(`r${i},${i}`);
-  await page.evaluate((c) => createNote("t.md", c), "```csv\n" + rows.join("\n") + "\n```\n");
+  await page.evaluate((c) => createNote("t.md", c), "intro\n\n```csv\n" + rows.join("\n") + "\n```\n\nafter\n");
   await page.evaluate(() => switchMdTab("view"));
   const table = page.locator("#mdPreview table");
-  await table.evaluate((t) => (t.scrollTop = 2000));
-  const [tb, hb] = await Promise.all([table.boundingBox(), page.locator("#mdPreview th").first().boundingBox()]);
-  expect(Math.abs(hb.y - tb.y)).toBeLessThan(2);
+  // The page scrolls, not the table
+  expect(await table.evaluate((t) => t.scrollHeight <= t.clientHeight + 1)).toBe(true);
+  await page.locator("#mdPreview").evaluate((p) => (p.scrollTop = 2000));
+  await page.waitForTimeout(50);
+  const [pb, hb] = await Promise.all([page.locator("#mdPreview").boundingBox(), page.locator("#mdPreview th").first().boundingBox()]);
+  // 2px above the top, so no row peeks out above it
+  expect(hb.y - pb.y).toBeGreaterThan(-3);
+  expect(hb.y - pb.y).toBeLessThanOrEqual(-1);
+  // Past the table it goes back
+  await page.locator("#mdPreview").evaluate((p) => (p.scrollTop = p.scrollHeight));
+  await page.waitForTimeout(50);
+  const [tb, hb2] = await Promise.all([table.boundingBox(), page.locator("#mdPreview th").first().boundingBox()]);
+  expect(hb2.y + hb2.height).toBeLessThanOrEqual(tb.y + tb.height + 1);
 });

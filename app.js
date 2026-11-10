@@ -3263,8 +3263,36 @@ function externalizeLinks(root) {
   });
 }
 
+// Long tables' headers follow the page down (see .md-preview thead in the CSS).
+// Scroll-driven animations need each table's sizes; without them, scroll events
+// move the header a frame late.
+const scrollDrivenHeads = CSS.supports?.("animation-timeline: view()");
+let previewTables = [];
+function followTableHeads() {
+  const top = mdPreview.getBoundingClientRect().top;
+  for (const t of previewTables) {
+    const head = t.tHead;
+    if (scrollDrivenHeads) {
+      t.style.setProperty("--table-h", t.offsetHeight + "px");
+      t.style.setProperty("--head-h", head.offsetHeight + "px");
+      continue;
+    }
+    const r = t.getBoundingClientRect();
+    const y = Math.max(0, Math.min(top - r.top - 2, r.height - head.offsetHeight));
+    head.style.transform = y ? `translateY(${y}px)` : "";
+  }
+}
+if (!scrollDrivenHeads)
+  mdPreview.addEventListener("scroll", () => previewTables.length && requestAnimationFrame(followTableHeads), {
+    passive: true,
+  });
+const tableSizes = new ResizeObserver(followTableHeads);
+
 function setPreviewHtml(html) {
   mdPreview.innerHTML = html;
+  tableSizes.disconnect();
+  previewTables = [...mdPreview.querySelectorAll("table")].filter((t) => t.tHead);
+  previewTables.forEach((t) => tableSizes.observe(t));
   externalizeLinks(mdPreview);
   hydrateDrawEmbeds();
   if (findMatches.length && inPreviewFind()) updateFindMatches(false);
