@@ -1367,20 +1367,114 @@ async function recoverNote(id) {
   return (await recoverVault([vault])) && openNote(id);
 }
 
-async function createEncryptedNote() {
+// An open vault: the one open already, else after the passkey (or setup)
+async function ensureVault() {
   const vaults = loadVaults();
-  let vault = vaults.find((v) => vaultKeys.has(v.id));
-  if (!vault)
-    vault = vaults.length
-      ? (await unlockVault(vaults)) || (await lostPasskey(vaults))
-      : await createVault();
-  if (!vault) return;
-  const o = { salt: b64u(rnd(16)), text: "", seq: 0 };
+  return (
+    vaults.find((v) => vaultKeys.has(v.id)) ||
+    (vaults.length ? (await unlockVault(vaults)) || (await lostPasskey(vaults)) : await createVault())
+  );
+}
+
+// `text` sealed with a new file key: what `opened` keeps for a file
+async function sealText(text, vault) {
+  const o = { salt: b64u(rnd(16)), text, seq: 0 };
   o.key = await fileKey(vaultKeys.get(vault.id), o.salt);
-  o.sealed = await encryptText(o, "");
+  o.sealed = await encryptText(o, text);
+  return o;
+}
+
+async function createEncryptedNote(name, text = "", focusName = true) {
+  const vault = await ensureVault();
+  if (!vault) return;
+  const o = await sealText(typeof name === "string" ? text : "", vault);
   const id = crypto.randomUUID();
   opened.set(id, o);
-  return createNote(undefined, o.sealed, true, undefined, { id, enc: vault.id });
+  return createNote(typeof name === "string" ? name : undefined, o.sealed, focusName, undefined, {
+    id,
+    enc: vault.id,
+  });
+}
+
+// A plain file encrypted in place; it stays open
+async function sealNote(n, vault) {
+  if (n.id === state.activeId && vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
+  for (;;) {
+    const text = n.content;
+    const o = await sealText(text, vault);
+    if (n.content !== text) continue;
+    opened.set(n.id, o);
+    handLocked.delete(n.id);
+    n.enc = vault.id;
+    n.content = o.sealed;
+    n.updatedAt = Date.now();
+    return;
+  }
+}
+
+// An encrypted file back to plain text (the passkey if it's locked)
+async function unsealNote(n) {
+  if (!opened.has(n.id) && !(await openNote(n.id)) && !(await unlockNote(n.id))) return false;
+  n.content = opened.get(n.id).text;
+  delete n.enc;
+  opened.delete(n.id);
+  handLocked.delete(n.id);
+  n.updatedAt = Date.now();
+  return true;
+}
+
+const fileCount = (k) => (k === 1 ? "1 file" : k + " files");
+
+async function cryptMoves(seal, unseal) {
+  if (unseal.length) {
+    const ok = await showModal(
+      `Moving ${fileCount(unseal.length)} out of the encrypted folder decrypts ${unseal.length === 1 ? "it" : "them"}.`,
+      "Move and decrypt",
+      "Cancel",
+    );
+    if (!ok) return false;
+    for (const n of unseal) if (!(await unsealNote(n))) return false;
+  }
+  if (seal.length) {
+    const vault = await ensureVault();
+    if (!vault) return false;
+    for (const n of seal) await sealNote(n, vault);
+  }
+  updateUrl();
+  return true;
+}
+
+async function encryptFolder(dir) {
+  const vault = await ensureVault();
+  if (!vault) return;
+  const plain = notesIn(dir).filter((n) => !n.enc);
+  for (const n of plain) await sealNote(n, vault);
+  encFolders.add(dir);
+  saveFolders();
+  saveState();
+  scheduleDriveUpload(true);
+  updateUrl();
+  render();
+  showToast(`${folderName(dir)} is encrypted` + (plain.length ? ` — ${fileCount(plain.length)}` : ""), { ic: "lock" });
+}
+
+async function decryptFolder(dir) {
+  const enc = notesIn(dir).filter((n) => n.enc);
+  if (
+    enc.length &&
+    !(await showModal(
+      `Decrypting ${folderName(dir)} stores its ${fileCount(enc.length)} as plain text again.`,
+      "Decrypt",
+      "Cancel",
+    ))
+  )
+    return;
+  for (const n of enc) if (!(await unsealNote(n))) break;
+  for (const f of [...encFolders]) if (f.startsWith(dir)) encFolders.delete(f);
+  saveFolders();
+  saveState();
+  scheduleDriveUpload(true);
+  render();
 }
 
 // Plaintext leaves memory: the text, its undo history, the editor
@@ -2871,7 +2965,11 @@ function renameNote(note, raw) {
   if (!name || name === note.name) return null;
   if (state.notes.some((n) => n !== note && n.name === name))
     return "A note called " + name + " exists";
-  applyMoves(new Map([[note, name]]), false);
+  const done = applyMoves(new Map([[note, name]]), false);
+  if (done instanceof Promise) {
+    done.then((ok) => ok && (saveState(), scheduleDriveUpload(true), scheduleUrlUpdate(), render()));
+    return null;
+  }
   saveState();
   scheduleDriveUpload(true);
   scheduleUrlUpdate();
@@ -2961,17 +3059,40 @@ function renameInTitle() {
 const FOLDERS_KEY = "notepad_folders";
 let keptFolders = new Set();
 let closedFolders = new Set();
+let encFolders = new Set(); // encrypted here; elsewhere a folder of only encrypted files is too
 let dragFolder = null;
 try {
   const f = JSON.parse(localStorage.getItem(FOLDERS_KEY) || "{}");
   keptFolders = new Set(f.kept || []);
   closedFolders = new Set(f.closed || []);
+  encFolders = new Set(f.enc || []);
 } catch {}
 
 function saveFolders() {
   try {
-    localStorage.setItem(FOLDERS_KEY, JSON.stringify({ kept: [...keptFolders], closed: [...closedFolders] }));
+    localStorage.setItem(
+      FOLDERS_KEY,
+      JSON.stringify({ kept: [...keptFolders], closed: [...closedFolders], enc: [...encFolders] }),
+    );
   } catch {}
+}
+
+// Encrypted folder: marked so in this browser, or every file in it is encrypted
+function isEncDir(dir) {
+  if (!vaultSupport || !dir) return false;
+  if (encFolders.has(dir)) return true;
+  const ns = notesIn(dir);
+  return ns.length > 0 && ns.every((n) => n.enc);
+}
+
+// The encrypted folder `name` is in, if any. `dirMap` [old, new]: a folder
+// being moved, so its new path counts as its old one
+function encFolderOf(name, dirMap) {
+  for (let d = dirOf(name); d; d = parentOf(d)) {
+    const was = dirMap && d.startsWith(dirMap[1]) ? dirMap[0] + d.slice(dirMap[1].length) : d;
+    if (isEncDir(was)) return was;
+  }
+  return null;
 }
 
 // Every folder: those notes are in (and their parents), and kept empty ones
@@ -3011,6 +3132,7 @@ function folderRow(dir, depth) {
     icon("chev-right", "sm folder-chev") +
     icon("folder", "kind folder") +
     `<span class="note-item-name">${escapeHtml(folderName(dir))}</span>` +
+    (isEncDir(dir) ? icon("lock", "sm row-lock") : "") +
     `<span class="note-item-time">${count || ""}</span>` +
     `<span class="note-item-acts"><button class="btn ghost sm square btn-more" data-tip="More actions" aria-label="More actions for ${escapeHtml(folderName(dir))}">${icon("more", "sm")}</button></span>`;
   div.addEventListener("click", (e) => {
@@ -3087,13 +3209,23 @@ noteList.addEventListener("drop", (e) => {
 
 // Renames notes, and rewrites the links to them and in them
 // (`moves`: note → new name). Returns false, changing nothing, on a clash.
-function applyMoves(moves, render = true) {
+// Into an encrypted folder encrypts, out of one decrypts: then it returns a
+// promise of that, asking for the passkey if needed.
+function applyMoves(moves, render = true, dirMap = null, crypted = false) {
   const taken = new Set(state.notes.filter((n) => !moves.has(n)).map((n) => n.name));
   for (const name of moves.values())
     if (taken.has(name)) {
       showToast(name + " exists already", { error: true });
       return false;
     }
+  if (!crypted) {
+    const seal = [...moves].filter(([n, to]) => !n.enc && encFolderOf(to, dirMap)).map(([n]) => n);
+    const unseal = [...moves]
+      .filter(([n, to]) => n.enc && encFolderOf(n.name) && !encFolderOf(to, dirMap))
+      .map(([n]) => n);
+    if (seal.length || unseal.length)
+      return cryptMoves(seal, unseal).then((ok) => ok && applyMoves(moves, render, dirMap, true));
+  }
   if (vimState.enabled && vimState.bufferDirty) vimWriteBuffer();
   const byOld = new Map([...moves].map(([n, name]) => [n.name, name]));
   for (const n of moves.keys()) keepFolder(dirOf(n.name));
@@ -3136,7 +3268,12 @@ function renameFolder(dir, to) {
     return false;
   }
   const moves = new Map(notesIn(dir).map((n) => [n, to + n.name.slice(dir.length)]));
-  if (moves.size && !applyMoves(moves)) return false;
+  const done = moves.size ? applyMoves(moves, true, [dir, to]) : true;
+  if (done instanceof Promise) return done.then((ok) => ok && movedFolder(dir, to));
+  return !!done && movedFolder(dir, to);
+}
+
+function movedFolder(dir, to) {
   const swap = (set) => {
     for (const f of [...set])
       if (f.startsWith(dir)) {
@@ -3146,6 +3283,7 @@ function renameFolder(dir, to) {
   };
   swap(keptFolders);
   swap(closedFolders);
+  swap(encFolders);
   keptFolders.add(to);
   saveFolders();
   renderNoteList();
@@ -3229,7 +3367,12 @@ function openFolderMenu(dir, anchor, at) {
     (dir
       ? item("pencil", "Rename", "rename") +
         item("folder", "Move to…", "move") +
-        item("search", "Search in folder", "search")
+        item("search", "Search in folder", "search") +
+        (vaultSupport
+          ? isEncDir(dir)
+            ? item("lock", "Stop encrypting", "decrypt")
+            : item("lock", "Encrypt folder", "encrypt")
+          : "")
       : "") +
     (subs || !dir
       ? item("chevron-down", "Expand all", "expand") + item("chevron-right", "Collapse all", "collapse")
@@ -3260,6 +3403,8 @@ function openFolderMenu(dir, anchor, at) {
       return renderNoteList();
     }
     if (act === "import") return openImport(dir);
+    if (act === "encrypt") return encryptFolder(dir);
+    if (act === "decrypt") return decryptFolder(dir);
     if (act === "zip")
       return dir ? downloadAll(notesIn(dir), folderName(dir) + ".zip", parentOf(dir)) : downloadAll();
     if (act === "delete") return deleteFolder(dir);
@@ -5727,6 +5872,8 @@ function uniqueName(name) {
 }
 
 async function createNote(name, content, focusName, ext, fields) {
+  // In an encrypted folder it is born encrypted
+  if (name && !fields?.enc && encFolderOf(name)) return createEncryptedNote(name, content || "", focusName);
   sharedNote = null;
   const contentStr = content || "";
   const estimatedBytes = (name || "").length * 2 + contentStr.length * 2 + 200;
@@ -10397,6 +10544,17 @@ async function importFiles(files, dir = "") {
 
   let last = null;
   let added = 0;
+  // Files landing in an encrypted folder are sealed before they are stored
+  const vault =
+    [...ready, ...clashes].some((it) => !it.meta?.enc && encFolderOf(it.name)) ? await ensureVault() : null;
+  const sealIn = async (n) => {
+    if (n.enc || !encFolderOf(n.name)) return;
+    if (vault) return sealNote(n, vault);
+    state.notes.splice(state.notes.indexOf(n), 1);
+    skipped.push(`${n.name} — its folder is encrypted`);
+    added--;
+    if (last === n) last = null;
+  };
   const add = (it, name) => {
     if (wouldExceedStorage(it.content.length * 2 + name.length * 2 + 200)) {
       skipped.push(`${name} — not enough storage space`);
@@ -10418,7 +10576,10 @@ async function importFiles(files, dir = "") {
     state.notes.unshift(last);
     added++;
   };
-  for (const it of ready) add(it, it.name);
+  for (const it of ready) {
+    add(it, it.name);
+    if (last?.name === it.name) await sealIn(last);
+  }
   for (const c of clashes) {
     if (c.choice === "replace") {
       // The file replaces it as it is: encrypted or not
@@ -10429,7 +10590,11 @@ async function importFiles(files, dir = "") {
       c.existing.updatedAt = c.meta?.updatedAt ?? Date.now();
       last = c.existing;
       added++;
-    } else if (c.choice === "keep") add(c, uniqueName(c.name));
+      await sealIn(c.existing);
+    } else if (c.choice === "keep") {
+      add(c, uniqueName(c.name));
+      await sealIn(last);
+    }
   }
   if (last) {
     sharedNote = null;

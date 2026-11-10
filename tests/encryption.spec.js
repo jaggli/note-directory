@@ -372,3 +372,53 @@ test("moving a linked file rewrites links in unlocked encrypted files, re-encryp
   await expect(page.locator("#editor")).toHaveValue("see [plan](work/plan.md)");
   expect(await page.evaluate((id) => realNote(id).content.includes("plan"), id)).toBe(false);
 });
+
+test("encrypted folders: encrypt in place, move in encrypts, move out decrypts, new files born sealed", async ({
+  page,
+}) => {
+  await authenticator(page);
+  await openApp(page);
+  // A vault first (setup shows the recovery key)
+  await newEncrypted(page, "x");
+  await page.evaluate(async () => {
+    await createNote("vault/a.md", "alpha secret");
+    await createNote("loose.md", "beta secret");
+  });
+  const enc = (name) => page.evaluate((n) => !!state.notes.find((x) => x.name === n)?.enc, name);
+  const sealed = (name) => page.evaluate((n) => state.notes.find((x) => x.name === n)?.content, name);
+
+  await page.locator('#noteList .folder-item[data-folder="vault/"]').click({ button: "right" });
+  await page.click('#noteMenu [data-folder-act="encrypt"]');
+  await expect.poll(() => enc("vault/a.md")).toBe(true);
+  expect(await sealed("vault/a.md")).not.toContain("alpha");
+  await expect(page.locator('#noteList .folder-item[data-folder="vault/"] .row-lock')).toBeVisible();
+
+  // In: sealed. Out: asks, then plain.
+  await page.evaluate(() => moveNotesTo([state.notes.find((n) => n.name === "loose.md")], "vault/"));
+  await expect.poll(() => enc("vault/loose.md")).toBe(true);
+  expect(await sealed("vault/loose.md")).not.toContain("beta");
+  page.evaluate(() => moveNotesTo([state.notes.find((n) => n.name === "vault/loose.md")], ""));
+  await expect(page.locator("#modalText")).toContainText("decrypts it");
+  await page.click("#modalConfirm");
+  await expect.poll(() => sealed("loose.md")).toBe("beta secret");
+  expect(await enc("loose.md")).toBe(false);
+
+  // Created inside: encrypted from the start
+  await page.evaluate(() => createNote("vault/new.md", "gamma"));
+  await expect.poll(() => enc("vault/new.md")).toBe(true);
+  expect(await sealed("vault/new.md")).not.toContain("gamma");
+
+  // Stop encrypting: all plain again
+  page.evaluate(() => decryptFolder("vault/"));
+  await page.click("#modalConfirm");
+  await expect.poll(() => sealed("vault/a.md")).toBe("alpha secret");
+  await expect(page.locator('#noteList .folder-item[data-folder="vault/"] .row-lock')).toHaveCount(0);
+});
+
+test("a folder of only encrypted files counts as encrypted on any device", async ({ page }) => {
+  await authenticator(page);
+  await openApp(page);
+  await newEncrypted(page, "x");
+  await page.evaluate(() => renameNote(realNote(state.activeId), "box/one.md"));
+  expect(await page.evaluate(() => [isEncDir("box/"), encFolderOf("box/sub/x.md"), isEncDir("")])).toEqual([true, "box/", false]);
+});

@@ -35,7 +35,9 @@ or close it; double-click or **Rename** to rename it.
   its folder, `/x.md` to the top level.
 - Folder menu (⋯, right-click, long press): New note / drawing / table / folder
   in it, Rename, Move to…, Search in folder, Expand / Collapse all (with
-  subfolders), Import files here…, Export as ZIP, Delete.
+  subfolders), Encrypt folder / Stop encrypting (see
+  [encryption.md](encryption.md#encrypted-folders)), Import files here…,
+  Export as ZIP, Delete.
 - Note menu, from the list: also Duplicate (`plan copy.md`, encrypted files
   stay sealed), Move to…, and Copy markdown link (relative to the open note;
   `![]()` for drawings and tables).

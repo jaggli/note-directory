@@ -63,3 +63,21 @@ Starting over leaves older files in the old vault. Opening one with its
 recovery key offers the passkey of another vault: evaluated with this vault's
 salt, it becomes a slot here too, so one passkey opens every vault. A lock
 screen whose passkeys don't answer points to the recovery key.
+
+## Encrypted folders
+
+**Encrypt folder** (folder menu) encrypts every file in it, subfolders
+included, with the open vault. Names stay readable, as for single files.
+
+- A folder counts as encrypted when this browser marked it (`enc` in
+  `notepad_folders`), or when every file in it is encrypted, so other devices
+  agree without syncing a flag. An empty folder is only marked locally.
+- Moving a file in (drag, Move to…, a typed path, a folder moved in) encrypts
+  it before it moves; the passkey is asked if no vault is open, and
+  cancelling leaves it where it was.
+- Moving a file out to a folder that isn't encrypted asks first, then decrypts
+  it (the passkey if it's locked). Files encrypted on their own stay
+  encrypted wherever they go.
+- New files and imports in it are encrypted before they're stored.
+- **Stop encrypting** decrypts everything in it after a confirmation.
+
