@@ -1014,13 +1014,14 @@
     const nr = r2 - r1 + 1;
     const nc = c2 - c1 + 1;
     const b = (g, label, cls = "") => `<button role="menuitem" data-g="${g}" class="${cls}">${label}</button>`;
+    const list = (its) =>
+      its.map((it) => (it ? b(it[0], pre ? pre + it[1] : it[1][0].toUpperCase() + it[1].slice(1)) : "<hr>")).join("");
+    const rows = [["row-above", "row above"], ["row-below", "row below"], ["row-above-10", "10 rows above"], ["row-below-10", "10 rows below"]];
+    const cols = [["col-left", "column left"], ["col-right", "column right"], ["col-left-10", "10 columns left"], ["col-right-10", "10 columns right"]];
     return {
-      insert: [
-        ["row-above", "row above"], ["row-below", "row below"], ["row-above-10", "10 rows above"], ["row-below-10", "10 rows below"], 0,
-        ["col-left", "column left"], ["col-right", "column right"], ["col-left-10", "10 columns left"], ["col-right-10", "10 columns right"],
-      ]
-        .map((it) => (it ? b(it[0], pre ? pre + it[1] : it[1][0].toUpperCase() + it[1].slice(1)) : "<hr>"))
-        .join(""),
+      insert: list([...rows, 0, ...cols]),
+      insertRows: list(rows),
+      insertCols: list(cols),
       sort:
         b("sort-asc", "Sort ascending") + b("sort-desc", "Sort descending") + (E.sort ? b("sort-off", "Clear sort") : ""),
       delete:
@@ -1056,26 +1057,50 @@
       return;
     }
     if (g === "save-sort") return saveSort();
-    if (g === "chart") {
-      const { c1, c2 } = range();
-      return E.opts.onChart(c1, c2);
-    }
+    if (g === "chart") return E.opts.onChart(rangeRef());
     if (E.pop.classList.contains("visible") && E.pop.dataset.from === g) return closePop();
     const r = b.getBoundingClientRect();
     E.pop.dataset.from = g;
     openPop(popItems()[g], r.left, r.bottom + 4);
   }
 
+  // The selection as "B2:D9" (row numbers as shown: data rows from 1), "B:D"
+  // when it spans every row, "" for one cell. Sorted or filtered: its first to last row.
+  function rangeRef() {
+    const { r1, r2, c1, c2 } = range();
+    if (r1 === r2 && c1 === c2) return "";
+    const rows = [];
+    for (let p = r1; p <= r2; p++) rows.push(real(p));
+    const lo = Math.min(...rows);
+    const hi = Math.max(...rows);
+    if ((lo <= d0() && hi >= E.rows.length - 1) || hi < d0()) return `${letters(c1)}:${letters(c2)}`;
+    return `${letters(c1)}${Math.max(lo, d0()) - d0() + 1}:${letters(c2)}${hi - d0() + 1}`;
+  }
+
+  // Cells: sort, chart, delete. Row and column headers add their own inserts.
   function onContextMenu(e) {
     const hit = cellAt(e.target);
     if (!hit) return;
     e.preventDefault();
     const { r1, r2, c1, c2 } = range();
-    const inside = hit.kind === "cell" ? hit.r >= r1 && hit.r <= r2 && hit.c >= c1 && hit.c <= c2 : false;
+    const inside =
+      hit.kind === "cell"
+        ? hit.r >= r1 && hit.r <= r2 && hit.c >= c1 && hit.c <= c2
+        : hit.kind === "row"
+          ? hit.r >= r1 && hit.r <= r2 && c1 === 0 && c2 === E.cols - 1
+          : hit.kind === "col" && hit.c >= c1 && hit.c <= c2 && r1 === 0;
     if (!inside) selectHit(hit, false);
     const items = popItems("Insert ");
     E.pop.dataset.from = "";
-    openPop(E.readonly ? items.sort : items.sort + "<hr>" + items.insert + "<hr>" + items.delete, e.clientX, e.clientY);
+    const chart = E.opts.onChart
+      ? `<button role="menuitem" data-g="chart">${rangeRef() ? "Create chart from range" : "Create chart"}</button><hr>`
+      : "";
+    const insert = hit.kind === "row" ? items.insertRows + "<hr>" : hit.kind === "col" ? items.insertCols + "<hr>" : "";
+    openPop(
+      E.readonly ? items.sort : (hit.kind === "row" ? "" : items.sort + "<hr>") + chart + insert + items.delete,
+      e.clientX,
+      e.clientY,
+    );
   }
 
   function onPop(e) {
@@ -1098,6 +1123,7 @@
       "del-rows": deleteRows,
       "del-cols": deleteCols,
       clear: clearRange,
+      chart: () => E.opts.onChart?.(rangeRef()),
     }[b.dataset.g];
     act?.();
     E.scroll.focus({ preventScroll: true });

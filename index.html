@@ -903,7 +903,8 @@
         background: var(--overlay);
       }
 
-      .md-preview li.task-item input[type="checkbox"] {
+      /* Task checkboxes; the chart panel and share popover use the same */
+      :is(.md-preview li.task-item, .chart-panel, .share-parts) input:is([type="checkbox"], [type="radio"]) {
         appearance: none;
         -webkit-appearance: none;
         display: inline-grid;
@@ -921,18 +922,28 @@
         flex-shrink: 0;
       }
 
+      /* Same specificity as the rule above, later: these win */
+      :is(.chart-panel, .share-parts, .md-preview li.task-item.x) input:is([type="checkbox"], [type="radio"]) {
+        margin: 0;
+        align-self: center;
+      }
+
+      .chart-panel input[type="radio"] {
+        border-radius: 50%;
+      }
+
       .md-preview li.task-item > :is(span, label) {
         flex: 1;
       }
 
       /* Checked: accent fill, a dark tick drawn in CSS — full contrast */
-      .md-preview li.task-item input[type="checkbox"]:checked {
+      :is(.md-preview li.task-item, .chart-panel, .share-parts) input:is([type="checkbox"], [type="radio"]):checked {
         background: var(--n-accent);
         box-shadow: none;
         color: var(--n-on-accent);
       }
 
-      .md-preview li.task-item input[type="checkbox"]:checked::after {
+      :is(.md-preview li.task-item, .chart-panel, .share-parts) input:is([type="checkbox"], [type="radio"]):checked::after {
         content: "";
         width: 8px;
         height: 4.5px;

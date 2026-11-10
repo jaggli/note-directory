@@ -71,9 +71,11 @@ Notes from the app's own zip export are not converted.
 - Delete clears the selection; ⌘⌫ removes it when whole rows or columns are
   selected. ⌘C / ⌘X copy TSV, ⌘V pastes TSV (what
   spreadsheets put on the clipboard); one value pasted over a range fills it.
-- **Insert ▾ / Delete ▾** (toolbar, or right-click): 1 or 10 rows above/below,
-  1 or 10 columns left/right (the new ones end up selected), delete the
-  selected rows or columns.
+- **Insert ▾ / Delete ▾** (toolbar): 1 or 10 rows above/below, 1 or 10
+  columns left/right (the new ones end up selected), delete the selected rows
+  or columns. Right-click: a cell gets sort, **Create chart from range** and
+  delete; a row number adds the row inserts, a column letter the column ones.
+- **Add chart**: see [chart-format.md](chart-format.md#in-the-app).
 - Every finished edit is one undo step and saves through the normal note path,
   like the canvas (`drawCommit`).
 - ⌘F finds in cells, including rows off screen; replace goes to Source.

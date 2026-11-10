@@ -81,17 +81,72 @@ test("data from a table follows it when it moves; the table lists the chart as u
   await expect(page.locator(".chart-msg")).toContainText("not a table");
 });
 
-test("Add chart in a table makes one next to it on the selected columns", async ({ page }) => {
+test("Add chart in a table uses the selected range; one cell takes the whole table", async ({ page }) => {
   await openApp(page);
   await page.evaluate((csv) => createNote("q/sales.csv", csv), SALES);
   await expect(page.locator("#gridHost .grid-scroll")).toBeVisible();
+  // Rows 1–2 as numbered (Q1, Q2), columns B–C
   await page.evaluate(() => {
-    Grid._state.act = { r: 1, c: 2 };
+    Grid._state.act = { r: 2, c: 2 };
     Grid._state.anc = { r: 1, c: 1 };
   });
   await page.click('#gridHost [data-g="chart"]');
-  await expect.poll(() => content(page, "q/sales.chart")).toBe("chart 1\ndata sales.csv\ny north south\n");
+  await expect.poll(() => content(page, "q/sales.chart")).toBe("chart 1\ndata sales.csv\nrange B1:C2\n");
   await expect(page.locator("#chartHost svg")).toBeVisible();
+  const c = await page.evaluate(() => {
+    const t = Chart.compile(getActiveNote().content, chartData(getActiveNote().name));
+    return { rows: t.table.rows.length, draw: t.draw };
+  });
+  expect(c.rows).toBe(2);
+  expect(c.draw).toContain('"Q1"');
+  expect(c.draw).not.toContain('"Q3"');
+
+  // Right-click a cell: no inserts, a chart from the range
+  await page.evaluate(() => switchNote(state.notes.find((n) => n.name === "q/sales.csv").id));
+  await expect(page.locator("#gridHost .grid-scroll")).toBeVisible();
+  await page.evaluate(() => {
+    Grid._state.act = { r: 3, c: 1 };
+    Grid._state.anc = { r: 0, c: 1 };
+  });
+  const cell = page.locator("#gridHost .grid-row[data-r='2'] .grid-cell[data-c='1']");
+  await cell.click({ button: "right" });
+  await expect(page.locator("#gridHost .grid-pop")).not.toContainText("Insert");
+  await page.click('#gridHost .grid-pop [data-g="chart"]');
+  await expect.poll(() => content(page, "q/sales1.chart")).toBe("chart 1\ndata sales.csv\nrange B:B\n");
+});
+
+test("ranges and sizes", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => loadChart());
+  const r = await page.evaluate((csv) => {
+    const t = (range) => Chart.table(csv, ",", true, range);
+    const c = Chart.compile("chart 1\nsize 900 300\ndata\n" + csv, () => ({}));
+    return {
+      rows: t("A2:C3").rows.map((r) => r[0]),
+      cols: Chart.compile("chart 1\nrange C:C\ndata\n" + csv, () => ({})).draw.includes('"north"'),
+      frame: c.draw.split("\n")[1],
+      bad: Chart.compile("chart 1\nrange nope\ndata\n" + csv, () => ({})).error,
+    };
+  }, SALES);
+  expect(r.rows).toEqual(["Q2", "Q3"]);
+  expect(r.cols).toBe(false);
+  expect(r.frame).toContain(" 900 300 ");
+  expect(r.bad).toContain("nope");
+});
+
+test("dragging the corner resizes the chart", async ({ page }) => {
+  await withChart(page, "chart 1\ndata sales.csv\n");
+  const rz = page.locator("#chartHost .chart-rz");
+  await page.locator("#chartHost .chart-frame").hover();
+  const b = await rz.boundingBox();
+  await page.mouse.move(b.x + 5, b.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(b.x - 95, b.y - 95, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(() => content(page, "sales.chart")).toMatch(/size \d+ \d+/);
+  const size = (await content(page, "sales.chart")).match(/size (\d+) (\d+)/);
+  expect(+size[1]).toBeLessThan(640);
+  expect(+size[2]).toBeLessThan(400);
 });
 
 test("markdown: ![](x.chart) embeds, ```chart blocks render and edit in the overlay", async ({ page }) => {

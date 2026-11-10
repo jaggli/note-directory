@@ -3848,7 +3848,7 @@ function showGrid(note, readonly) {
           drawCommit(note, content);
           if (findReplaceBar.classList.contains("visible")) updateFindMatches(false);
         },
-        onChart: readonly || !note.id ? null : (c1, c2) => addChart(note, c1, c2),
+        onChart: readonly || !note.id ? null : (range) => addChart(note, range),
         onHeader: (on) => {
           const n = state.notes.find((x) => x.id === note.id);
           if (!n) return;
@@ -3982,20 +3982,14 @@ async function drawTextOf(note) {
   return Chart.compile(note.content, chartData(note.name)).draw;
 }
 
-// From a table: a chart next to it on the selected columns (one column: all)
-async function addChart(table, c1, c2) {
+// From a table: a chart next to it on the selected range ("" for the whole table)
+function addChart(table, range) {
   const real = viewOf(realNote(table.id));
   if (!real) return;
-  await loadChart();
-  const names = Chart.table(real.content, csvSep(real.name), real.csvHeader !== false).cols;
-  let text = `chart 1\ndata ${relRef(dirOf(real.name), real.name)}\n`;
-  // The first column is the categories
-  if (c2 > c1) text += "y " + names.slice(Math.max(c1, 1), c2 + 1).map(quoteChart).join(" ") + "\n";
   let name = real.name.replace(/\.[^./]+$/, "") + ".chart";
   if (state.notes.some((n) => n.name === name)) name = uniqueName(name);
-  return createNote(name, text);
+  return createNote(name, `chart 1\ndata ${relRef(dirOf(real.name), real.name)}\n` + (range ? `range ${range}\n` : ""));
 }
-const quoteChart = (v) => (/^[^\s"\\]+$/.test(v) ? v : '"' + v.replace(/[\\"]/g, "\\$&") + '"');
 
 const NEW_CHART = "chart 1\ntype column\ndata\nmonth,visits\nJan,120\nFeb,150\nMar,90\nApr,180\n";
 

@@ -21,7 +21,7 @@
   const DEFAULTS = {
     type: "column", data: "", x: "", y: [], title: "", colors: [], stroke: "m",
     background: "none", border: "none", legend: "auto", labels: "off", grid: "on",
-    ymin: "auto", ymax: "auto", xlabel: "", ylabel: "",
+    ymin: "auto", ymax: "auto", xlabel: "", ylabel: "", range: "", size: "640 400",
   };
   const KEYS = Object.keys(DEFAULTS);
   const LISTS = new Set(["y", "colors"]);
@@ -66,7 +66,8 @@
     const end = inlineAt(lines) < 0 ? lines.length : inlineAt(lines);
     const at = lines.slice(0, end).findIndex((l) => tokens(l.trim())[0] === key);
     const def = DEFAULTS[key];
-    const isDef = Array.isArray(value) ? !value.length : value == null || value === "" || value === def;
+    // Arrays are several values: series, colours, a size
+    const isDef = Array.isArray(value) ? !value.length || value.join(" ") === def : value == null || value === "" || value === def;
     const line = isDef ? null : key + " " + (Array.isArray(value) ? value.map(quote).join(" ") : quote(String(value)));
     if (at >= 0) {
       if (line == null) lines.splice(at, 1);
@@ -102,14 +103,30 @@
     return s && Number.isFinite(n) ? n : null;
   }
 
-  // {cols, rows} from CSV text; without a header row the columns are A, B, …
-  function table(text, sep = ",", header = true) {
-    const rows = window.csvParse(text || "", sep).filter((r) => r.some((c) => c.trim()));
-    const w = Math.max(0, ...rows.map((r) => r.length));
-    const letters = (c) => (c >= 26 ? letters(Math.floor(c / 26) - 1) : "") + String.fromCharCode(65 + (c % 26));
-    const cols = header && rows.length ? rows.shift().map((c, i) => c.trim() || letters(i)) : [];
+  const letters = (c) => (c >= 26 ? letters(Math.floor(c / 26) - 1) : "") + String.fromCharCode(65 + (c % 26));
+  const colIndex = (s) => [...s.toUpperCase()].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+
+  // "B2:D9" (data rows from 1, as the grid numbers them) or "B:D": 0-based, rows null for all
+  function parseRange(s) {
+    const m = /^([A-Z]+)(\d*):([A-Z]+)(\d*)$/i.exec(String(s || "").trim());
+    if (!m) return null;
+    const [c1, c2] = [colIndex(m[1]), colIndex(m[3])].sort((a, b) => a - b);
+    const rows = m[2] && m[4] ? [+m[2] - 1, +m[4] - 1].sort((a, b) => a - b) : null;
+    return { c1, c2, r1: rows?.[0] ?? null, r2: rows?.[1] ?? null };
+  }
+
+  // {cols, rows, range} from CSV text; without a header row the columns are A, B, …
+  function table(text, sep = ",", header = true, range = "") {
+    const all = window.csvParse(text || "", sep);
+    const head = header && all.length ? all[0] : null;
+    const rg = parseRange(range);
+    let rows = header ? all.slice(1) : all;
+    if (rg && rg.r1 != null) rows = rows.filter((_, i) => i >= rg.r1 && i <= rg.r2);
+    rows = rows.filter((r) => r.some((c) => c.trim()));
+    const w = Math.max(head?.length || 0, ...rows.map((r) => r.length));
+    const cols = head ? head.map((c, i) => c.trim() || letters(i)) : [];
     for (let c = cols.length; c < w; c++) cols.push(letters(c));
-    return { cols, rows };
+    return { cols, rows, range: rg };
   }
 
   const numeric = (t, c) => {
@@ -118,20 +135,27 @@
   };
 
   // The columns the chart uses: x (categories) and the series
+  // (a range: its number columns; its first column is the categories unless it holds numbers)
   function columns(spec, t) {
+    const rg = t.range;
+    const inRange = (c) => !rg || (c >= rg.c1 && c <= rg.c2);
     let x = t.cols.indexOf(spec.x);
-    if (x < 0) x = 0;
+    if (x < 0) x = rg && !numeric(t, rg.c1) ? rg.c1 : 0;
     let y = spec.y.map((n) => t.cols.indexOf(n)).filter((c) => c >= 0 && c !== x);
-    if (!y.length) y = t.cols.map((_, c) => c).filter((c) => c !== x && numeric(t, c));
+    if (!y.length) y = t.cols.map((_, c) => c).filter((c) => c !== x && inRange(c) && numeric(t, c));
     if (/pie|donut/.test(spec.type)) y = y.slice(0, 1);
     return { x, y };
   }
 
   // ── Layout: the chart as drawing lines ──
 
-  const W = 640;
-  const H = 400;
   const PAD = 20;
+  // Chart size in drawing units: `size W H`
+  function dims(spec) {
+    const m = /^(\d+)\s+(\d+)$/.exec(spec.size || "");
+    const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+    return m ? [cl(+m[1], 240, 2400), cl(+m[2], 160, 1600)] : [640, 400];
+  }
   const CH = 6.6; // about one 12px sans character
 
   const fmtNum = (v) =>
@@ -153,6 +177,7 @@
   const clip = (s, n) => (s.length > n ? s.slice(0, Math.max(1, n - 1)) + "…" : s);
 
   function layout(spec, t) {
+    const [W, H] = dims(spec);
     const out = ["draw 1"];
     let n = 0;
     const R = Math.round;
@@ -347,12 +372,13 @@
     const spec = parse(text);
     let t = null;
     let error = spec.errors[0] || "";
-    if (spec.inline != null) t = table(spec.inline);
+    if (spec.inline != null) t = table(spec.inline, ",", true, spec.range);
     else if (spec.data) {
       const d = data(spec.data);
       if (d.error) error = d.error;
-      else t = table(d.text, d.sep, d.header);
+      else t = table(d.text, d.sep, d.header, spec.range);
     } else error ||= "no data: pick a table or add rows";
+    if (spec.range && !parseRange(spec.range)) error ||= `range “${spec.range}” isn't like B2:D9 or B:D`;
     return { draw: layout(spec, t), spec, table: t, error };
   }
 
@@ -363,24 +389,31 @@
   const CSS = `
 .chart-host{display:none;flex:1;min-width:0;min-height:0;background:var(--bg);color:var(--n-text);font:var(--n-body)}
 .chart-host.visible{display:flex}
-.chart-view{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;overflow:auto}
-.chart-view svg{max-width:100%;height:auto;max-height:100%}
+.chart-view{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:8px;padding:24px;overflow:auto}
+.chart-frame{position:relative;max-width:100%}
+.chart-canvas svg{display:block;max-width:100%;height:auto}
+.chart-rz{position:absolute;right:-6px;bottom:-6px;width:14px;height:14px;border-radius:3px;background:var(--n-raised);box-shadow:inset 0 0 0 1.5px var(--n-text-3);cursor:nwse-resize;touch-action:none;opacity:0;transition:opacity .12s}
+.chart-frame:hover .chart-rz,.chart-rz.dragging{opacity:1}
+.chart-host.readonly .chart-rz{display:none}
+.chart-size-tip{position:absolute;right:12px;bottom:12px;padding:2px 6px;border-radius:var(--n-r-sm);background:var(--n-inverse);color:var(--n-inverse-text);font:var(--n-caption);pointer-events:none}
 .chart-msg{color:var(--n-warning);font:var(--n-label)}
 .chart-msg:empty{display:none}
-.chart-panel{width:280px;flex:none;overflow-y:auto;border-left:1px solid var(--n-line);padding:12px 14px 24px;display:flex;flex-direction:column;gap:14px}
+.chart-panel{width:288px;flex:none;overflow-y:auto;border-left:1px solid var(--n-line);padding:16px 16px 28px;display:flex;flex-direction:column;gap:22px}
 .chart-host.readonly .chart-panel{display:none}
-.chart-panel h3{margin:0 0 6px;font:var(--n-label);color:var(--n-text-3);text-transform:uppercase;letter-spacing:.04em}
+.chart-panel section{display:flex;flex-direction:column;gap:8px}
+.chart-panel h3{margin:0 0 2px;font:var(--n-caption);color:var(--n-text-3);text-transform:uppercase;letter-spacing:.06em}
 .chart-types{display:grid;grid-template-columns:1fr 1fr;gap:4px}
 .chart-types button{height:28px;border:0;border-radius:var(--n-r-md);background:var(--n-field);color:var(--n-text);font:var(--n-label);cursor:pointer}
+.chart-types button:hover{background:var(--n-hover)}
 .chart-types button[aria-pressed=true]{background:var(--n-accent);color:var(--n-on-accent)}
-.chart-row{display:flex;align-items:center;gap:8px;min-height:28px}
-.chart-row>span:first-child{flex:none;width:84px;color:var(--n-text-2);font:var(--n-label)}
-.chart-row input[type=text],.chart-row select{flex:1;min-width:0;height:28px;border:1px solid var(--n-line);border-radius:var(--n-r-md);background:var(--n-field);color:var(--n-text);font:var(--n-label);padding:0 6px}
-.chart-row input[type=checkbox]{margin:0}
-.chart-series{display:flex;flex-direction:column;gap:2px}
-.chart-series label{display:flex;align-items:center;gap:8px;min-height:26px;font:var(--n-label)}
-.chart-series label span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chart-series select{width:92px;height:24px;border:1px solid var(--n-line);border-radius:var(--n-r-md);background:var(--n-field);color:var(--n-text);font:var(--n-label)}
+.chart-row{display:grid;grid-template-columns:88px 1fr;align-items:center;gap:10px}
+.chart-row>span:first-child{color:var(--n-text-2);font:var(--n-label)}
+.chart-panel input[type=text],.chart-panel input[type=number],.chart-panel select{min-width:0;width:100%;height:28px;box-sizing:border-box;border:1px solid var(--n-line);border-radius:var(--n-r-md);background:var(--n-field);color:var(--n-text);font:var(--n-label);padding:0 8px}
+.chart-pair{display:flex;align-items:center;gap:6px;color:var(--n-text-3);font:var(--n-label)}
+.chart-series{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.chart-check{display:flex;align-items:center;gap:10px;min-height:28px;font:var(--n-label);cursor:pointer}
+.chart-check>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chart-check select{width:96px;flex:none;height:26px}
 .chart-swatch{width:12px;height:12px;border-radius:3px;flex:none}
 .chart-hint{color:var(--n-text-3);font:var(--n-label)}
 @media (max-width:700px){.chart-host{flex-direction:column}.chart-panel{width:auto;border-left:0;border-top:1px solid var(--n-line);max-height:45%}}
@@ -399,8 +432,9 @@
       document.head.appendChild(st);
     }
     E.host = host;
-    host.innerHTML = `<div class="chart-view"><div class="chart-canvas"></div><div class="chart-msg" role="status"></div></div><div class="chart-panel" aria-label="Chart settings"></div>`;
+    host.innerHTML = `<div class="chart-view"><div class="chart-frame"><div class="chart-canvas"></div><div class="chart-rz" title="Drag to resize" aria-hidden="true"></div></div><div class="chart-msg" role="status"></div></div><div class="chart-panel" aria-label="Chart settings"></div>`;
     E.canvas = host.querySelector(".chart-canvas");
+    host.querySelector(".chart-rz").addEventListener("pointerdown", onResize);
     E.msg = host.querySelector(".chart-msg");
     E.panel = host.querySelector(".chart-panel");
     E.panel.addEventListener("click", onPanelClick);
@@ -445,7 +479,7 @@
     const cur = spec.inline != null ? "" : spec.data;
     const a = document.activeElement;
     const refocus = E.panel.contains(a)
-      ? ["k", "y", "color", "type"].map((d) => (a.dataset[d] != null ? `[data-${d}="${a.dataset[d]}"]` : null)).find(Boolean)
+      ? ["k", "y", "color", "type", "size"].map((d) => (a.dataset[d] != null ? `[data-${d}="${a.dataset[d]}"]` : null)).find(Boolean)
       : null;
     E.panel.innerHTML =
       `<section><h3>Type</h3><div class="chart-types">${TYPES.map(
@@ -456,6 +490,7 @@
         .map((x) => opt(x.ref, x.label, cur))
         .join("")}${opt("", "Rows in this chart", cur)}</select></label>` +
       (spec.inline != null ? `<div class="chart-hint">Edit the rows in Source, after the <code>data</code> line.</div>` : "") +
+      `<label class="chart-row"><span>Range</span><input type="text" data-k="range" value="${esc(spec.range)}" placeholder="whole table" spellcheck="false" /></label>` +
       (t && t.cols.length
         ? `<label class="chart-row"><span>${round ? "Slices" : "Categories"}</span><select data-k="x">${t.cols
             .map((c, i) => opt(String(i), c, String(cols.x)))
@@ -465,7 +500,7 @@
               if (i === cols.x) return "";
               const k = cols.y.indexOf(i);
               const color = spec.colors[k] || PALETTE[k % PALETTE.length];
-              return `<label><input type="${round ? "radio" : "checkbox"}" name="chart-y" data-y="${i}"${k >= 0 ? " checked" : ""} /><span>${esc(c)}</span>${
+              return `<label class="chart-check"><input type="${round ? "radio" : "checkbox"}" name="chart-y" data-y="${i}"${k >= 0 ? " checked" : ""} /><span>${esc(c)}</span>${
                 k >= 0 && !round
                   ? `<i class="chart-swatch" style="background:var(--${color})"></i><select data-color="${k}" aria-label="Colour of ${esc(c)}">${colorOpts(color)}</select>`
                   : ""
@@ -483,10 +518,11 @@
           `<label class="chart-row"><span>Min</span><input type="text" inputmode="decimal" data-k="ymin" value="${esc(spec.ymin === "auto" ? "" : spec.ymin)}" placeholder="auto" /></label>` +
           `<label class="chart-row"><span>Max</span><input type="text" inputmode="decimal" data-k="ymax" value="${esc(spec.ymax === "auto" ? "" : spec.ymax)}" placeholder="auto" /></label>`) +
       `<label class="chart-row"><span>Legend</span><select data-k="legend">${opt("auto", "Auto", spec.legend)}${opt("on", "Show", spec.legend)}${opt("off", "Hide", spec.legend)}</select></label>` +
-      `<label class="chart-row"><span>Values</span><input type="checkbox" data-k="labels"${spec.labels === "on" ? " checked" : ""} /></label>` +
-      (round ? "" : `<label class="chart-row"><span>Gridlines</span><input type="checkbox" data-k="grid"${spec.grid !== "off" ? " checked" : ""} /></label>`) +
+      `<label class="chart-check"><input type="checkbox" data-k="labels"${spec.labels === "on" ? " checked" : ""} /><span>Show values</span></label>` +
+      (round ? "" : `<label class="chart-check"><input type="checkbox" data-k="grid"${spec.grid !== "off" ? " checked" : ""} /><span>Gridlines</span></label>`) +
       `</section>` +
       `<section><h3>Style</h3>` +
+      `<div class="chart-row"><span>Size</span><span class="chart-pair"><input type="number" min="240" max="2400" step="10" data-size="w" value="${dims(spec)[0]}" aria-label="Width" />×<input type="number" min="160" max="1600" step="10" data-size="h" value="${dims(spec)[1]}" aria-label="Height" /></span></div>` +
       (/line|area/.test(spec.type)
         ? `<label class="chart-row"><span>Line</span><select data-k="stroke">${SIZES.map(([v, l]) => opt(v, l, spec.stroke)).join("")}</select></label>`
         : "") +
@@ -494,6 +530,38 @@
       `<label class="chart-row"><span>Border</span><select data-k="border">${colorOpts(spec.border, true)}</select></label>` +
       `</section>`;
     if (refocus) E.panel.querySelector(refocus)?.focus();
+  }
+
+  // Dragging the corner: the chart's size in drawing units, kept on release
+  function onResize(e) {
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("dragging");
+    const svg = E.canvas.querySelector("svg");
+    const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width || 1;
+    const [w0, h0] = dims(E.compiled.spec);
+    const tip = document.createElement("div");
+    tip.className = "chart-size-tip";
+    E.host.querySelector(".chart-view").append(tip);
+    let size = null;
+    const move = (ev) => {
+      const snap = (v) => Math.round(v / 10) * 10;
+      const w = Math.max(240, Math.min(2400, snap(w0 + (ev.clientX - e.clientX) / scale)));
+      const h = Math.max(160, Math.min(1600, snap(h0 + (ev.clientY - e.clientY) / scale)));
+      size = [w, h];
+      tip.textContent = `${w} × ${h}`;
+      render(set(E.text, "size", size.map(String)));
+    };
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.classList.remove("dragging");
+      tip.remove();
+      if (size) commit(set(E.text, "size", size.map(String)));
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up, { once: true });
+    handle.addEventListener("pointercancel", up, { once: true });
   }
 
   function commit(text) {
@@ -539,6 +607,10 @@
       // Defaults at the end are left out
       while (colors.length && colors.at(-1) === PALETTE[(colors.length - 1) % PALETTE.length]) colors.pop();
       return commit(set(E.text, "colors", colors));
+    }
+    if (el.dataset.size) {
+      const [w, h] = [...E.panel.querySelectorAll("[data-size]")].map((i) => Math.round(+i.value) || 0);
+      return commit(set(E.text, "size", [String(Math.max(240, Math.min(2400, w))), String(Math.max(160, Math.min(1600, h)))]));
     }
     if (el.type === "checkbox") return commit(set(E.text, k, el.checked ? "on" : "off"));
     if (k === "ymin" || k === "ymax") return commit(set(E.text, k, num(el.value) == null ? "" : el.value.trim()));

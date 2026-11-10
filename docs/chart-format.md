@@ -37,10 +37,12 @@ writes a file; unknown lines are reported and kept.
 | ------------ | ------------------------------------------------------------- | ------- |
 | `type`       | `column bar line area pie donut stacked-column stacked-bar`  | `column` |
 | `data`       | a table note (`.csv`/`.tsv`), relative to the chart; bare: inline rows follow | — |
-| `x`          | the column with the categories (pie: the slices)             | first column |
-| `y`          | the series columns                                           | every number column but `x` |
+| `range`      | part of the table: `B1:D9` (data rows numbered as in the grid, from 1) or `B:D` (every row) | whole table |
+| `x`          | the column with the categories (pie: the slices)             | the range's first column if it isn't numbers, else the table's first |
+| `y`          | the series columns                                           | every number column in the range but `x` |
 | `title`      | text above the chart                                          | none |
 | `colors`     | palette names, one per series (pie: per slice)                | `blue peach green pink yellow …` |
+| `size`       | width and height in drawing units, 240–2400 × 160–1600         | `640 400` |
 | `stroke`     | line and area thickness: `xs s m l xl`                        | `m` |
 | `background` | `none` or a palette colour (a soft tint)                      | `none` |
 | `border`     | `none` or a palette colour                                    | `none` |
@@ -62,8 +64,12 @@ called A, B, C…
 - **Chart | Source**: the chart with a settings panel (type, table, columns
   and colours, labels, axes, style). Every change rewrites only its line, as
   one undo step. Text fields redraw as you type and save on Enter or leaving.
-- **Add chart** in a table's toolbar makes `name.chart` next to it, on the
-  selected columns (one cell or column selected: all number columns).
+- **Add chart** in a table's toolbar, or **Create chart from range** in its
+  right-click menu, makes `name.chart` next to it with the selection as
+  `range` (one cell: the whole table). Sorted or filtered, the range runs from
+  the selection's first to its last row in the file.
+- Drag the chart's bottom-right corner to resize it (snaps to 10), or type
+  the size in Style.
 - **New chart** (New menus, palette, folder menu) starts with sample rows.
 - Moving or renaming the table rewrites `data`; the table's menu lists the
   chart under **Used in**.
